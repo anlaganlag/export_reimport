@@ -1,0 +1,20 @@
+Original Packing List Structure:
+Columns: ['Sr NO\n(序列号)', 'P/N.                                  （系统料号 ）', '供应商', '项目名称', '工厂(Daman/Silvassa)', 'end use', 'HScode', '清关英文货描（关务提供）', '报关中文品名', 'DESCRIPTION\n(系统英文品名）', '开票名称', '物料名称', 'MODEL                                   （货物型号\n（与实物相符)', 'QUANTITY \n（数量）', '单位', 'Carton\nMEASUREMENT (外箱尺寸CM）', '体积（CBM）', '总体积', '单件毛重', 'G.W（KG)\n总毛重', '单件净重', 'N.W  (KG)\n总净重', '整箱数量', '件数', 'CTN NO.\n(箱号)', '(栈板尺寸）(mm*mm*mm)', 'Pallet No\n(栈板号)', '出口报关方式', '采购单位\n（智乐/UC/客供/供应商赠送/系统外订单）', '不含税单价（RMB）', '开票税率', 'UNIT \n（单位中文-开票）', '材质', '用途', '功能/原理\n（如是设备，需提供）', '中文品牌名(与实际包装相符）', '外文品牌名(与实际包装相符）', '品牌类型', 'Unnamed: 38']
+
+First few rows:
+   Sr NO\n(序列号) P/N.                                  （系统料号 ）  ... 品牌类型 Unnamed: 38
+0           NaN                                           NaN  ...  NaN         NaN
+1           1.0                            C100.C05-032-04-00  ...  NaN         NaN
+2           2.0                                E100.020310008  ...  NaN         NaN
+3           3.0                                E100.020310014  ...  NaN         NaN
+4           4.0                                E100.020310015  ...  NaN         NaN
+
+[5 rows x 39 columns]
+
+
+Policy File Structure:
+Columns: ['生效日期', '总重量(KG)', '总运费(RMB)', '运费(KG)', '加价率', '保险费率', '保险系数', '汇率(RMB/美元)']
+
+All rows:
+       生效日期  总重量(KG)  总运费(RMB)    运费(KG)   加价率    保险费率  保险系数  汇率(RMB/美元)
+0  2025.4.1  3156.66   6339.01  2.008138  0.05  0.0005   1.1    0.139276
