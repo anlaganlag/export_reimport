@@ -384,7 +384,7 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
     
     # Calculate total cost (采购总价) for each row and sum
     result_df['采购总价'] = result_df['Unit Price'] * result_df['Qty'] 
-    total_cost = result_df['采购总价'].sum()
+    total_cost =  (result_df['Unit Price'] * result_df['Qty'] ).sum()
     
     # Summary statistics
     print(f"\nSummary statistics:")
