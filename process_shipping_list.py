@@ -378,14 +378,21 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
     result_df['Unit Price'] = result_df['Unit Price'].fillna(0)
     
     # Calculate total net weightf
+    net_weight = result_df['net weight']
     total_net_weight = result_df['net weight'].sum()
-    total_qty = result_df['Qty'].sum()
 
     
     # Calculate total cost (采购总价) for each row and sum
     result_df['采购总价'] = result_df['Unit Price'] * result_df['Qty'] 
-    total_cost =  (result_df['Unit Price'] * result_df['Qty'] ).sum()
-    
+    total_amount =  result_df['采购总价'].sum()
+    #总价加价就是总价FOB
+    totalFOB = total_amount * (1 + markup_percentage)
+    # 总CIF = 总价FOB+总保费+总运费(policy表上传)
+    totalCIF = totalFOB(1+insurance_coefficient*insurance_rate)+total_freight_amount
+    # 每公斤净重CIF
+    cif_per_kg = totalCIF / total_net_weight
+    # 每行数据净重*每公斤净重CIF = 该行数据CIF总价
+    unit_cif = cif_per_kg * net_weight
     # Summary statistics
     print(f"\nSummary statistics:")
     print(f"  Total items: {len(result_df)}")
