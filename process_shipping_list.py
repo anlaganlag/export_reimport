@@ -330,7 +330,13 @@ def process_shipping_list(packing_list_file, policy_file):
     # Fill in the unit column if it exists
     result_df['单位'] = result_df['Unit'] if 'Unit' in result_df.columns else ""
     
-    # Filter and reorganize columns according to the required format from 1.py
+    # Calculate USD unit price
+    result_df['Unit Price'] = result_df['Unit Price'] * exchange_rate
+
+    # Calculate Amount as Unit Price multiplied by Quantity
+    result_df['Amount'] = result_df['Unit Price'] * result_df['Qty'] 
+
+    # Ensure Amount is included in the output columns
     output_columns = [
         'NO.', 'Material code', 'DESCRIPTION', 'Model NO.', 'Unit Price', 'Qty', 'Unit', 'Amount',
         'net weight', '采购单价', '采购总价', 'FOB单价', 'FOB总价', '保费', '运费', '每公斤摊的运保费',
