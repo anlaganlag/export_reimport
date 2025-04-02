@@ -1,6 +1,7 @@
 import pandas as pd
 import os
 import time
+import argparse
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Alignment, Font, Border, Side, PatternFill, Color
 from openpyxl.utils import get_column_letter
@@ -223,7 +224,7 @@ def print_column_mappings(mappings):
     print(f"\nFound {found_count} out of {expected_count} expected column mappings ({100*found_count/expected_count:.1f}%)")
 
 # Main function to process the shipping list
-def process_shipping_list(packing_list_file, policy_file):
+def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
     # Read the input files
     packing_list_df = read_excel_file(packing_list_file)
     policy_df = read_excel_file(policy_file)
@@ -265,6 +266,9 @@ def process_shipping_list(packing_list_file, policy_file):
     factory_col = find_column_with_pattern(packing_list_df, ['factory', '工厂', 'daman/silvass'], 'factory')
     project_col = find_column_with_pattern(packing_list_df, ['project', '项目名称', '项目'], 'project')
     end_use_col = find_column_with_pattern(packing_list_df, ['end use', '用途'], 'end use')
+    
+    # 查找贸易类型列
+    trade_type_col = find_column_with_pattern(packing_list_df, ['出口报关方式', '贸易方式', 'trade type'], 'Trade Type')
     
     # Map found columns to result DataFrame
     if sr_no_col:
@@ -314,8 +318,49 @@ def process_shipping_list(packing_list_file, policy_file):
         result_df['end use'] = packing_list_df[end_use_col]
         column_mappings['end use'] = end_use_col
     
+    # 添加贸易类型列
+    if trade_type_col:
+        result_df['Trade Type'] = packing_list_df[trade_type_col]
+        column_mappings['Trade Type'] = trade_type_col
+    else:
+        # 如果找不到贸易类型列，尝试分析出口报关方式列
+        report_type_col = find_column_with_pattern(packing_list_df, ['出口报关方式'], '出口报关方式')
+        if report_type_col:
+            result_df['Trade Type'] = packing_list_df[report_type_col]
+            column_mappings['Trade Type'] = report_type_col
+        else:
+            print("WARNING: 无法确定贸易类型，默认将所有物料视为一般贸易处理")
+            result_df['Trade Type'] = '一般贸易'  # 默认为一般贸易
+    
     # Print found mappings for debugging
     print_column_mappings(column_mappings)
+    
+    # 检查贸易类型
+    # 确定每行的贸易类型（一般贸易或买单）
+    def determine_trade_type(row_type):
+        if pd.isna(row_type):
+            return '一般贸易'  # 如果为空，默认为一般贸易
+        
+        row_type_str = str(row_type).strip().lower()
+        if '买单' in row_type_str :
+            return '买单贸易'
+        else:
+            return '一般贸易'
+    
+    # 应用贸易类型判断
+    result_df['Trade Type'] = result_df['Trade Type'].apply(determine_trade_type)
+    
+    # 统计两种贸易类型的数量
+    general_trade_count = (result_df['Trade Type'] == '一般贸易').sum()
+    purchase_trade_count = (result_df['Trade Type'] == '买单贸易').sum()
+    print(f"\n贸易类型统计：")
+    print(f"  一般贸易物料数量: {general_trade_count}")
+    print(f"  买单贸易物料数量: {purchase_trade_count}")
+    
+    # 设置发货人信息 Shipper
+    result_df['Shipper'] = result_df['Trade Type'].apply(
+        lambda x: '创想(创想-PCT)' if x == '一般贸易' else 'Unicair(UC-PCT)'
+    )
     
     # If Amount column is missing, set to None
     if 'Amount' not in result_df.columns:
@@ -385,7 +430,7 @@ def process_shipping_list(packing_list_file, policy_file):
     # Ensure Amount is included in the output columns
     cif_output_columns = [
         'NO.', 'Material code', 'DESCRIPTION', 'Model NO.', 'Unit Price', 'Qty', 'Unit', 'Amount',
-        'net weight', '采购单价', '采购总价', 'FOB单价', 'FOB总价', '总保费', '运费', '每公斤摊的运保费',
+        'net weight', '采购单价', '采购总价', 'FOB单价', 'FOB总价', '总保费', '总运费', '每公斤摊的运保费',
         '该项对应的运保费', 'CIF总价(FOB总价+运保费)', 'CIF单价', '单价USD数值', '单位',
         'factory', 'project', 'end use'
     ]
@@ -395,20 +440,23 @@ def process_shipping_list(packing_list_file, policy_file):
         'NO.', 'Material code', 'DESCRIPTION', 'Model NO.', 'Unit Price', 'Qty', 'Unit', 'Amount'
     ]
     
+    # 内部计算需要的完整列集合（包含Trade Type和Shipper）
+    internal_columns = cif_output_columns + ['Trade Type', 'Shipper']
+    
     # Ensure all required columns exist
-    for col in cif_output_columns:
+    for col in internal_columns:
         if col not in result_df.columns:
             result_df[col] = None
     
-    # Reindex the dataframe to match the required column order
-    result_df = result_df.reindex(columns=cif_output_columns)
+    # Reindex the dataframe to match the required column order for internal processing
+    result_df = result_df.reindex(columns=internal_columns)
     
     # Drop rows with no material code or all NaN values
     result_df = result_df.dropna(subset=['Material code'], how='all')
     result_df = result_df.dropna(how='all')
     
     # Apply formatting to numeric columns
-    numeric_columns = ['采购单价', '采购总价', 'FOB单价', 'FOB总价', '保费', '运费', 
+    numeric_columns = ['采购单价', '采购总价', 'FOB单价', 'FOB总价', '总保费', '总运费', 
                       '每公斤摊的运保费', '该项对应的运保费', 'CIF总价(FOB总价+运保费)', 
                       'CIF单价', '单价USD数值']
     
@@ -418,44 +466,117 @@ def process_shipping_list(packing_list_file, policy_file):
     
     # Generate the intermediate CIF invoice file (CIF原始发票)
     cif_invoice = result_df.copy()
-    cif_file_path = 'outputs/cif_original_invoice.xlsx'
+    
+    # Remove Trade Type and Shipper columns before saving
+    if 'Trade Type' in cif_invoice.columns:
+        cif_invoice = cif_invoice.drop(columns=['Trade Type'])
+    if 'Shipper' in cif_invoice.columns:
+        cif_invoice = cif_invoice.drop(columns=['Shipper'])
+        
+    cif_file_path = os.path.join(output_dir, 'cif_original_invoice.xlsx')
     
     # Save CIF invoice
     safe_save_to_excel(cif_invoice, cif_file_path)
     
-    # Generate the export invoice - merge items by Material code and update Qty and Amount
-    # First, create a copy with only the required columns
-    export_invoice = result_df[exportReimport_output_columns].copy()
+    # 提取一般贸易的物料
+    general_trade_df = result_df[result_df['Trade Type'] == '一般贸易'].copy()
     
-    # Group by Material code, DESCRIPTION, Model NO., Unit Price, and Unit to merge entries
-    # This combines items with the same material code and price
-    export_grouped = export_invoice.groupby(['Material code', 'DESCRIPTION', 'Model NO.', 'Unit Price', 'Unit'], as_index=False).agg({
-        'Qty': 'sum',
-        'NO.': 'first' # Keep the first item number
-    })
-    
-    # Recalculate Amount based on grouped quantities
-    export_grouped['Amount'] = export_grouped['Unit Price'] * export_grouped['Qty']
-    
-    # Ensure all required columns exist
-    for col in exportReimport_output_columns:
-        if col not in export_grouped.columns:
-            export_grouped[col] = None
-    
-    # Reindex to match the required column order
-    export_grouped = export_grouped.reindex(columns=exportReimport_output_columns)
-    
-    # Sort by NO. to maintain original ordering
-    export_grouped = export_grouped.sort_values('NO.')
-    
-    # Reset the index to generate sequential numbers
-    export_grouped = export_grouped.reset_index(drop=True)
-    export_grouped['NO.'] = export_grouped.index + 1
-    
-    export_file_path = 'outputs/export_invoice.xlsx'
-    
-    # Save export invoice
-    safe_save_to_excel(export_grouped, export_file_path)
+    # 只有在存在一般贸易物料时才生成出口发票文件
+    if not general_trade_df.empty:
+        # Generate the export invoice with two sheets - packing list and commercial invoice
+        # First, create a copy for packing list (Sheet1)
+        packing_list = general_trade_df.copy()
+        
+        # Remove Trade Type and Shipper columns before saving to Excel
+        if 'Trade Type' in packing_list.columns:
+            packing_list = packing_list.drop(columns=['Trade Type'])
+        if 'Shipper' in packing_list.columns:
+            packing_list = packing_list.drop(columns=['Shipper'])
+        
+        # Create a copy for commercial invoice (Sheet2) - with only the required columns
+        export_invoice = general_trade_df[exportReimport_output_columns].copy()
+        
+        # Group by Material code, DESCRIPTION, Model NO., Unit Price, and Unit to merge entries
+        # This combines items with the same material code and price
+        export_grouped = export_invoice.groupby(['Material code', 'DESCRIPTION', 'Model NO.', 'Unit Price', 'Unit'], as_index=False).agg({
+            'Qty': 'sum',
+            'NO.': 'first' # Keep the first item number
+        })
+        
+        # Recalculate Amount based on grouped quantities
+        export_grouped['Amount'] = export_grouped['Unit Price'] * export_grouped['Qty']
+        
+        # Ensure all required columns exist
+        for col in exportReimport_output_columns:
+            if col not in export_grouped.columns:
+                export_grouped[col] = None
+        
+        # Reindex to match the required column order
+        export_grouped = export_grouped.reindex(columns=exportReimport_output_columns)
+        
+        # Sort by NO. to maintain original ordering
+        export_grouped = export_grouped.sort_values('NO.')
+        
+        # Reset the index to generate sequential numbers
+        export_grouped = export_grouped.reset_index(drop=True)
+        export_grouped['NO.'] = export_grouped.index + 1
+
+        # Save both sheets to the same Excel file
+        export_file_path = os.path.join(output_dir, 'export_invoice.xlsx')
+        
+        # Create a new Excel writer
+        with pd.ExcelWriter(export_file_path, engine='openpyxl') as writer:
+            # Write the packing list to Sheet1
+            packing_list.to_excel(writer, sheet_name='Packing List', index=False)
+            
+            # Write the commercial invoice to Sheet2
+            export_grouped.to_excel(writer, sheet_name='Commercial Invoice', index=False)
+        
+        # Apply styling to both sheets
+        try:
+            # Load the workbook
+            wb = load_workbook(export_file_path)
+            
+            # Style each sheet
+            for sheet_name in wb.sheetnames:
+                ws = wb[sheet_name]
+                
+                # Define styles
+                header_font = Font(name='Arial', size=11, bold=True, color='FFFFFF')
+                header_fill = PatternFill(start_color='366092', end_color='366092', fill_type='solid')
+                header_alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+                
+                # Apply styling to headers
+                for col_idx, col in enumerate(ws[1], 1):
+                    col.font = header_font
+                    col.fill = header_fill
+                    col.alignment = header_alignment
+                    
+                    # Set column width
+                    ws.column_dimensions[get_column_letter(col_idx)].width = 15
+                
+                # Apply borders to all cells
+                thin_border = Border(
+                    left=Side(style='thin'),
+                    right=Side(style='thin'),
+                    top=Side(style='thin'),
+                    bottom=Side(style='thin')
+                )
+                
+                for row in ws.iter_rows():
+                    for cell in row:
+                        cell.border = thin_border
+                
+                # Freeze the header row
+                ws.freeze_panes = 'A2'
+            
+            # Save the styled workbook
+            wb.save(export_file_path)
+            print(f"Successfully saved and styled export file with multiple sheets: {export_file_path}")
+        except Exception as e:
+            print(f"Warning: File saved but could not apply styling: {e}")
+    else:
+        print("没有一般贸易的物料，不生成出口发票文件")
     
     # Generate reimport invoices by factory - using only required columns, no grouping needed
     factories = result_df['factory'].dropna().unique()
@@ -465,7 +586,13 @@ def process_shipping_list(packing_list_file, policy_file):
             # Select only required columns for reimport invoice
             factory_df = factory_df[exportReimport_output_columns].copy()
             
-            factory_file_path = f'outputs/reimport_invoice_factory_{factory}.xlsx'
+            # Ensure Trade Type and Shipper are not included
+            if 'Trade Type' in factory_df.columns:
+                factory_df = factory_df.drop(columns=['Trade Type'])
+            if 'Shipper' in factory_df.columns:
+                factory_df = factory_df.drop(columns=['Shipper'])
+                
+            factory_file_path = os.path.join(output_dir, f'reimport_invoice_factory_{factory}.xlsx')
             
             # Save factory invoice
             safe_save_to_excel(factory_df, factory_file_path)
@@ -474,18 +601,59 @@ def process_shipping_list(packing_list_file, policy_file):
 
 # Run the process
 if __name__ == "__main__":
-    packing_list_file = 'testfiles/original_packing_list.xlsx'
-    policy_file = 'testfiles/policy.xlsx'
+    # Set up command line argument parsing
+    parser = argparse.ArgumentParser(description='处理装运清单并生成出口和复进口发票')
+    
+    parser.add_argument('--packing-list', type=str, default='testfiles/original_packing_list.xlsx',
+                      help='原始装箱单文件路径 (默认: testfiles/original_packing_list.xlsx)')
+    
+    parser.add_argument('--policy', type=str, default='testfiles/policy.xlsx',
+                      help='政策文件路径 (默认: testfiles/policy.xlsx)')
+    
+    parser.add_argument('--output-dir', type=str, default='outputs',
+                      help='输出目录 (默认: outputs)')
+    
+    args = parser.parse_args()
+    
+    # Create output directory if it doesn't exist
+    if not os.path.exists(args.output_dir):
+        try:
+            os.makedirs(args.output_dir)
+            print(f"Created output directory: {args.output_dir}")
+        except Exception as e:
+            print(f"Error creating output directory: {e}")
+            raise
+    
+    # Get file paths from arguments
+    packing_list_file = args.packing_list
+    policy_file = args.policy
     
     try:
-        result = process_shipping_list(packing_list_file, policy_file)
-        print(f"Processing complete. Output files saved to the 'outputs' directory.")
+        # Verify input files exist
+        if not os.path.exists(packing_list_file):
+            raise FileNotFoundError(f"原始装箱单文件不存在: {packing_list_file}")
+        
+        if not os.path.exists(policy_file):
+            raise FileNotFoundError(f"政策文件不存在: {policy_file}")
+        
+        result = process_shipping_list(packing_list_file, policy_file, args.output_dir)
+        print(f"处理完成！输出文件已保存到 '{args.output_dir}' 目录。")
+    except FileNotFoundError as e:
+        print(f"错误: {e}")
     except Exception as e:
-        print(f"Error processing files: {e}")
+        print(f"处理文件时出错: {e}")
         import traceback
         traceback.print_exc()
-        # Print the column names for debugging
-        policy_df = read_excel_file(policy_file)
-        print("Available policy columns:", list(policy_df.columns))
-        packing_list_df = read_excel_file(packing_list_file)
-        print("Available packing list columns:", list(packing_list_df.columns))
+        
+        # 打印列名进行调试
+        try:
+            policy_df = read_excel_file(policy_file)
+            print("可用的政策列名:", list(policy_df.columns))
+        except:
+            print("无法读取政策文件")
+            
+        try:
+            packing_list_df = read_excel_file(packing_list_file)
+            print("可用的装箱单列名:", list(packing_list_df.columns))
+        except:
+            print("无法读取装箱单文件")
