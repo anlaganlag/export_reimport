@@ -6,9 +6,14 @@ from openpyxl.styles import Alignment, Font, Border, Side, PatternFill, Color
 from openpyxl.utils import get_column_letter
 from openpyxl.utils.dataframe import dataframe_to_rows
 
-# Ensure the outputs directory exists
+# Make sure outputs directory exists
 if not os.path.exists('outputs'):
-    os.makedirs('outputs')
+    try:
+        os.makedirs('outputs')
+        print("Created outputs directory")
+    except Exception as e:
+        print(f"Error creating outputs directory: {e}")
+        raise
 
 # Function to read Excel files
 def read_excel_file(file_path):
@@ -107,7 +112,7 @@ def apply_excel_styling(file_path):
 def add_summary_row(df, file_path):
     """Add a summary row to the Excel file and save."""
     # Calculate totals for numeric columns
-    numeric_cols = ['Qty', 'net weight', '采购总价', 'FOB总价', '保费', '运费', '该项对应的运保费', 'CIF总价(FOB总价+运保费)']
+    numeric_cols = ['Qty', 'net weight', '采购总价', 'FOB总价', '总保费', '运费', '该项对应的运保费', 'CIF总价(FOB总价+运保费)', 'Amount']
     
     # Create a summary row
     summary = {}
@@ -123,18 +128,54 @@ def add_summary_row(df, file_path):
     
     # Write to Excel with retries to handle permission issues
     max_retries = 3
+    retry_delay = 2  # seconds
+    
     for attempt in range(max_retries):
         try:
             # Safe save to handle file access issues
             df_with_summary.to_excel(file_path, index=False)
-            break
+            # If we get here, the save was successful
+            return True
         except PermissionError:
             if attempt < max_retries - 1:
-                print(f"File {file_path} is locked. Retrying in 2 seconds... (Attempt {attempt+1}/{max_retries})")
-                time.sleep(2)
+                print(f"File {file_path} is locked. Retrying in {retry_delay} seconds... (Attempt {attempt+1}/{max_retries})")
+                time.sleep(retry_delay)
             else:
                 print(f"Could not save to {file_path} after {max_retries} attempts due to permission issues.")
+                print("Please close any applications that might have this file open.")
                 raise
+        except Exception as e:
+            print(f"Unexpected error while saving {file_path}: {e}")
+            raise
+
+# Function to safely save DataFrame to Excel
+def safe_save_to_excel(df, file_path, include_summary=True):
+    """Safely save DataFrame to Excel with proper error handling."""
+    try:
+        if include_summary:
+            # Add a summary row
+            add_summary_row(df, file_path)
+        else:
+            # Save directly without summary
+            df.to_excel(file_path, index=False)
+            
+        # Apply styling
+        try:
+            apply_excel_styling(file_path)
+            print(f"Successfully saved and styled: {file_path}")
+            return True
+        except Exception as e:
+            print(f"Warning: File saved but could not apply styling: {e}")
+            return True
+    except PermissionError as e:
+        print(f"Error: Could not save to {file_path} due to permission issues.")
+        print(f"Please close the file if it's open in another application.")
+        print(f"Error details: {e}")
+        return False
+    except Exception as e:
+        print(f"Error: Failed to save to {file_path}.")
+        print(f"Error details: {e}")
+        return False
 
 # Helper function to find columns with specific patterns
 def find_column_with_pattern(df, patterns, target_col_name=None):
@@ -342,20 +383,25 @@ def process_shipping_list(packing_list_file, policy_file):
     result_df['Amount'] = (result_df['Unit Price'] * result_df['Qty'] ).round(8)
 
     # Ensure Amount is included in the output columns
-    output_columns = [
+    cif_output_columns = [
         'NO.', 'Material code', 'DESCRIPTION', 'Model NO.', 'Unit Price', 'Qty', 'Unit', 'Amount',
         'net weight', '采购单价', '采购总价', 'FOB单价', 'FOB总价', '总保费', '运费', '每公斤摊的运保费',
         '该项对应的运保费', 'CIF总价(FOB总价+运保费)', 'CIF单价', '单价USD数值', '单位',
         'factory', 'project', 'end use'
     ]
+
+    # Ensure Amount is included in the output columns
+    exportReimport_output_columns = [
+        'NO.', 'Material code', 'DESCRIPTION', 'Model NO.', 'Unit Price', 'Qty', 'Unit', 'Amount'
+    ]
     
     # Ensure all required columns exist
-    for col in output_columns:
+    for col in cif_output_columns:
         if col not in result_df.columns:
             result_df[col] = None
     
     # Reindex the dataframe to match the required column order
-    result_df = result_df.reindex(columns=output_columns)
+    result_df = result_df.reindex(columns=cif_output_columns)
     
     # Drop rows with no material code or all NaN values
     result_df = result_df.dropna(subset=['Material code'], how='all')
@@ -370,45 +416,59 @@ def process_shipping_list(packing_list_file, policy_file):
         if col in result_df.columns:
             result_df[col] = result_df[col].round(2)
     
-    # Generate the export invoice with styling
-    export_invoice = result_df.copy()
+    # Generate the intermediate CIF invoice file (CIF原始发票)
+    cif_invoice = result_df.copy()
+    cif_file_path = 'outputs/cif_original_invoice.xlsx'
     
-    # Adjust column names for the output - renaming to 开票品名 to match Chinese context
-    # and meet user requirements
-    if '开票品名' in export_invoice.columns and 'DESCRIPTION' in export_invoice.columns:
-        # If both columns exist, drop one to avoid duplication
-        export_invoice.drop(columns=['开票品名'], inplace=True)
-        export_invoice.rename(columns={'DESCRIPTION': '开票品名'}, inplace=True)
-    elif 'DESCRIPTION' in export_invoice.columns:
-        # If only DESCRIPTION exists, rename it
-        export_invoice.rename(columns={'DESCRIPTION': '开票品名'}, inplace=True)
+    # Save CIF invoice
+    safe_save_to_excel(cif_invoice, cif_file_path)
+    
+    # Generate the export invoice - merge items by Material code and update Qty and Amount
+    # First, create a copy with only the required columns
+    export_invoice = result_df[exportReimport_output_columns].copy()
+    
+    # Group by Material code, DESCRIPTION, Model NO., Unit Price, and Unit to merge entries
+    # This combines items with the same material code and price
+    export_grouped = export_invoice.groupby(['Material code', 'DESCRIPTION', 'Model NO.', 'Unit Price', 'Unit'], as_index=False).agg({
+        'Qty': 'sum',
+        'NO.': 'first' # Keep the first item number
+    })
+    
+    # Recalculate Amount based on grouped quantities
+    export_grouped['Amount'] = export_grouped['Unit Price'] * export_grouped['Qty']
+    
+    # Ensure all required columns exist
+    for col in exportReimport_output_columns:
+        if col not in export_grouped.columns:
+            export_grouped[col] = None
+    
+    # Reindex to match the required column order
+    export_grouped = export_grouped.reindex(columns=exportReimport_output_columns)
+    
+    # Sort by NO. to maintain original ordering
+    export_grouped = export_grouped.sort_values('NO.')
+    
+    # Reset the index to generate sequential numbers
+    export_grouped = export_grouped.reset_index(drop=True)
+    export_grouped['NO.'] = export_grouped.index + 1
     
     export_file_path = 'outputs/export_invoice.xlsx'
     
-    # Add summary and save export invoice
-    add_summary_row(export_invoice, export_file_path)
+    # Save export invoice
+    safe_save_to_excel(export_grouped, export_file_path)
     
-    # Apply styling to the export invoice
-    try:
-        apply_excel_styling(export_file_path)
-    except Exception as e:
-        print(f"Warning: Could not apply styling to export invoice: {e}")
-    
-    # Generate reimport invoices by factory with styling
+    # Generate reimport invoices by factory - using only required columns, no grouping needed
     factories = result_df['factory'].dropna().unique()
     for factory in factories:
         factory_df = result_df[result_df['factory'] == factory].copy()
         if not factory_df.empty:
+            # Select only required columns for reimport invoice
+            factory_df = factory_df[exportReimport_output_columns].copy()
+            
             factory_file_path = f'outputs/reimport_invoice_factory_{factory}.xlsx'
             
-            # Add summary and save factory invoice
-            add_summary_row(factory_df, factory_file_path)
-            
-            # Apply styling to the factory invoice
-            try:
-                apply_excel_styling(factory_file_path)
-            except Exception as e:
-                print(f"Warning: Could not apply styling to {factory} invoice: {e}")
+            # Save factory invoice
+            safe_save_to_excel(factory_df, factory_file_path)
     
     return result_df
 

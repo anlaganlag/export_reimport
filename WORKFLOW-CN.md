@@ -27,12 +27,15 @@ graph TD
     PF --> |保险费率|CCIF
     CFOB --> |FOB原始发票|CCIF
     
+    %% 生成CIF原始发票
+    CCIF --> |CIF原始发票|CIFORG[CIF原始发票]
+    
     %% CIF到最终发票处理
-    CCIF --> |合并CIF原始发票|MERGE[合并CIF原始发票同类项]
+    CIFORG --> |合并CIF原始发票|MERGE[合并CIF原始发票同类项]
     MERGE --> EXP[最终出口发票]
 
     %% 拆分原始发票
-    CCIF --> |CIF原始发票|SI[按目的地拆分发票]
+    CIFORG --> |CIF原始发票|SI[按目的地拆分发票]
     OPL --> |目的地工厂|SI
     SI --> RIMP1[最终复进口发票1]
     SI --> RIMP2[最终复进口发票2]
@@ -41,10 +44,12 @@ graph TD
     classDef input fill:#e1f5fe,stroke:#01579b
     classDef process fill:#fff3e0,stroke:#e65100
     classDef output fill:#e8f5e9,stroke:#1b5e20
+    classDef highlight fill:#ffccbc,stroke:#bf360c,stroke-width:2px
     
     class OPL,PF input
-    class CFOB,CCIF,SI,CFEI,MIL2,MIL3,MIL4,MERGE process
-    class EXP,EXP1,RIMP1,RIMP2 output
+    class CFOB,CCIF,SI,MERGE process
+    class CIFORG highlight
+    class EXP,RIMP1,RIMP2 output
 ```
 
 ### 单个物料FOB价格计算详情
@@ -190,15 +195,20 @@ graph LR
 
 系统处理后生成以下Excel输出文件：
 
-1. **最终出口发票 (outputs/export_invoice.xlsx)**
-   - 合并后的CIF价格发票
-   - 包含所有物料的汇总信息
-   - 总金额和计算明细
+1. **CIF原始发票 (outputs/cif_original_invoice.xlsx)**
+   - 包含所有物料的CIF价格计算详情
+   - 包含全部计算字段，用于验证CIF价格计算是否正确
+   - 是生成出口发票和复进口发票的中间文件
 
-2. **最终复进口发票 (outputs/reimport_invoice_factory_*.xlsx)**
-   - 按目的地工厂拆分的发票
+2. **最终出口发票 (outputs/export_invoice.xlsx)**
+   - 合并CIF原始发票中相同物料代码(Material code)的项目
+   - 合并过程会更新数量(Qty)和总价(Amount)
+   - 包含简化字段集: NO., Material code, DESCRIPTION, Model NO., Unit Price, Qty, Unit, Amount
+
+3. **最终复进口发票 (outputs/reimport_invoice_factory_*.xlsx)**
+   - 直接从CIF原始发票按目的地工厂(factory)拆分，不合并项目
    - 每个目的地工厂对应一个独立的发票文件
-   - 包含该工厂相关物料的CIF价格和明细
+   - 包含简化字段集: NO., Material code, DESCRIPTION, Model NO., Unit Price, Qty, Unit, Amount
 
 ### 数据处理流程
 
@@ -212,11 +222,15 @@ graph TD
     Process --> CalcNW[计算总净重]
     Process --> FOB[FOB价格计算]
     Process --> CIF[CIF价格计算]
-    Process --> Split[发票拆分]
     
-    %% 输出文件
-    FOB --> Export[outputs/export_invoice.xlsx]
-    CIF --> Export
+    %% 生成CIF原始发票
+    CIF --> CIFORG[生成CIF原始发票]
+    
+    %% 处理CIF原始发票
+    CIFORG --> MERGE[合并同类项]
+    MERGE --> Export[outputs/export_invoice.xlsx]
+    
+    CIFORG --> Split[按工厂拆分]
     Split --> Reimport1[outputs/reimport_invoice_factory_A.xlsx]
     Split --> Reimport2[outputs/reimport_invoice_factory_B.xlsx]
     
@@ -224,10 +238,12 @@ graph TD
     classDef input fill:#e1f5fe,stroke:#01579b
     classDef process fill:#fff3e0,stroke:#e65100
     classDef output fill:#e8f5e9,stroke:#1b5e20
+    classDef highlight fill:#ffccbc,stroke:#bf360c,stroke-width:2px
     
     class PL,PF input
-    class Process,CalcNW,FOB,CIF,Split process
-    class Export,Reimport1,Reimport2,ReimportN output
+    class Process,CalcNW,FOB,CIF,MERGE,Split process
+    class CIFORG highlight
+    class Export,Reimport1,Reimport2 output
 ```
 
 ### 特别说明
