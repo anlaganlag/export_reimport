@@ -21,8 +21,8 @@ graph TD
     PF[政策文件] --> |加价百分比| CFOB
     
     %% FOB到CIF转换
-    PF --> |单批次总净重|CCIF[计算CIF价格]
-    PF --> |单批次总运费|CCIF
+    OPL --> |计算装运物料总净重|CCIF[计算CIF价格]
+    PF --> |总运费金额|CCIF
     PF --> |汇率|CCIF
     PF --> |保险费率|CCIF
     CFOB --> |FOB原始发票|CCIF
@@ -113,7 +113,7 @@ graph LR
     ÷
     总净重
     (人民币/公斤)"]
-    OPL[原始装箱单] --> |总净重|UFR
+    OPL[原始装箱单] --> |计算得到的总净重|UFR
     
     %% 单个物料运费的输入值
     OPL[原始装箱单] --> |单个物料净重|PFC["计算单个物料运费
@@ -176,6 +176,7 @@ graph LR
    - 包含物料编号、描述、单价、数量、净重
    - 每个物料的目的地工厂信息
    - 物料规格和包装信息
+   - **重要说明**: 总净重从装箱单中每个物料的净重汇总计算得出，而不是从政策文件获取
 
 2. **政策文件 (testfiles/policy.xlsx)**
    - 加价百分比设置
@@ -183,6 +184,7 @@ graph LR
    - 汇率信息
    - 运费总金额
    - 其他计算参数
+   - **注意**: 虽然政策文件可能包含总净重字段，但实际计算中使用的是从装箱单计算得出的总净重
 
 ### 输出文件
 
@@ -207,6 +209,7 @@ graph TD
     PF[testfiles/policy.xlsx] --> Process
     
     %% 处理步骤
+    Process --> CalcNW[计算总净重]
     Process --> FOB[FOB价格计算]
     Process --> CIF[CIF价格计算]
     Process --> Split[发票拆分]
@@ -223,30 +226,10 @@ graph TD
     classDef output fill:#e8f5e9,stroke:#1b5e20
     
     class PL,PF input
-    class Process,FOB,CIF,Split process
+    class Process,CalcNW,FOB,CIF,Split process
     class Export,Reimport1,Reimport2,ReimportN output
 ```
 
-### 测试文件格式要求
+### 特别说明
 
-#### 原始装箱单 (original_packing_list.xlsx)
-- **物料信息表**: 包含物料编号、描述、规格等基本信息
-- **价格信息表**: 包含单价、数量、净重等计算所需数据
-- **目的地信息表**: 标明每个物料的目的地工厂代码
-
-#### 政策文件 (policy.xlsx)
-- **加价政策表**: 不同类型物料的加价百分比
-- **费率表**: 保险费率、运费计算参数
-- **汇率表**: 不同货币的汇率信息
-
-### 输出文件格式说明
-
-#### 出口发票 (export_invoice.xlsx)
-- 包含所有物料的FOB和CIF价格
-- 汇总的总金额和各项费用明细
-- 按物料类型分类的统计信息
-
-#### 复进口发票 (reimport_invoice_factory_*.xlsx)
-- 每个目的地工厂的专属发票
-- 仅包含该工厂相关的物料信息
-- 该工厂物料的CIF价格和费用明细
+本系统在计算运费分摊时，使用从装箱单中汇总计算的总净重，而不是政策文件中可能提供的预设总净重。这确保了运费分摊基于实际装运物料的准确净重。

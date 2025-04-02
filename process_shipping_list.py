@@ -41,8 +41,8 @@ def apply_excel_styling(file_path):
         '采购总价': 12,
         'FOB单价': 12,
         'FOB总价': 12,
-        '保费': 10,
-        '运费': 10,
+        '总保费': 10,
+        '总运费': 10,
         '每公斤摊的运保费': 18,
         '该项对应的运保费': 18,
         'CIF总价(FOB总价+运保费)': 20,
@@ -74,7 +74,7 @@ def apply_excel_styling(file_path):
             col_name = ws.cell(row=1, column=col_idx).value
             
             # Apply cell styling based on column type
-            if col_name in ['FOB单价', 'FOB总价', 'CIF单价', 'CIF总价(FOB总价+运保费)', '采购单价', '采购总价', '保费', '运费', '每公斤摊的运保费', '该项对应的运保费', '单价USD数值']:
+            if col_name in ['FOB单价', 'FOB总价', 'CIF单价', 'CIF总价(FOB总价+运保费)', '采购单价', '采购总价', '总保费', '总运费', '每公斤摊的运保费', '该项对应的运保费', '单价USD数值']:
                 cell.number_format = '#,##0.00'
                 cell.alignment = Alignment(horizontal='right')
             elif col_name in ['Qty', 'net weight']:
@@ -291,7 +291,12 @@ def process_shipping_list(packing_list_file, policy_file):
     result_df['Qty'] = result_df['Qty'].fillna(0)
     result_df['Unit Price'] = result_df['Unit Price'].fillna(0)
     
+    # Calculate total net weightf
     total_net_weight = result_df['net weight'].sum()
+    
+    # Calculate total cost (采购总价) for each row and sum
+    result_df['采购总价'] = result_df['Unit Price'] * result_df['Qty'] 
+    total_cost = result_df['采购总价'].sum()
     
     # Summary statistics
     print(f"\nSummary statistics:")
@@ -311,14 +316,14 @@ def process_shipping_list(packing_list_file, policy_file):
     result_df['FOB总价'] = result_df['FOB单价'] * result_df['Qty']
     
     # Calculate insurance fee for each item
-    result_df['保费'] = result_df['FOB单价'] * insurance_coefficient * insurance_rate
+    result_df['总保费'] = total_cost * insurance_coefficient * insurance_rate
     
     # Calculate freight for each item
-    result_df['每公斤摊的运保费'] = unit_freight_rate
-    result_df['运费'] = result_df['net weight'] * unit_freight_rate
+    result_df['总运费'] = total_freight_amount
+    result_df['每公斤摊的运保费'] = (result_df['总保费'] + total_freight_amount) / total_net_weight
     
     # Calculate total insurance and freight cost for each item
-    result_df['该项对应的运保费'] = result_df['运费'] + (result_df['保费'] * result_df['Qty'])
+    result_df['该项对应的运保费'] = result_df['每公斤摊的运保费'] * result_df['net weight']
     
     # Calculate CIF price for each item
     result_df['CIF总价(FOB总价+运保费)'] = result_df['FOB总价'] + result_df['该项对应的运保费']
@@ -331,15 +336,15 @@ def process_shipping_list(packing_list_file, policy_file):
     result_df['单位'] = result_df['Unit'] if 'Unit' in result_df.columns else ""
     
     # Calculate USD unit price
-    result_df['Unit Price'] = result_df['Unit Price'] * exchange_rate
+    result_df['Unit Price'] = (result_df['Unit Price'] * exchange_rate).round(8)
 
     # Calculate Amount as Unit Price multiplied by Quantity
-    result_df['Amount'] = result_df['Unit Price'] * result_df['Qty'] 
+    result_df['Amount'] = (result_df['Unit Price'] * result_df['Qty'] ).round(8)
 
     # Ensure Amount is included in the output columns
     output_columns = [
         'NO.', 'Material code', 'DESCRIPTION', 'Model NO.', 'Unit Price', 'Qty', 'Unit', 'Amount',
-        'net weight', '采购单价', '采购总价', 'FOB单价', 'FOB总价', '保费', '运费', '每公斤摊的运保费',
+        'net weight', '采购单价', '采购总价', 'FOB单价', 'FOB总价', '总保费', '运费', '每公斤摊的运保费',
         '该项对应的运保费', 'CIF总价(FOB总价+运保费)', 'CIF单价', '单价USD数值', '单位',
         'factory', 'project', 'end use'
     ]
