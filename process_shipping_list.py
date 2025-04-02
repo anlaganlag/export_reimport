@@ -113,7 +113,7 @@ def apply_excel_styling(file_path):
 def add_summary_row(df, file_path):
     """Add a summary row to the Excel file and save."""
     # Calculate totals for numeric columns
-    numeric_cols = ['Qty', 'net weight', '采购总价', 'FOB总价', '总保费', '运费', '该项对应的运保费', 'CIF总价(FOB总价+运保费)', 'Amount']
+    numeric_cols = ['Qty', 'net weight', '采购总价', 'FOB总价', 'CIF总价(FOB总价+运保费)', 'Amount']
     
     # Create a summary row
     summary = {}
@@ -262,7 +262,7 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
     unit_price_col = find_column_with_pattern(packing_list_df, ['单价', 'unit price', 'price', '不含税单价'], 'Unit Price')
     qty_col = find_column_with_pattern(packing_list_df, ['qty', 'quantity', '数量'], 'Qty')
     unit_col = find_column_with_pattern(packing_list_df, ['unit', '单位', '单位中文'], 'Unit')
-    net_weight_col = find_column_with_pattern(packing_list_df, ['net weight', '净重', 'n.w', '总净重', '单件净重'], 'net weight')
+    net_weight_col = find_column_with_pattern(packing_list_df, ['net weight', 'N.W  (KG)总净重', 'n.w', '总净重', 'N.W  (KG)总净重'], 'net weight')
     factory_col = find_column_with_pattern(packing_list_df, ['factory', '工厂', 'daman/silvass'], 'factory')
     project_col = find_column_with_pattern(packing_list_df, ['project', '项目名称', '项目'], 'project')
     end_use_col = find_column_with_pattern(packing_list_df, ['end use', '用途'], 'end use')
@@ -379,6 +379,8 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
     
     # Calculate total net weightf
     total_net_weight = result_df['net weight'].sum()
+    total_qty = result_df['Qty'].sum()
+
     
     # Calculate total cost (采购总价) for each row and sum
     result_df['采购总价'] = result_df['Unit Price'] * result_df['Qty'] 
@@ -498,7 +500,7 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
         
         # Group by Material code, DESCRIPTION, Model NO., Unit Price, and Unit to merge entries
         # This combines items with the same material code and price
-        export_grouped = export_invoice.groupby(['Material code', 'DESCRIPTION', 'Model NO.', 'Unit Price', 'Unit'], as_index=False).agg({
+        export_grouped = export_invoice.groupby(['Material code', 'Unit Price', ], as_index=False).agg({
             'Qty': 'sum',
             'NO.': 'first' # Keep the first item number
         })
