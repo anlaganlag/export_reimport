@@ -417,7 +417,14 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
     # 每行数据净重*每公斤净重CIF = 该行数据CIF价格
     unit_kg_cif = cif_per_kg * net_weight
 
-    result_df['CIF总价(FOB总价+运保费)'] =  (result_df['采购总价']*markup_percentage) * (1+insurance_coefficient*insurance_rate) + unit_kg_cif*net_weight
+        # Calculate FOB price for each item
+    result_df['采购单价'] = result_df['Unit Price']
+    result_df['采购总价'] = result_df['Unit Price'] * result_df['Qty']
+    result_df['FOB单价'] = result_df['Unit Price'] * (1 + markup_percentage)
+    result_df['FOB总价'] = result_df['FOB单价'] * result_df['Qty']
+
+
+    result_df['CIF总价(FOB总价+运保费)'] =  result_df['FOB总价']  + result_df['该项对应的运保费']
 
     result_df['CIF单价'] = result_df['CIF总价(FOB总价+运保费)'] / result_df['Qty'].replace(0, 1)
 
@@ -435,11 +442,7 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
     print(f"  Markup percentage: {markup_percentage*100:.1f}%")
     print(f"  Exchange rate: ¥{exchange_rate:.4f} per USD")
     
-    # Calculate FOB price for each item
-    result_df['采购单价'] = result_df['Unit Price']
-    result_df['采购总价'] = result_df['Unit Price'] * result_df['Qty']
-    result_df['FOB单价'] = result_df['Unit Price'] * (1 + markup_percentage)
-    result_df['FOB总价'] = result_df['FOB单价'] * result_df['Qty']
+
     
 
 
