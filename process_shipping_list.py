@@ -80,10 +80,10 @@ def apply_excel_styling(file_path):
             col_name = ws.cell(row=1, column=col_idx).value
             
             # Apply cell styling based on column type
-            if col_name in ['FOB单价', 'FOB总价', 'CIF单价', 'CIF总价(FOB总价+运保费)', '采购单价', '采购总价', '总保费', '总运费', '每公斤摊的运保费', '该项对应的运保费', '单价USD数值']:
+            if col_name in ['net weight','FOB单价', 'FOB总价', 'CIF单价', 'CIF总价(FOB总价+运保费)', '采购单价', '采购总价', '总保费', '总运费', '每公斤摊的运保费', '该项对应的运保费', '单价USD数值']:
                 cell.number_format = '#,##0.00'
                 cell.alignment = Alignment(horizontal='right')
-            elif col_name in ['Qty', 'net weight']:
+            elif col_name in ['Qty', ]:
                 cell.number_format = '#,##0'
                 cell.alignment = Alignment(horizontal='right')
             elif col_name in ['NO.']:
@@ -393,7 +393,7 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
     print(f"  总价FOB: ¥{totalFOB:.4f}")
 
 
-    total_insurance = total_amount * insurance_coefficient * insurance_rate
+    total_insurance = totalFOB * insurance_coefficient * insurance_rate
     result_df['总保费'] = total_insurance
     print(f"  总保费: ¥{total_insurance:.4f}")
 

@@ -243,9 +243,10 @@ graph LR
 2. **最终出口文件 (outputs/export_invoice.xlsx)** - **仅适用于一般贸易物料**
    - 包含两个工作表(Sheet):
      - **Sheet1 - 装箱单(Packing List)**: 包含一般贸易物料的完整装箱单信息
-     - **Sheet2 - 商业发票(Commercial Invoice)**: 合并一般贸易物料的CIF原始发票中相同物料代码的项目的商业发票
+     - **Sheet2 - 商业发票(Commercial Invoice)**: 合并一般贸易物料的CIF原始发票中相同物料代码和相同单价的项目的商业发票
    - 合并过程会更新数量(Qty)和总价(Amount)
    - 包含简化字段集: NO., Material code, DESCRIPTION, Model NO., Unit Price, Qty, Unit, Amount, Shipper
+   - **合并说明**: 对于发票来说，同物料编号(Material code)和同单价(Unit Price)的项目会被合并，与箱号(Box Number)无关
    - **注意**: 只有一般贸易物料会生成出口文件，发货人(Shipper)为"创想(创想-PCT)"
    - **如果没有一般贸易物料，则不会生成此文件**
 
@@ -310,7 +311,7 @@ graph TD
     
     %% 一般贸易物料 - 生成出口文件
     GeneralTrade --> GeneralTradeCheck[检查是否有一般贸易物料]
-    GeneralTradeCheck -->|Yes| MERGE[合并同类项]
+    GeneralTradeCheck -->|Yes| MERGE[合并同料号同价格的项目]
     MERGE --> Export[outputs/export_invoice.xlsx]
     GeneralTradeCheck -->|No| NoExport[不生成出口文件]
     
@@ -354,3 +355,8 @@ graph TD
    - 买单贸易：Unicair（UC-PCT）
 
 4. 如果原始装箱单中没有一般贸易的物料，系统将不会生成出口发票文件，只会生成复进口发票。
+
+5. 合并CIF原始发票同类项的规则：
+   - 合并依据是物料编号(Material code)和单价(Unit Price)相同
+   - 合并过程不考虑箱号(Box Number)，即使物料分布在不同箱子中，只要物料编号和单价相同，也会被合并
+   - 合并仅在生成商业发票(Commercial Invoice)时进行，装箱单(Packing List)保持原始记录不变
