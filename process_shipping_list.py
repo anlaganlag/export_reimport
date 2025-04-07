@@ -537,7 +537,11 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
         # This combines items with the same material code and price
         export_grouped = export_invoice.groupby(['Material code', 'Unit Price', ], as_index=False).agg({
             'Qty': 'sum',
-            'NO.': 'first' # Keep the first item number
+            'NO.': 'first',
+            'Unit': 'first',
+            'Model NO.': 'first',
+            'DESCRIPTION': 'first',
+
         })
         
         # Recalculate Amount based on grouped quantities
@@ -563,11 +567,31 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
         
         # Create a new Excel writer
         with pd.ExcelWriter(export_file_path, engine='openpyxl') as writer:
-            # Write the packing list to Sheet1
-            packing_list.to_excel(writer, sheet_name='Packing List', index=False)
+            # Packing List 工作表处理
+            packing_df = packing_list.copy()
+
             
-            # Write the commercial invoice to Sheet2
-            export_grouped.to_excel(writer, sheet_name='Commercial Invoice', index=False)
+            # 添加汇总行（需要根据实际列名调整）
+            
+            summary_packing = packing_df[['Qty', 'Amount', 'net weight','采购总价','FOB总价','该项对应的运保费','CIF总价(FOB总价+运保费)',]].sum()
+            packing_df = pd.concat([packing_df, summary_packing.to_frame().T], ignore_index=True)
+            packing_df.to_excel(writer, sheet_name='Packing List', index=False)
+
+            # Commercial Invoice 工作表处理
+            commercial_df = export_grouped.copy()
+            # 添加汇总行
+            summary_commercial = commercial_df[['Qty', 'Amount']].sum()
+            commercial_df = pd.concat([commercial_df, summary_commercial.to_frame().T], ignore_index=True)
+            commercial_df.to_excel(writer, sheet_name='Commercial Invoice', index=False)
+
+            # 确保至少一个工作表可见
+            workbook = writer.book
+            for sheet in workbook.worksheets:
+                sheet.sheet_state = "visible"  # 显式设置所有工作表可见
+            
+            # 设置默认打开第二个sheet
+            worksheet = workbook['Commercial Invoice']
+            workbook.active = workbook.index(worksheet)
         
         # Apply styling to both sheets
         try:
