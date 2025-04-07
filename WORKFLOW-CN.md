@@ -256,6 +256,9 @@ graph LR
      - **Sheet2 - 商业发票(Commercial Invoice)**: 合并一般贸易物料的CIF原始发票中相同物料代码和相同单价的项目的商业发票
    - 合并过程会更新数量(Qty)和总价(Amount)
    - 包含简化字段集: NO., Material code, DESCRIPTION, Model NO., Unit Price, Qty, Unit, Amount, Shipper
+   - **数值精度要求**:
+     - 单价(Unit Price): 保留6位小数
+     - 总价(Amount): 保留2位小数
    - **合并说明**: 对于发票来说，同物料编号(Material code)和同单价(Unit Price)的项目会被合并，与箱号(Box Number)无关
    - **注意**: 只有一般贸易物料会生成出口文件，发货人(Shipper)为"创想(创想-PCT)"
    - **如果没有一般贸易物料，则不会生成此文件**
