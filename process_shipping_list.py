@@ -631,6 +631,28 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
                 # Freeze the header row
                 ws.freeze_panes = 'A2'
             
+            # Apply number formatting to specific columns
+            unit_price_col = None
+            amount_col = None
+            
+            # Find the Unit Price and Amount column indices
+            for col_idx, cell in enumerate(ws[1], 1):
+                if cell.value == 'Unit Price':
+                    unit_price_col = col_idx
+                elif cell.value == 'Amount':
+                    amount_col = col_idx
+            
+            # Apply formatting to the entire column
+            if unit_price_col:
+                for row in range(2, ws.max_row + 1):  # Start from row 2 (skip header)
+                    cell = ws.cell(row=row, column=unit_price_col)
+                    cell.number_format = '#,##0.00'
+            
+            if amount_col:
+                for row in range(2, ws.max_row + 1):  # Start from row 2 (skip header)
+                    cell = ws.cell(row=row, column=amount_col)
+                    cell.number_format = '#,##0.00'
+            
             # Save the styled workbook
             wb.save(export_file_path)
             print(f"Successfully saved and styled export file with multiple sheets: {export_file_path}")
