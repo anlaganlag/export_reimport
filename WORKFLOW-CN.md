@@ -20,12 +20,6 @@
 
 ```mermaid
 graph TD
-    Title[CIIBER 原始装箱单
-     到出口/在进口发票流程图]
-```
-
-```mermaid
-graph TD
     %% 输入文件
     OPL[原始装箱单] --> |包含贸易类型信息|SPLIT[贸易类型拆分]
     SPLIT --> GT[一般贸易物料]
@@ -53,6 +47,10 @@ graph TD
     EXP --> |第一个Sheet|PL[装箱单]
     EXP --> |第二个Sheet|CI[商业发票]
     
+    %% 商品编码对照表输入和报关单生成
+    HSC[商品编码对照表] --> CD[生成报关单]
+    CI --> CD
+    
     %% 买单贸易流程
     BT --> CFOB_BT[计算单个物料FOB价格]
     PF --> |加价百分比| CFOB_BT
@@ -71,8 +69,16 @@ graph TD
     CIFORG_GT --> SI[按目的地拆分发票]
     CIFORG_BT --> SI
     OPL --> |目的地工厂|SI
-    SI --> RIMP1[最终复进口发票1]
-    SI --> RIMP2[最终复进口发票2]
+    
+    %% Daman工厂复进口发票
+    SI --> RIMP_D[Daman工厂复进口文件]
+    RIMP_D --> |第一个Sheet|RIMP_DPL[Daman装箱单]
+    RIMP_D --> |第二个Sheet|RIMP_DCI[Daman商业发票]
+    
+    %% Silvassa工厂复进口发票
+    SI --> RIMP_S[Silvassa工厂复进口文件]
+    RIMP_S --> |第一个Sheet|RIMP_SPL[Silvassa装箱单]
+    RIMP_S --> |第二个Sheet|RIMP_SCI[Silvassa商业发票]
 
     %% 样式
     classDef input fill:#e1f5fe,stroke:#01579b
@@ -82,11 +88,11 @@ graph TD
     classDef suboutput fill:#c8e6c9,stroke:#1b5e20
     classDef split fill:#b3e5fc,stroke:#0288d1,stroke-width:2px
     
-    class OPL,PF input
+    class OPL,PF,HSC input
     class CFOB_GT,CCIF_GT,CFOB_BT,CCIF_BT,SI,MERGE process
     class CIFORG_GT,CIFORG_BT highlight
-    class EXP,RIMP1,RIMP2 output
-    class PL,CI suboutput
+    class EXP,RIMP_D,RIMP_S,CD output
+    class PL,CI,RIMP_DPL,RIMP_DCI,RIMP_SPL,RIMP_SCI suboutput
     class SPLIT,GT,BT split
 ```
 
@@ -231,6 +237,10 @@ graph LR
    - 其他计算参数
    - **注意**: 虽然政策文件可能包含总净重字段，但实际计算中使用的是从装箱单计算得出的总净重
 
+3. **商品编码对照表 (testfiles/hs_code_mapping.xlsx)**
+   - 包含物料编号与海关商品编码的对应关系
+   - 用于生成报关单所需的商品编码信息
+
 ### 输出文件
 
 系统处理后生成以下Excel输出文件：
@@ -251,13 +261,21 @@ graph LR
    - **如果没有一般贸易物料，则不会生成此文件**
 
 3. **最终复进口发票 (outputs/reimport_invoice_factory_*.xlsx)**
-   - 直接从CIF原始发票按目的地工厂(factory)拆分，不合并项目
+   - 直接从CIF原始发票按目的地工厂(factory)拆分
    - 包含所有物料（一般贸易和买单贸易）
    - 每个目的地工厂对应一个独立的发票文件
+   - 每个文件包含两个工作表(Sheet):
+     - **Sheet1 - 装箱单(Packing List)**: 包含该工厂的完整装箱单信息
+     - **Sheet2 - 商业发票(Commercial Invoice)**: 包含该工厂的商业发票信息
    - 包含简化字段集: NO., Material code, DESCRIPTION, Model NO., Unit Price, Qty, Unit, Amount, Shipper
    - 发货人信息会根据原始装箱单中的贸易类型自动设置:
      - 一般贸易物料: 发货人为"创想(创想-PCT)"
      - 买单贸易物料: 发货人为"Unicair(UC-PCT)"
+
+4. **报关单文件 (outputs/customs_declaration.xlsx)** - **仅适用于一般贸易物料**
+   - 基于最终出口文件和商品编码对照表生成
+   - 包含海关所需的商品编码信息
+   - 用于办理出口报关手续
 
 ### 贸易类型识别机制
 
