@@ -206,6 +206,20 @@ def print_column_mappings(mappings):
         'NO.', 'Material code', 'DESCRIPTION', 'Model NO.', 'Unit Price', 'Qty', 'Unit', 
         'net weight', 'factory', 'project', 'end use'
     ]
+
+    pack_list_expected_columns = [
+        'Sr No.',
+        'P/N.',
+        'DESCRIPTION', 
+        'Model NO.',
+        'QUANTITY',
+        'CTNS',
+        'Carton MEASUREMENT',
+        'G.W (KG)',
+        'N.W(KG)',
+        'Carton NO.'
+    ]
+
     
     # Print the found mappings
     print("\nFound column mappings:")
@@ -237,6 +251,15 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
     for col in packing_list_df.columns:
         print(f"  {col}")
     
+    # Define packing list output columns - define this at the beginning so it's available everywhere
+    pl_output_columns = [
+        'Sr No.', 'P/N.', 'DESCRIPTION', 'Model NO.', 'QUANTITY', 'CTNS', 
+        'Carton MEASUREMENT', 'G.W (KG)', 'N.W(KG)', 'Carton NO.'
+    ]
+    
+    print("\nPacking List output columns defined:")
+    print(pl_output_columns)
+    
     # Extract policy parameters using correct column names
     markup_percentage = policy_df['加价率'].iloc[0]  # Markup percentage
     insurance_coefficient = policy_df['保险系数'].iloc[0]  # Insurance coefficient
@@ -247,33 +270,38 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
     # Clean up the column names for better handling
     packing_list_df.columns = [str(col).strip() for col in packing_list_df.columns]
     
-    # Create a new DataFrame for the processed data
+    # Create new DataFrames for the processed data
     result_df = pd.DataFrame()
+    pl_result_df = pd.DataFrame()
     
     # Keep track of mappings for debugging
     column_mappings = {}
     
     # Find key columns by pattern matching
     print("\nFinding column mappings...")
+    # Main invoice columns
     sr_no_col = find_column_with_pattern(packing_list_df, ['sr no', '序号', '序列号'], 'NO.')
     material_code_col = find_column_with_pattern(packing_list_df, ['p/n', '料号', 'material code', '系统料号'], 'Material code')
-    
-    # Use '开票名称' as the source for DESCRIPTION
     description_col = find_column_with_pattern(packing_list_df, ['开票名称', '开票品名'], 'DESCRIPTION')
-    
     model_col = find_column_with_pattern(packing_list_df, ['model', '型号', '物料型号', '货物型号'], 'Model NO.')
     unit_price_col = find_column_with_pattern(packing_list_df, ['单价', 'unit price', 'price', '不含税单价'], 'Unit Price')
     qty_col = find_column_with_pattern(packing_list_df, ['qty', 'quantity', '数量'], 'Qty')
     unit_col = find_column_with_pattern(packing_list_df, ['unit', '单位', '单位中文'], 'Unit')
-    net_weight_col = find_column_with_pattern(packing_list_df, ['net weight', 'N.W  (KG)总净重', 'n.w', '总净重', 'N.W  (KG)总净重'], 'net weight')
+    net_weight_col = find_column_with_pattern(packing_list_df, ['net weight', 'N.W  (KG)总净重', 'n.w', '总净重', 'N.W(KG)', 'N.W  (KG)总净重'], 'net weight')
+    gross_weight_col = find_column_with_pattern(packing_list_df, ['G.W（KG)\n总毛重','gross weight', 'G.W  (KG)总毛重', 'g.w', '总毛重', 'G.W (KG)', 'G.W  (KG)总毛重'], 'gross weight')
     factory_col = find_column_with_pattern(packing_list_df, ['factory', '工厂', 'daman/silvass'], 'factory')
     project_col = find_column_with_pattern(packing_list_df, ['project', '项目名称', '项目'], 'project')
     end_use_col = find_column_with_pattern(packing_list_df, ['end use', '用途'], 'end use')
     
-    # 查找贸易类型列
+    # Additional packing list columns
+    ctns_col = find_column_with_pattern(packing_list_df, ['ctns', '件数'], 'CTNS')
+    carton_measurement_col = find_column_with_pattern(packing_list_df, ['carton measurement', '总体积', 'measurement'], 'Carton MEASUREMENT')
+    carton_no_col = find_column_with_pattern(packing_list_df, ['carton no', '箱号', 'ctn no'], 'Carton NO.')
+    
+    # 贸易类型列
     trade_type_col = find_column_with_pattern(packing_list_df, ['出口报关方式', '贸易方式', 'trade type'], 'Trade Type')
     
-    # Map found columns to result DataFrame
+    # Map main invoice columns
     if sr_no_col:
         result_df['NO.'] = packing_list_df[sr_no_col]
         column_mappings['NO.'] = sr_no_col
@@ -282,9 +310,7 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
         result_df['Material code'] = packing_list_df[material_code_col]
         column_mappings['Material code'] = material_code_col
     
-    # Use '开票名称' for DESCRIPTION directly
     if description_col:
-        # Store the 开票名称 values in DESCRIPTION column
         result_df['DESCRIPTION'] = packing_list_df[description_col]
         column_mappings['DESCRIPTION'] = description_col
         print(f"Using '{description_col}' as the source for DESCRIPTION")
@@ -309,6 +335,11 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
         result_df['net weight'] = packing_list_df[net_weight_col]
         column_mappings['net weight'] = net_weight_col
     
+    if gross_weight_col:
+        result_df['gross weight'] = packing_list_df[gross_weight_col]
+        result_df['G.W (KG)'] = packing_list_df[gross_weight_col]  # Also add as G.W (KG)
+        column_mappings['gross weight'] = gross_weight_col
+    
     if factory_col:
         result_df['factory'] = packing_list_df[factory_col]
         column_mappings['factory'] = factory_col
@@ -321,72 +352,128 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
         result_df['end use'] = packing_list_df[end_use_col]
         column_mappings['end use'] = end_use_col
     
-    # 添加贸易类型列
+    # Map packing list columns
+    if sr_no_col:
+        pl_result_df['Sr No.'] = packing_list_df[sr_no_col]
+    
+    if material_code_col:
+        pl_result_df['P/N.'] = packing_list_df[material_code_col]
+    
+    if description_col:
+        pl_result_df['DESCRIPTION'] = packing_list_df[description_col]
+    
+    if model_col:
+        pl_result_df['Model NO.'] = packing_list_df[model_col]
+    
+    if qty_col:
+        pl_result_df['QUANTITY'] = packing_list_df[qty_col]
+    
+    if ctns_col:
+        pl_result_df['CTNS'] = packing_list_df[ctns_col]
+    else:
+        pl_result_df['CTNS'] = 1  # Default value if not found
+    
+    if carton_measurement_col:
+        pl_result_df['Carton MEASUREMENT'] = packing_list_df[carton_measurement_col]
+    else:
+        pl_result_df['Carton MEASUREMENT'] = ""  # Default empty value if not found
+    
+    if gross_weight_col:
+        pl_result_df['G.W (KG)'] = packing_list_df[gross_weight_col]
+    else:
+        pl_result_df['G.W (KG)'] = 0  # Default value if not found
+    
+    if net_weight_col:
+        pl_result_df['N.W(KG)'] = packing_list_df[net_weight_col]
+    else:
+        pl_result_df['N.W(KG)'] = 0  # Default value if not found
+    
+    if carton_no_col:
+        pl_result_df['Carton NO.'] = packing_list_df[carton_no_col]
+    else:
+        pl_result_df['Carton NO.'] = ""  # Default empty value if not found
+    
+    # Add Trade Type column
     if trade_type_col:
         result_df['Trade Type'] = packing_list_df[trade_type_col]
+        pl_result_df['Trade Type'] = packing_list_df[trade_type_col]
         column_mappings['Trade Type'] = trade_type_col
     else:
-        # 如果找不到贸易类型列，尝试分析出口报关方式列
+        # Try to find 出口报关方式 column
         report_type_col = find_column_with_pattern(packing_list_df, ['出口报关方式'], '出口报关方式')
         if report_type_col:
             result_df['Trade Type'] = packing_list_df[report_type_col]
+            pl_result_df['Trade Type'] = packing_list_df[report_type_col]
             column_mappings['Trade Type'] = report_type_col
         else:
             print("WARNING: 无法确定贸易类型，默认将所有物料视为一般贸易处理")
-            result_df['Trade Type'] = '一般贸易'  # 默认为一般贸易
+            result_df['Trade Type'] = '一般贸易'  # Default to general trade
+            pl_result_df['Trade Type'] = '一般贸易'  # Default to general trade
+    
+    # Add factory to packing list
+    if factory_col:
+        pl_result_df['factory'] = packing_list_df[factory_col]
     
     # Print found mappings for debugging
     print_column_mappings(column_mappings)
     
-    # 检查贸易类型
-    # 确定每行的贸易类型（一般贸易或买单）
+    # Apply trade type determination
     def determine_trade_type(row_type):
         if pd.isna(row_type):
-            return '一般贸易'  # 如果为空，默认为一般贸易
+            return '一般贸易'  # Default to general trade if empty
         
         row_type_str = str(row_type).strip().lower()
-        if '买单' in row_type_str :
+        if '买单' in row_type_str:
             return '买单贸易'
         else:
             return '一般贸易'
     
-    # 应用贸易类型判断
+    # Apply trade type determination to both DataFrames
     result_df['Trade Type'] = result_df['Trade Type'].apply(determine_trade_type)
+    pl_result_df['Trade Type'] = pl_result_df['Trade Type'].apply(determine_trade_type)
     
-    # 统计两种贸易类型的数量
+    # Count items by trade type
     general_trade_count = (result_df['Trade Type'] == '一般贸易').sum()
     purchase_trade_count = (result_df['Trade Type'] == '买单贸易').sum()
     print(f"\n贸易类型统计：")
     print(f"  一般贸易物料数量: {general_trade_count}")
     print(f"  买单贸易物料数量: {purchase_trade_count}")
     
-    # 设置发货人信息 Shipper
+    # Set Shipper information for both DataFrames
     result_df['Shipper'] = result_df['Trade Type'].apply(
+        lambda x: '创想(创想-PCT)' if x == '一般贸易' else 'Unicair(UC-PCT)'
+    )
+    
+    pl_result_df['Shipper'] = pl_result_df['Trade Type'].apply(
         lambda x: '创想(创想-PCT)' if x == '一般贸易' else 'Unicair(UC-PCT)'
     )
     
     # If Amount column is missing, set to None
     if 'Amount' not in result_df.columns:
         result_df['Amount'] = None
-    
-    # Calculate total net weight from packing list
-    # Convert to numeric, handling errors by coercing to NaN
+        
+    # Convert columns to numeric for calculations
     result_df['net weight'] = pd.to_numeric(result_df['net weight'], errors='coerce')
     result_df['Qty'] = pd.to_numeric(result_df['Qty'], errors='coerce')
     result_df['Unit Price'] = pd.to_numeric(result_df['Unit Price'], errors='coerce')
+    
+    # Also convert packing list numeric columns
+    pl_result_df['QUANTITY'] = pd.to_numeric(pl_result_df['QUANTITY'], errors='coerce')
+    pl_result_df['G.W (KG)'] = pd.to_numeric(pl_result_df['G.W (KG)'], errors='coerce')
+    pl_result_df['N.W(KG)'] = pd.to_numeric(pl_result_df['N.W(KG)'], errors='coerce')
     
     # Fill NaN values with 0 for numerical calculations
     result_df['net weight'] = result_df['net weight'].fillna(0)
     result_df['Qty'] = result_df['Qty'].fillna(0)
     result_df['Unit Price'] = result_df['Unit Price'].fillna(0)
     
-    # Calculate total net weightf
+    pl_result_df['QUANTITY'] = pl_result_df['QUANTITY'].fillna(0)
+    pl_result_df['G.W (KG)'] = pl_result_df['G.W (KG)'].fillna(0)
+    pl_result_df['N.W(KG)'] = pl_result_df['N.W(KG)'].fillna(0)
+    
+    # Calculate total net weight
     net_weight = result_df['net weight']
     total_net_weight = result_df['net weight'].sum()
-
-
-
-
     
     # Calculate total cost (采购总价) for each row and sum
     result_df['采购总价']  = result_df['Unit Price'] * result_df['Qty'] 
@@ -467,13 +554,15 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
     # Calculate Amount as Unit Price multiplied by Quantity
     result_df['Amount'] = (result_df['Unit Price'] * result_df['Qty'] ).round(8)
 
-    # Ensure Amount is included in the output columns
+    # Define output column sets
     cif_output_columns = [
         'NO.', 'Material code', 'DESCRIPTION', 'Model NO.', 'Unit Price', 'Qty', 'Unit', 'Amount',
         'net weight', '采购单价', '采购总价', 'FOB单价', 'FOB总价', '总保费', '总运费', '每公斤摊的运保费',
         '该项对应的运保费', 'CIF总价(FOB总价+运保费)', 'CIF单价', '单价USD数值', '单位',
         'factory', 'project', 'end use'
     ]
+    
+    cif_output_columns = cif_output_columns + ['G.W (KG)']
 
     # Ensure Amount is included in the output columns
     exportReimport_output_columns = [
@@ -483,17 +572,28 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
     # 内部计算需要的完整列集合（包含Trade Type和Shipper）
     internal_columns = cif_output_columns + ['Trade Type', 'Shipper']
     
+    # Packing list internal columns
+    pl_internal_columns = pl_output_columns + ['Trade Type', 'Shipper', 'factory']
+    
     # Ensure all required columns exist
     for col in internal_columns:
         if col not in result_df.columns:
             result_df[col] = None
     
+    for col in pl_internal_columns:
+        if col not in pl_result_df.columns:
+            pl_result_df[col] = None
+    
     # Reindex the dataframe to match the required column order for internal processing
     result_df = result_df.reindex(columns=internal_columns)
-    
+    pl_result_df = pl_result_df.reindex(columns=pl_internal_columns)
+
     # Drop rows with no material code or all NaN values
     result_df = result_df.dropna(subset=['Material code'], how='all')
     result_df = result_df.dropna(how='all')
+    
+    pl_result_df = pl_result_df.dropna(subset=['P/N.'], how='all')
+    pl_result_df = pl_result_df.dropna(how='all')
     
     # Apply formatting to numeric columns
     numeric_columns = ['采购单价', '采购总价', 'FOB单价', 'FOB总价', '总保费', '总运费', 
@@ -506,6 +606,7 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
     
     # Generate the intermediate CIF invoice file (CIF原始发票)
     cif_invoice = result_df.copy()
+    pl_invoice = pl_result_df.copy()
     
     # Remove Trade Type and Shipper columns before saving
     if 'Trade Type' in cif_invoice.columns:
@@ -513,13 +614,32 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
     if 'Shipper' in cif_invoice.columns:
         cif_invoice = cif_invoice.drop(columns=['Shipper'])
         
+    if 'Trade Type' in pl_invoice.columns:
+        pl_invoice = pl_invoice.drop(columns=['Trade Type'])
+    if 'Shipper' in pl_invoice.columns:
+        pl_invoice = pl_invoice.drop(columns=['Shipper'])
+    if 'factory' in pl_invoice.columns:
+        pl_invoice = pl_invoice.drop(columns=['factory'])
+        
     cif_file_path = os.path.join(output_dir, 'cif_original_invoice.xlsx')
+    pl_file_path = os.path.join(output_dir, 'pl_original_invoice.xlsx')
     
     # Save CIF invoice
     safe_save_to_excel(cif_invoice, cif_file_path)
+    safe_save_to_excel(pl_invoice, pl_file_path)
     
     # 提取一般贸易的物料
     general_trade_df = result_df[result_df['Trade Type'] == '一般贸易'].copy()
+    pl_df = pl_result_df[pl_result_df['Trade Type'] == '一般贸易'].copy()
+
+    print(f"\nGeneral trade count in result_df: {len(general_trade_df)}")
+    print(f"General trade count in pl_result_df: {len(pl_df)}")
+    
+    print("\nColumns in pl_result_df:")
+    print(pl_result_df.columns.tolist())
+    
+    print("\nColumns in pl_df:")
+    print(pl_df.columns.tolist() if not pl_df.empty else "pl_df is empty")
     
     # 只有在存在一般贸易物料时才生成出口发票文件
     if not general_trade_df.empty:
@@ -568,17 +688,51 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
         # Save both sheets to the same Excel file
         export_file_path = os.path.join(output_dir, 'export_invoice.xlsx')
         
+        # Try to delete existing file to avoid permission issues
+        try:
+            if os.path.exists(export_file_path):
+                os.remove(export_file_path)
+                print(f"Removed existing file: {export_file_path}")
+                time.sleep(1)  # Give the OS time to fully release the file
+        except Exception as e:
+            print(f"Warning: Could not remove existing file: {e}")
+        
         # Create a new Excel writer
         with pd.ExcelWriter(export_file_path, engine='openpyxl') as writer:
             # Packing List 工作表处理
-            packing_df = packing_list.copy()
-
-            
-            # 添加汇总行（需要根据实际列名调整）
-            
-            summary_packing = packing_df[['Qty', 'Amount', 'net weight','采购总价','FOB总价','该项对应的运保费','CIF总价(FOB总价+运保费)',]].sum()
-            packing_df = pd.concat([packing_df, summary_packing.to_frame().T], ignore_index=True)
-            packing_df.to_excel(writer, sheet_name='Packing List', index=False)
+            if not pl_df.empty:
+                packing_df = pl_df.copy()
+                
+                # 确保所有需要的列都存在
+                for col in pl_output_columns:
+                    if col not in packing_df.columns:
+                        print(f"Warning: Column '{col}' not found in packing list data, adding empty column")
+                        packing_df[col] = None
+                
+                # 确保正确的输出列顺序
+                packing_df = packing_df[pl_output_columns]
+                
+                # 添加汇总行（只对数字列计算总和）
+                summary_cols = ['QUANTITY', 'G.W (KG)', 'N.W(KG)']
+                summary_packing = {}
+                for col in summary_cols:
+                    if col in packing_df.columns:
+                        packing_df[col] = pd.to_numeric(packing_df[col], errors='coerce').fillna(0)
+                        summary_packing[col] = packing_df[col].sum()
+                
+                summary_row = pd.DataFrame([{col: (summary_packing.get(col, None) if col in summary_cols else None) for col in packing_df.columns}])
+                summary_row['DESCRIPTION'] = 'Total'
+                packing_df = pd.concat([packing_df, summary_row], ignore_index=True)
+                
+                # Debug print columns
+                print("\nPacking List columns before saving:")
+                print(packing_df.columns.tolist())
+                
+                packing_df.to_excel(writer, sheet_name='Packing List', index=False)
+            else:
+                # 如果没有pl_df数据，创建一个空的packing list with correct columns
+                empty_pl_df = pd.DataFrame(columns=pl_output_columns)
+                empty_pl_df.to_excel(writer, sheet_name='Packing List', index=False)
 
             # Commercial Invoice 工作表处理
             commercial_df = export_grouped.copy()
@@ -669,21 +823,99 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
     for factory in factories:
         factory_df = result_df[result_df['factory'] == factory].copy()
         if not factory_df.empty:
-            # Select only required columns for reimport invoice
-            factory_df = factory_df[exportReimport_output_columns].copy()
-            
-            # Ensure Trade Type and Shipper are not included
-            if 'Trade Type' in factory_df.columns:
-                factory_df = factory_df.drop(columns=['Trade Type'])
-            if 'Shipper' in factory_df.columns:
-                factory_df = factory_df.drop(columns=['Shipper'])
-                
+            # 创建新的Excel writer
             factory_file_path = os.path.join(output_dir, f'reimport_invoice_factory_{factory}.xlsx')
             
-            # Save factory invoice
-            safe_save_to_excel(factory_df, factory_file_path)
+            # Try to delete existing file to avoid permission issues
+            try:
+                if os.path.exists(factory_file_path):
+                    os.remove(factory_file_path)
+                    print(f"Removed existing file: {factory_file_path}")
+                    time.sleep(1)  # Give the OS time to fully release the file
+            except Exception as e:
+                print(f"Warning: Could not remove existing file: {e}")
+            
+            with pd.ExcelWriter(factory_file_path, engine='openpyxl') as writer:
+                # Packing List 工作表
+                factory_pl_df = pl_result_df[pl_result_df['factory'] == factory].copy() if 'factory' in pl_result_df.columns else pd.DataFrame()
+                
+                # 如果pl_result_df中没有factory列或没有对应的数据，则使用factory_df中的数据创建packing list
+                if factory_pl_df.empty:
+                    # 创建一个简化版的packing list
+                    factory_pl_df = pd.DataFrame()
+                    factory_pl_df['Sr No.'] = factory_df['NO.']
+                    factory_pl_df['P/N.'] = factory_df['Material code']
+                    factory_pl_df['DESCRIPTION'] = factory_df['DESCRIPTION']
+                    factory_pl_df['Model NO.'] = factory_df['Model NO.']
+                    factory_pl_df['QUANTITY'] = factory_df['Qty']
+                    factory_pl_df['CTNS'] = 1  # 默认值
+                    factory_pl_df['Carton MEASUREMENT'] = ""  # 默认值
+                    if 'gross weight' in factory_df.columns:
+                        factory_pl_df['G.W (KG)'] = factory_df['gross weight']
+                    else:
+                        factory_pl_df['G.W (KG)'] = 0
+                    factory_pl_df['N.W(KG)'] = factory_df['net weight']
+                    factory_pl_df['Carton NO.'] = ""  # 默认值
+                
+                # 确保输出列正确
+                for col in pl_output_columns:
+                    if col not in factory_pl_df.columns:
+                        factory_pl_df[col] = None
+                
+                # 重新排序列
+                factory_pl_df = factory_pl_df[pl_output_columns]
+                
+                # 添加汇总行
+                summary_cols = ['QUANTITY', 'G.W (KG)', 'N.W(KG)']
+                summary_packing = {}
+                for col in summary_cols:
+                    if col in factory_pl_df.columns:
+                        factory_pl_df[col] = pd.to_numeric(factory_pl_df[col], errors='coerce').fillna(0)
+                        summary_packing[col] = factory_pl_df[col].sum()
+                
+                summary_row = pd.DataFrame([{col: (summary_packing.get(col, None) if col in summary_cols else None) for col in factory_pl_df.columns}])
+                summary_row['DESCRIPTION'] = 'Total'
+                factory_pl_df = pd.concat([factory_pl_df, summary_row], ignore_index=True)
+                
+                # 保存Packing List工作表
+                factory_pl_df.to_excel(writer, sheet_name='Packing List', index=False)
+                
+                # Commercial Invoice 工作表
+                # Select only required columns for reimport invoice
+                commercial_df = factory_df[exportReimport_output_columns].copy()
+                
+                # 添加汇总行
+                summary_commercial = commercial_df[['Qty', 'Amount']].sum()
+                summary_row = pd.DataFrame({col: [summary_commercial[col] if col in ['Qty', 'Amount'] else None] 
+                                         for col in commercial_df.columns})
+                summary_row['Material code'] = 'Total'
+                commercial_df = pd.concat([commercial_df, summary_row], ignore_index=True)
+                
+                # 保存Commercial Invoice工作表
+                commercial_df.to_excel(writer, sheet_name='Commercial Invoice', index=False)
+                
+                # 设置默认打开第二个sheet
+                workbook = writer.book
+                worksheet = workbook['Commercial Invoice']
+                workbook.active = workbook.index(worksheet)
+            
+            # 应用样式
+            try:
+                apply_excel_styling(factory_file_path)
+                print(f"Successfully saved and styled factory file: {factory_file_path}")
+            except Exception as e:
+                print(f"Warning: Factory file saved but could not apply styling: {e}")
     
     return result_df
+
+
+    add_columns = [
+        '件数',  # 件数
+        '总体积',  # 总体积
+        'G.W（KG)\n总毛重',  # 总毛重
+        'N.W  (KG)\n总净重',  # 总净重
+        'CTN NO.\n(箱号)'  # 箱号
+    ]
 
 # Run the process
 if __name__ == "__main__":
