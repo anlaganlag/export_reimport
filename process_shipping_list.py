@@ -80,11 +80,14 @@ def apply_excel_styling(file_path):
             col_name = ws.cell(row=1, column=col_idx).value
             
             # Apply cell styling based on column type
-            if col_name in ['net weight','FOB单价', 'FOB总价', 'CIF单价', 'CIF总价(FOB总价+运保费)', '采购单价', '采购总价', '总保费', '总运费', '每公斤摊的运保费', '该项对应的运保费', '单价USD数值']:
+            if col_name in ['net weight','FOB单价','Amount', 'FOB总价', 'CIF单价', 'CIF总价(FOB总价+运保费)', '采购单价', '采购总价', '总保费', '总运费', '每公斤摊的运保费', '该项对应的运保费', '单价USD数值']:
                 cell.number_format = '#,##0.00'
                 cell.alignment = Alignment(horizontal='right')
-            elif col_name in ['Qty', ]:
+            elif col_name in ['Qty' ]:
                 cell.number_format = '#,##0'
+                cell.alignment = Alignment(horizontal='right')
+            elif col_name in ['Unit Price' ]:
+                cell.number_format = '#,##0.000000'
                 cell.alignment = Alignment(horizontal='right')
             elif col_name in ['NO.']:
                 cell.alignment = Alignment(horizontal='center')
@@ -646,7 +649,7 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
             if unit_price_col:
                 for row in range(2, ws.max_row + 1):  # Start from row 2 (skip header)
                     cell = ws.cell(row=row, column=unit_price_col)
-                    cell.number_format = '#,##0.00'
+                    cell.number_format = '#,##0.000000'
             
             if amount_col:
                 for row in range(2, ws.max_row + 1):  # Start from row 2 (skip header)
