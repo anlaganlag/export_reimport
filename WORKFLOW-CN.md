@@ -65,9 +65,12 @@ graph TD
     %% 生成CIF原始发票 - 买单贸易
     CCIF_BT --> |CIF原始发票|CIFORG_BT[CIF原始发票-买单贸易]
     
-    %% 按工厂拆分发票 - 两种贸易类型共用
-    CIFORG_GT --> SI[按目的地拆分发票]
-    CIFORG_BT --> SI
+    %% 按项目拆分发票 - 两种贸易类型共用
+    CIFORG_GT --> PSI[按项目拆分发票]
+    CIFORG_BT --> PSI
+    
+    %% 按目的地拆分发票
+    PSI --> SI[按目的地拆分发票]
     OPL --> |目的地工厂|SI
     
     %% Daman工厂印度进口发票
@@ -264,12 +267,12 @@ graph LR
    - **如果没有一般贸易物料，则不会生成此文件**
 
 3. **最终印度进口发票 (outputs/reimport_invoice_factory_*.xlsx)**
-   - 直接从CIF原始发票按目的地工厂(factory)拆分
+   - 从CIF原始发票先按项目拆分，再按目的地工厂(factory)拆分
    - 包含所有物料（一般贸易和买单贸易）
-   - 每个目的地工厂对应一个独立的发票文件
+   - 每个项目和目的地工厂组合对应一个独立的发票文件
    - 每个文件包含两个工作表(Sheet):
-     - **Sheet1 - 装箱单(Packing List)**: 包含该工厂的完整装箱单信息
-     - **Sheet2 - 商业发票(Commercial Invoice)**: 包含该工厂的商业发票信息
+     - **Sheet1 - 装箱单(Packing List)**: 包含该项目该工厂的完整装箱单信息
+     - **Sheet2 - 商业发票(Commercial Invoice)**: 包含该项目该工厂的商业发票信息
    - 包含简化字段集: NO., Material code, DESCRIPTION, Model NO., Unit Price, Qty, Unit, Amount, Shipper
    - 发货人信息会根据原始装箱单中的贸易类型自动设置:
      - 一般贸易物料: 发货人为"创想(创想-PCT)"
@@ -341,9 +344,12 @@ graph TD
     Export --> ExpSheet2[Sheet2: 商业发票(Commercial Invoice)]
     
     %% 印度进口处理 - 全部物料
-    CIFORG --> Split[按工厂拆分]
-    Split --> Reimport1[outputs/reimport_invoice_factory_A.xlsx]
-    Split --> Reimport2[outputs/reimport_invoice_factory_B.xlsx]
+    CIFORG --> PSplit[按项目拆分]
+    PSplit --> DSplit[按工厂拆分]
+    DSplit --> Reimport1[outputs/reimport_invoice_project_A_factory_A.xlsx]
+    DSplit --> Reimport2[outputs/reimport_invoice_project_A_factory_B.xlsx]
+    DSplit --> Reimport3[outputs/reimport_invoice_project_B_factory_A.xlsx]
+    DSplit --> Reimport4[outputs/reimport_invoice_project_B_factory_B.xlsx]
     
     %% 样式
     classDef input fill:#e1f5fe,stroke:#01579b
@@ -355,10 +361,10 @@ graph TD
     classDef negative fill:#ffcdd2,stroke:#c62828,stroke-width:1px
     
     class PL,PF input
-    class Process,FOB_GT,FOB_PT,CIF_GT,CIF_PT,MERGE,Split process
+    class Process,FOB_GT,FOB_PT,CIF_GT,CIF_PT,MERGE,PSplit,DSplit process
     class TradeTypeSplit,GeneralTrade,PurchaseTrade,GeneralTradeCheck split
     class CIFORG highlight
-    class Export,Reimport1,Reimport2 output
+    class Export,Reimport1,Reimport2,Reimport3,Reimport4 output
     class ExpSheet1,ExpSheet2 suboutput
     class NoExport negative
 ```
@@ -381,3 +387,9 @@ graph TD
    - 合并依据是物料编号(Material code)和单价(Unit Price)相同
    - 合并过程不考虑箱号(Box Number)，即使物料分布在不同箱子中，只要物料编号和单价相同，也会被合并
    - 合并仅在生成商业发票(Commercial Invoice)时进行，装箱单(Packing List)保持原始记录不变
+
+6. 印度进口发票的拆分规则：
+   - 第一步：按项目拆分CIF原始发票
+   - 第二步：对每个项目的发票按目的地工厂进行拆分
+   - 生成的文件命名格式为：reimport_invoice_project_[项目代号]_factory_[工厂代号].xlsx
+   - 每个项目和工厂组合生成独立的发票文件
