@@ -240,6 +240,41 @@ def print_column_mappings(mappings):
     expected_count = len(expected_columns)
     print(f"\nFound {found_count} out of {expected_count} expected column mappings ({100*found_count/expected_count:.1f}%)")
 
+def split_by_project_and_factory(df):
+    """Split the dataframe by project and factory."""
+    print("Available columns for splitting:", df.columns.tolist())
+    print("Unique project values:", df['project'].unique())
+    print("Unique factory values:", df['factory'].unique())
+    
+    # Define the project categories with more robust string handling
+    project_categories = {
+        '大华': lambda x: str(x).strip() == '大华',
+        '麦格米特': lambda x: str(x).strip() == '麦格米特',
+        '工厂': lambda x: str(x).strip() not in ['大华', '麦格米特']  # Changed from 'others' to '工厂'
+    }
+    
+    # Get unique factories
+    factories = df['factory'].unique()
+    
+    # Dictionary to store split dataframes
+    split_dfs = {}
+    
+    # Split by project and factory
+    for project_name, project_filter in project_categories.items():
+        try:
+            project_df = df[df['project'].apply(project_filter)]
+            print(f"Found {len(project_df)} rows for project {project_name}")
+            
+            for factory in factories:
+                key = (project_name, factory)
+                split_dfs[key] = project_df[project_df['factory'] == factory]
+                print(f"Found {len(split_dfs[key])} rows for {project_name} - {factory}")
+        except Exception as e:
+            print(f"Error processing project {project_name}: {e}")
+            continue
+    
+    return split_dfs, project_categories
+
 # Main function to process the shipping list
 def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
     # Read the input files
@@ -434,6 +469,17 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
     if factory_col:
         pl_result_df['factory'] = packing_list_df[factory_col]
     
+    # Map project column directly from source
+    if '项目名称' in packing_list_df.columns:
+        result_df['project'] = packing_list_df['项目名称']
+        pl_result_df['project'] = packing_list_df['项目名称']
+        column_mappings['project'] = '项目名称'
+        print(f"Successfully mapped project column from '项目名称'")
+    else:
+        print(f"Warning: Project column '项目名称' not found in packing list")
+        result_df['project'] = '工厂'  # Changed from 'others' to '工厂'
+        pl_result_df['project'] = '工厂'  # Changed from 'others' to '工厂'
+    
     # Print found mappings for debugging
     print_column_mappings(column_mappings)
     
@@ -592,7 +638,8 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
     # 内部计算需要的完整列集合（包含Trade Type和Shipper）
     internal_columns = cif_output_columns + ['Trade Type', 'Shipper']
     
-    # Packing list internal columns
+    # Packing list internal columns - add project to pl_output_columns
+    pl_output_columns.append('project')  # Add project to the output columns
     pl_internal_columns = pl_output_columns + ['Trade Type', 'Shipper', 'factory']
     
     # Ensure all required columns exist
@@ -839,95 +886,46 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
     else:
         print("没有一般贸易的物料，不生成出口发票文件")
     
-    # Generate reimport invoices by factory - using only required columns, no grouping needed
-    factories = result_df['factory'].dropna().unique()
-    for factory in factories:
-        factory_df = result_df[result_df['factory'] == factory].copy()
-        if not factory_df.empty:
-            # 创建新的Excel writer
-            factory_file_path = os.path.join(output_dir, f'reimport_invoice_factory_{factory}.xlsx')
-            
-            # Try to delete existing file to avoid permission issues
-            try:
-                if os.path.exists(factory_file_path):
-                    os.remove(factory_file_path)
-                    print(f"Removed existing file: {factory_file_path}")
-                    time.sleep(1)  # Give the OS time to fully release the file
-            except Exception as e:
-                print(f"Warning: Could not remove existing file: {e}")
-            
-            with pd.ExcelWriter(factory_file_path, engine='openpyxl') as writer:
-                # Packing List 工作表
-                factory_pl_df = pl_result_df[pl_result_df['factory'] == factory].copy() if 'factory' in pl_result_df.columns else pd.DataFrame()
-                
-                # 如果pl_result_df中没有factory列或没有对应的数据，则使用factory_df中的数据创建packing list
-                if factory_pl_df.empty:
-                    # 创建一个简化版的packing list
-                    factory_pl_df = pd.DataFrame()
-                    factory_pl_df['Sr No.'] = factory_df['NO.']
-                    factory_pl_df['P/N.'] = factory_df['Material code']
-                    factory_pl_df['DESCRIPTION'] = factory_df['DESCRIPTION']
-                    factory_pl_df['Model NO.'] = factory_df['Model NO.']
-                    factory_pl_df['QUANTITY'] = factory_df['Qty']
-                    factory_pl_df['CTNS'] = 1  # 默认值
-                    factory_pl_df['Carton MEASUREMENT'] = ""  # 默认值
-                    if 'gross weight' in factory_df.columns:
-                        factory_pl_df['G.W (KG)'] = factory_df['gross weight']
-                    else:
-                        factory_pl_df['G.W (KG)'] = ""  # Changed default value to empty string
-                    factory_pl_df['N.W(KG)'] = factory_df['net weight']
-                    factory_pl_df['Carton NO.'] = ""  # 默认值
-                
-                # 确保输出列正确
-                for col in pl_output_columns:
-                    if col not in factory_pl_df.columns:
-                        factory_pl_df[col] = None
-                
-                # 重新排序列
-                factory_pl_df = factory_pl_df[pl_output_columns]
-                
-                # 添加汇总行
-                summary_cols = ['QUANTITY', 'G.W (KG)', 'N.W(KG)']
-                summary_packing = {}
-                for col in summary_cols:
-                    if col in factory_pl_df.columns:
-                        # Calculate sum without modifying the original column in place
-                        # Coerce to numeric, fill NA with 0 JUST for the sum calculation
-                        summary_packing[col] = pd.to_numeric(factory_pl_df[col], errors='coerce').fillna(0).sum()
-
-                summary_row = pd.DataFrame([{col: (summary_packing.get(col, None) if col in summary_cols else None) for col in factory_pl_df.columns}])
-                summary_row['DESCRIPTION'] = 'Total'
-                factory_pl_df = pd.concat([factory_pl_df, summary_row], ignore_index=True)
-                
-                # 保存Packing List工作表
-                factory_pl_df.to_excel(writer, sheet_name='Packing List', index=False)
-                
-                # Commercial Invoice 工作表
-                # Select only required columns for reimport invoice
-                commercial_df = factory_df[exportReimport_output_columns].copy()
-                
-                # 添加汇总行
-                summary_commercial = commercial_df[['Qty', 'Amount']].sum()
-                summary_row = pd.DataFrame({col: [summary_commercial[col] if col in ['Qty', 'Amount'] else None] 
-                                         for col in commercial_df.columns})
-                summary_row['Material code'] = 'Total'
-                commercial_df = pd.concat([commercial_df, summary_row], ignore_index=True)
-                
-                # 保存Commercial Invoice工作表
-                commercial_df.to_excel(writer, sheet_name='Commercial Invoice', index=False)
-                
-                # 设置默认打开第二个sheet
-                workbook = writer.book
-                worksheet = workbook['Commercial Invoice']
-                workbook.active = workbook.index(worksheet)
-            
-            # 应用样式
-            try:
-                apply_excel_styling(factory_file_path)
-                print(f"Successfully saved and styled factory file: {factory_file_path}")
-            except Exception as e:
-                print(f"Warning: Factory file saved but could not apply styling: {e}")
+    # After creating result_df and before generating any output files
+    # Split the data by project and factory
+    split_dfs, project_categories = split_by_project_and_factory(result_df)
     
+    # Generate separate invoice files for each split
+    for (project, factory), df in split_dfs.items():
+        if not df.empty:
+            # Create filename
+            filename = f'invoice_{project}_{factory}.xlsx'
+            file_path = os.path.join(output_dir, filename)
+            
+            # Create a copy for the invoice
+            invoice_df = df[exportReimport_output_columns].copy()
+            
+            # Create a copy for the packing list
+            packing_df = pl_result_df[pl_result_df['factory'] == factory].copy()
+            project_filter = project_categories[project]
+            packing_df = packing_df[packing_df['project'].apply(project_filter)]
+            
+            # Save both sheets to the same Excel file
+            with pd.ExcelWriter(file_path, engine='openpyxl') as writer:
+                # Save packing list
+                if not packing_df.empty:
+                    # Remove internal columns before saving
+                    save_columns = [col for col in pl_output_columns if col != 'project']  # Remove project from output
+                    packing_df = packing_df[save_columns]
+                    packing_df.to_excel(writer, sheet_name='Packing List', index=False)
+                else:
+                    pd.DataFrame(columns=[col for col in pl_output_columns if col != 'project']).to_excel(writer, sheet_name='Packing List', index=False)
+                
+                # Save commercial invoice
+                invoice_df.to_excel(writer, sheet_name='Commercial Invoice', index=False)
+            
+            # Apply styling
+            try:
+                apply_excel_styling(file_path)
+                print(f"Successfully generated invoice for project {project}, factory {factory}")
+            except Exception as e:
+                print(f"Warning: Could not apply styling to {filename}: {e}")
+
     return result_df
 
 
