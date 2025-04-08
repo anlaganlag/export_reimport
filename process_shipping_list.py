@@ -295,7 +295,13 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
     
     # Additional packing list columns
     ctns_col = find_column_with_pattern(packing_list_df, ['ctns', '件数'], 'CTNS')
-    carton_measurement_col = find_column_with_pattern(packing_list_df, ['carton measurement', '总体积', 'measurement'], 'Carton MEASUREMENT')
+    # find_column_with_pattern takes 3 parameters:
+    # 1. packing_list_df: The dataframe to search in
+    # 2. ['体积（CBM）', '总体积', 'measurement']: Array of possible column names to look for in Chinese/English
+    #    - Will match any column that contains these strings
+    # 3. 'Carton MEASUREMENT': The standardized name to use if a match is found
+    #    - This is what the matched column will be renamed to in the output
+    carton_measurement_col = find_column_with_pattern(packing_list_df, ['体积（CBM）', '总体积', 'CBM'], 'Carton MEASUREMENT')
     carton_no_col = find_column_with_pattern(packing_list_df, ['carton no', '箱号', 'ctn no'], 'Carton NO.')
     
     # 贸易类型列
@@ -381,7 +387,7 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
     if gross_weight_col:
         pl_result_df['G.W (KG)'] = packing_list_df[gross_weight_col]
     else:
-        pl_result_df['G.W (KG)'] = 0  # Default value if not found
+        pl_result_df['G.W (KG)'] = ""  # Default empty value if not found
     
     if net_weight_col:
         pl_result_df['N.W(KG)'] = packing_list_df[net_weight_col]
@@ -717,9 +723,10 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
                 summary_packing = {}
                 for col in summary_cols:
                     if col in packing_df.columns:
-                        packing_df[col] = pd.to_numeric(packing_df[col], errors='coerce').fillna(0)
-                        summary_packing[col] = packing_df[col].sum()
-                
+                        # Calculate sum without modifying the original column in place
+                        # Coerce to numeric, fill NA with 0 JUST for the sum calculation
+                        summary_packing[col] = pd.to_numeric(packing_df[col], errors='coerce').fillna(0).sum()
+
                 summary_row = pd.DataFrame([{col: (summary_packing.get(col, None) if col in summary_cols else None) for col in packing_df.columns}])
                 summary_row['DESCRIPTION'] = 'Total'
                 packing_df = pd.concat([packing_df, summary_row], ignore_index=True)
@@ -853,7 +860,7 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
                     if 'gross weight' in factory_df.columns:
                         factory_pl_df['G.W (KG)'] = factory_df['gross weight']
                     else:
-                        factory_pl_df['G.W (KG)'] = 0
+                        factory_pl_df['G.W (KG)'] = ""  # Changed default value to empty string
                     factory_pl_df['N.W(KG)'] = factory_df['net weight']
                     factory_pl_df['Carton NO.'] = ""  # 默认值
                 
@@ -870,9 +877,10 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
                 summary_packing = {}
                 for col in summary_cols:
                     if col in factory_pl_df.columns:
-                        factory_pl_df[col] = pd.to_numeric(factory_pl_df[col], errors='coerce').fillna(0)
-                        summary_packing[col] = factory_pl_df[col].sum()
-                
+                        # Calculate sum without modifying the original column in place
+                        # Coerce to numeric, fill NA with 0 JUST for the sum calculation
+                        summary_packing[col] = pd.to_numeric(factory_pl_df[col], errors='coerce').fillna(0).sum()
+
                 summary_row = pd.DataFrame([{col: (summary_packing.get(col, None) if col in summary_cols else None) for col in factory_pl_df.columns}])
                 summary_row['DESCRIPTION'] = 'Total'
                 factory_pl_df = pd.concat([factory_pl_df, summary_row], ignore_index=True)
