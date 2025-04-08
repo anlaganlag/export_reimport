@@ -1,6 +1,6 @@
 # 装运清单处理工作流程
 
-本文档概述了处理装运清单并生成出口和复进口收据的完整工作流程。
+本文档概述了处理装运清单并生成出口和印度进口收据的完整工作流程。
 
 ## 辅料材发运概述
 
@@ -16,7 +16,7 @@
 
 ## 流程图
 
-### CIIBER原始装箱单到出口/在进口发票工作流程
+### CIIBER原始装箱单到出口/在印度进口发票工作流程
 
 ```mermaid
 graph TD
@@ -70,13 +70,13 @@ graph TD
     CIFORG_BT --> SI
     OPL --> |目的地工厂|SI
     
-    %% Daman工厂复进口发票
-    SI --> RIMP_D[Daman工厂复进口文件]
+    %% Daman工厂印度进口发票
+    SI --> RIMP_D[Daman工厂印度进口文件]
     RIMP_D --> |第一个Sheet|RIMP_DPL[Daman装箱单]
     RIMP_D --> |第二个Sheet|RIMP_DCI[Daman商业发票]
     
-    %% Silvassa工厂复进口发票
-    SI --> RIMP_S[Silvassa工厂复进口文件]
+    %% Silvassa工厂印度进口发票
+    SI --> RIMP_S[Silvassa工厂印度进口文件]
     RIMP_S --> |第一个Sheet|RIMP_SPL[Silvassa装箱单]
     RIMP_S --> |第二个Sheet|RIMP_SCI[Silvassa商业发票]
 
@@ -248,7 +248,7 @@ graph LR
 1. **CIF原始发票 (outputs/cif_original_invoice.xlsx)**
    - 包含所有物料的CIF价格计算详情（包括一般贸易和买单贸易）
    - 包含全部计算字段，用于验证CIF价格计算是否正确
-   - 是生成出口发票和复进口发票的中间文件
+   - 是生成出口发票和印度进口发票的中间文件
 
 2. **最终出口文件 (outputs/export_invoice.xlsx)** - **仅适用于一般贸易物料**
    - 包含两个工作表(Sheet):
@@ -263,7 +263,7 @@ graph LR
    - **注意**: 只有一般贸易物料会生成出口文件，发货人(Shipper)为"创想(创想-PCT)"
    - **如果没有一般贸易物料，则不会生成此文件**
 
-3. **最终复进口发票 (outputs/reimport_invoice_factory_*.xlsx)**
+3. **最终印度进口发票 (outputs/reimport_invoice_factory_*.xlsx)**
    - 直接从CIF原始发票按目的地工厂(factory)拆分
    - 包含所有物料（一般贸易和买单贸易）
    - 每个目的地工厂对应一个独立的发票文件
@@ -340,7 +340,7 @@ graph TD
     Export --> ExpSheet1[Sheet1: 装箱单(Packing List)]
     Export --> ExpSheet2[Sheet2: 商业发票(Commercial Invoice)]
     
-    %% 复进口处理 - 全部物料
+    %% 印度进口处理 - 全部物料
     CIFORG --> Split[按工厂拆分]
     Split --> Reimport1[outputs/reimport_invoice_factory_A.xlsx]
     Split --> Reimport2[outputs/reimport_invoice_factory_B.xlsx]
@@ -368,14 +368,14 @@ graph TD
 1. 本系统在计算运费分摊时，使用从装箱单中汇总计算的总净重，而不是政策文件中可能提供的预设总净重。这确保了运费分摊基于实际装运物料的准确净重。
 
 2. 对于一般贸易和买单贸易的处理差异：
-   - 一般贸易：系统会生成包含装箱单和商业发票的完整出口文件，以及相应的复进口发票
-   - 买单贸易：系统不会生成出口文件，仅生成复进口发票部分
+   - 一般贸易：系统会生成包含装箱单和商业发票的完整出口文件，以及相应的印度进口发票
+   - 买单贸易：系统不会生成出口文件，仅生成印度进口发票部分
 
 3. 发货人(Shipper)信息会根据贸易类型自动设置，无需用户手动指定：
    - 一般贸易：创想（创想-PCT）
    - 买单贸易：Unicair（UC-PCT）
 
-4. 如果原始装箱单中没有一般贸易的物料，系统将不会生成出口发票文件，只会生成复进口发票。
+4. 如果原始装箱单中没有一般贸易的物料，系统将不会生成出口发票文件，只会生成印度进口发票。
 
 5. 合并CIF原始发票同类项的规则：
    - 合并依据是物料编号(Material code)和单价(Unit Price)相同
