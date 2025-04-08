@@ -282,7 +282,7 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
     # Main invoice columns
     sr_no_col = find_column_with_pattern(packing_list_df, ['sr no', '序号', '序列号'], 'NO.')
     material_code_col = find_column_with_pattern(packing_list_df, ['p/n', '料号', 'material code', '系统料号'], 'Material code')
-    description_col = find_column_with_pattern(packing_list_df, ['开票名称', '开票品名'], 'DESCRIPTION')
+    description_col = find_column_with_pattern(packing_list_df, ['清关英文货描', '清关英文货描(关务提供)'], 'DESCRIPTION')
     model_col = find_column_with_pattern(packing_list_df, ['model', '型号', '物料型号', '货物型号'], 'Model NO.')
     unit_price_col = find_column_with_pattern(packing_list_df, ['单价', 'unit price', 'price', '不含税单价'], 'Unit Price')
     qty_col = find_column_with_pattern(packing_list_df, ['qty', 'quantity', '数量'], 'Qty')
@@ -334,7 +334,21 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
         column_mappings['Qty'] = qty_col
     
     if unit_col:
-        result_df['Unit'] = packing_list_df[unit_col]
+        # Convert Chinese units to English
+        def convert_unit_to_english(unit):
+            unit_mapping = {
+                '个': 'PCS',
+                '件': 'PCS',
+                '卷': 'ROLL',
+                '套': 'SET',
+                '箱': 'BOX',
+                '米': 'M',
+                '千克': 'KG',
+                '公斤': 'KG'
+            }
+            return unit_mapping.get(str(unit).strip(), str(unit))
+        
+        result_df['Unit'] = packing_list_df[unit_col].apply(convert_unit_to_english)
         column_mappings['Unit'] = unit_col
     
     if net_weight_col:
