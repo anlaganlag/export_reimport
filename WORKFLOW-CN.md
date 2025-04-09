@@ -341,8 +341,8 @@ graph TD
     GeneralTradeCheck -->|No| NoExport[不生成出口文件]
     
     %% 出口文件的两个Sheet - 仅适用于一般贸易
-    Export --> ExpSheet1[Sheet1: 装箱单(Packing List)]
-    Export --> ExpSheet2[Sheet2: 商业发票(Commercial Invoice)]
+    Export --> ExpSheet1[Sheet1: 装箱单Packing List]
+    Export --> ExpSheet2[Sheet2: 商业发票Commercial Invoice]
     
     %% 印度进口处理 - 全部物料
     CIFORG --> PSplit[按项目拆分]
