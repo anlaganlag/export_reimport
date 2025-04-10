@@ -43,6 +43,7 @@ def merge_packing_list_cells(workbook_path):
         ctns_idx = None
         measurement_idx = None
         gw_idx = None
+        desc_idx = None
         
         for col_idx, cell in enumerate(ws[1], 1):
             if cell.value == 'Carton NO.':
@@ -53,6 +54,8 @@ def merge_packing_list_cells(workbook_path):
                 measurement_idx = col_idx
             elif cell.value == 'G.W (KG)':
                 gw_idx = col_idx
+            elif cell.value == 'DESCRIPTION':
+                desc_idx = col_idx
         
         if not all([carton_no_idx, ctns_idx, measurement_idx, gw_idx]):
             print("Could not find all required columns for merging")
@@ -63,7 +66,17 @@ def merge_packing_list_cells(workbook_path):
         start_row = None
         last_row = ws.max_row
         
-        for row_idx in range(2, last_row + 1):
+        # Check if the last row is a "Total" row
+        total_row_idx = None
+        for row_idx in range(last_row, 1, -1):
+            if desc_idx and ws.cell(row=row_idx, column=desc_idx).value == 'Total':
+                total_row_idx = row_idx
+                break
+        
+        # If we found a Total row, adjust the last_row to be one before it
+        effective_last_row = total_row_idx - 1 if total_row_idx else last_row
+        
+        for row_idx in range(2, effective_last_row + 1):
             carton_no = ws.cell(row=row_idx, column=carton_no_idx).value
             
             # Skip empty or None values
@@ -98,192 +111,17 @@ def merge_packing_list_cells(workbook_path):
                 current_carton = carton_no
                 start_row = row_idx
         
-        # Handle the last group
-        if start_row and start_row < last_row:  # More than one row in the last group
+        # Handle the last group before the Total row
+        if start_row and start_row < effective_last_row:  # More than one row in the last group
+            end_row = effective_last_row
             ws.merge_cells(start_row=start_row, start_column=ctns_idx, 
-                          end_row=last_row, end_column=ctns_idx)
+                          end_row=end_row, end_column=ctns_idx)
             ws.merge_cells(start_row=start_row, start_column=measurement_idx,
-                          end_row=last_row, end_column=measurement_idx)
+                          end_row=end_row, end_column=measurement_idx)
             ws.merge_cells(start_row=start_row, start_column=gw_idx,
-                          end_row=last_row, end_column=gw_idx)
+                          end_row=end_row, end_column=gw_idx)
             ws.merge_cells(start_row=start_row, start_column=carton_no_idx,
-                          end_row=last_row, end_column=carton_no_idx)
-        
-        # Set vertical alignment for merged cells
-        for row in ws.iter_rows():
-            for cell in row:
-                if cell.coordinate in ws.merged_cells:
-                    cell.alignment = Alignment(vertical='center')
-        
-        wb.save(workbook_path)
-        print(f"Successfully merged cells in Packing List for {workbook_path}")
-        return True
-    except Exception as e:
-        print(f"Error merging cells in Packing List: {e}")
-        return False
-    """
-    Merge cells in the Packing List sheet for rows with the same Carton NO.
-    Specifically merges the CTNS, Carton MEASUREMENT, G.W (KG), and Carton NO. columns vertically.
-    """
-    try:
-        wb = load_workbook(workbook_path)
-        if 'Packing List' not in wb.sheetnames:
-            print("No 'Packing List' sheet found in workbook")
-            return False
-            
-        ws = wb['Packing List']
-        
-        # Find column indices
-        carton_no_idx = None
-        ctns_idx = None
-        measurement_idx = None
-        gw_idx = None
-        
-        for col_idx, cell in enumerate(ws[1], 1):
-            if cell.value == 'Carton NO.':
-                carton_no_idx = col_idx
-            elif cell.value == 'CTNS':
-                ctns_idx = col_idx
-            elif cell.value == 'Carton MEASUREMENT':
-                measurement_idx = col_idx
-            elif cell.value == 'G.W (KG)':
-                gw_idx = col_idx
-        
-        if not all([carton_no_idx, ctns_idx, measurement_idx, gw_idx]):
-            print("Could not find all required columns for merging")
-            return False
-            
-        # Track rows with the same carton number
-        current_carton = None
-        start_row = None
-        last_row = ws.max_row
-        
-        for row_idx in range(2, last_row + 1):
-            carton_no = ws.cell(row=row_idx, column=carton_no_idx).value
-            
-            # Skip empty or None values
-            if not carton_no:
-                continue
-                
-            # If this is a new carton number
-            if current_carton is not None and current_carton != carton_no:
-                # Merge cells for the previous group if it has multiple rows
-                if start_row < row_idx - 1:
-                    end_row = row_idx - 1
-                    ws.merge_cells(start_row=start_row, start_column=ctns_idx, end_row=end_row, end_column=ctns_idx)
-                    ws.merge_cells(start_row=start_row, start_column=measurement_idx, end_row=end_row, end_column=measurement_idx)
-                    ws.merge_cells(start_row=start_row, start_column=gw_idx, end_row=end_row, end_column=gw_idx)
-                    ws.merge_cells(start_row=start_row, start_column=carton_no_idx, end_row=end_row, end_column=carton_no_idx)
-            
-            # Update tracking for the current carton
-            current_carton = carton_no
-            start_row = row_idx
-        
-        # Handle the last group of rows
-        if start_row and start_row < last_row:
-            ws.merge_cells(start_row=start_row, start_column=ctns_idx, end_row=last_row, end_column=last_row)
-            ws.merge_cells(start_row=start_row, start_column=measurement_idx, end_row=last_row, end_column=measurement_idx)
-            ws.merge_cells(start_row=start_row, start_column=gw_idx, end_row=last_row, end_column=gw_idx)
-            ws.merge_cells(start_row=start_row, start_column=carton_no_idx, end_row=last_row, end_column=carton_no_idx)
-        
-        # Set vertical alignment for merged cells
-        for row in ws.iter_rows():
-            for cell in row:
-                if cell.coordinate in ws.merged_cells:
-                    cell.alignment = Alignment(vertical='center')
-        
-        wb.save(workbook_path)
-        print(f"Successfully merged cells in Packing List for {workbook_path}")
-        return True
-    except Exception as e:
-        print(f"Error merging cells in Packing List: {e}")
-        return False
-    """
-    Merge cells in the Packing List sheet for rows with the same Carton NO.
-    Specifically merges the CTNS, Carton MEASUREMENT, G.W (KG), and Carton NO. columns vertically.
-    """
-    try:
-        wb = load_workbook(workbook_path)
-        if 'Packing List' not in wb.sheetnames:
-            print("No 'Packing List' sheet found in workbook")
-            return False
-            
-        ws = wb['Packing List']
-        
-        # Find column indices
-        carton_no_idx = None
-        ctns_idx = None
-        measurement_idx = None
-        gw_idx = None
-        
-        for col_idx, cell in enumerate(ws[1], 1):
-            if cell.value == 'Carton NO.':
-                carton_no_idx = col_idx
-            elif cell.value == 'CTNS':
-                ctns_idx = col_idx
-            elif cell.value == 'Carton MEASUREMENT':
-                measurement_idx = col_idx
-            elif cell.value == 'G.W (KG)':
-                gw_idx = col_idx
-        
-        if not all([carton_no_idx, ctns_idx, measurement_idx, gw_idx]):
-            print("Could not find all required columns for merging")
-            return False
-            
-        # Track rows with the same carton number
-        current_carton = None
-        start_row = None
-        last_row = ws.max_row
-        
-        for row_idx in range(2, last_row + 1):
-            carton_no = ws.cell(row=row_idx, column=carton_no_idx).value
-            
-            # Skip empty or None values
-            if not carton_no:
-                continue
-                
-            # If this is a new carton number or last row
-            if current_carton != carton_no or row_idx == last_row:
-                # Merge cells for previous carton if we have a start row
-                if start_row and start_row < row_idx - 1 and current_carton:
-                    end_row = row_idx - 1
-                    
-                    # If it's the last row and same carton, include it
-                    if row_idx == last_row and current_carton == carton_no:
-                        end_row = row_idx
-                    
-                    # Merge CTNS cells
-                    ws.merge_cells(start_row=start_row, start_column=ctns_idx, 
-                                  end_row=end_row, end_column=ctns_idx)
-                    
-                    # Merge Carton MEASUREMENT cells
-                    ws.merge_cells(start_row=start_row, start_column=measurement_idx,
-                                  end_row=end_row, end_column=measurement_idx)
-                    
-                    # Merge G.W (KG) cells
-                    ws.merge_cells(start_row=start_row, start_column=gw_idx,
-                                  end_row=end_row, end_column=gw_idx)
-                    
-                    # Merge Carton NO. cells
-                    ws.merge_cells(start_row=start_row, start_column=carton_no_idx,
-                                  end_row=end_row, end_column=carton_no_idx)
-                
-                # Start tracking new carton
-                current_carton = carton_no
-                start_row = row_idx
-                
-                # Special case for the last row
-                # if row_idx == last_row and row_idx > start_row:
-                if row_idx == last_row and row_idx > start_row:
-                    # Merge cells for the last carton
-                    ws.merge_cells(start_row=start_row, start_column=ctns_idx, 
-                                  end_row=row_idx, end_column=ctns_idx)
-                    ws.merge_cells(start_row=start_row, start_column=measurement_idx,
-                                  end_row=row_idx, end_column=measurement_idx)
-                    ws.merge_cells(start_row=start_row, start_column=gw_idx,
-                                  end_row=row_idx, end_column=gw_idx)
-                    ws.merge_cells(start_row=start_row, start_column=carton_no_idx,
-                                  end_row=row_idx, end_column=carton_no_idx)
+                          end_row=end_row, end_column=carton_no_idx)
         
         # Set vertical alignment for merged cells
         for row in ws.iter_rows():
