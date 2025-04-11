@@ -3,6 +3,7 @@ import openpyxl
 import copy
 import os
 import sys
+from openpyxl.styles import Border, Side
 
 def copy_cell_formatting(source_cell, target_cell):
     """Helper function to copy cell formatting."""
@@ -103,6 +104,77 @@ def load_workbook_safely(file_path):
         print(f"Error opening file {file_path}: {e}")
         return None
 
+def apply_outer_border(sheet):
+    """Apply outer border to the used range of the worksheet."""
+    from openpyxl.styles import Border, Side
+    
+    # Define thick border style
+    thick_border = Side(style='medium')
+    
+    # Find the actual content boundaries
+    min_row = 1  # Always start from first row as it contains the header
+    min_col = 1
+    
+    # Find the last row with content (looking for specific markers)
+    max_row = 1
+    for row in range(1, sheet.max_row + 1):
+        if sheet.cell(row=row, column=1).value == "COUNTRY OF ORIGIN: CHINA":
+            # Include a few more rows to capture payment terms and delivery info
+            max_row = row + 4
+            break
+        elif sheet.cell(row=row, column=1).value is not None:
+            max_row = row
+
+    # Find the last column with content
+    max_col = 1
+    for col in range(1, sheet.max_column + 1):
+        for row in range(1, max_row + 1):
+            if sheet.cell(row=row, column=col).value is not None:
+                max_col = max(max_col, col)
+    
+    # Apply borders to all cells on the edges
+    for row in range(min_row, max_row + 1):
+        # Left edge cell
+        left_cell = sheet.cell(row=row, column=min_col)
+        current_border = left_cell.border
+        left_cell.border = Border(
+            left=thick_border,
+            right=current_border.right if current_border else None,
+            top=current_border.top if current_border else None,
+            bottom=current_border.bottom if current_border else None
+        )
+        
+        # Right edge cell
+        right_cell = sheet.cell(row=row, column=max_col)
+        current_border = right_cell.border
+        right_cell.border = Border(
+            left=current_border.left if current_border else None,
+            right=thick_border,
+            top=current_border.top if current_border else None,
+            bottom=current_border.bottom if current_border else None
+        )
+    
+    for col in range(min_col, max_col + 1):
+        # Top edge cell
+        top_cell = sheet.cell(row=min_row, column=col)
+        current_border = top_cell.border
+        top_cell.border = Border(
+            left=current_border.left if current_border else None,
+            right=current_border.right if current_border else None,
+            top=thick_border,
+            bottom=current_border.bottom if current_border else None
+        )
+        
+        # Bottom edge cell
+        bottom_cell = sheet.cell(row=max_row, column=col)
+        current_border = bottom_cell.border
+        bottom_cell.border = Border(
+            left=current_border.left if current_border else None,
+            right=current_border.right if current_border else None,
+            top=current_border.top if current_border else None,
+            bottom=thick_border
+        )
+
 def merge_three_excel_files(first_file, middle_file, last_file, output_file):
     """
     Merge exactly three Excel files with specific requirements:
@@ -157,6 +229,9 @@ def merge_three_excel_files(first_file, middle_file, last_file, output_file):
     
     # Apply column widths
     apply_column_widths(merged_sheet, column_widths)
+    
+    # Apply outer border to Commercial Invoice sheet
+    apply_outer_border(merged_sheet)
     
     # Reorder sheets
     merged_wb._sheets = [merged_wb['Packing List'], merged_wb['Commercial Invoice']]
