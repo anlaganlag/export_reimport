@@ -486,21 +486,10 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
         column_mappings['Qty'] = qty_col
     
     if unit_col:
-        # Convert Chinese units to English
-        def convert_unit_to_english(unit):
-            unit_mapping = {
-                '个': 'PCS',
-                '件': 'PCS',
-                '卷': 'ROLL',
-                '套': 'SET',
-                '箱': 'BOX',
-                '米': 'M',
-                '千克': 'KG',
-                '公斤': 'KG'
-            }
-            return unit_mapping.get(str(unit).strip(), str(unit))
-        
-        result_df['Unit'] = packing_list_df[unit_col].apply(convert_unit_to_english)
+        # First, copy the original units to both dataframes
+        result_df['Unit'] = packing_list_df[unit_col]
+        result_df['Original_Unit'] = packing_list_df[unit_col]  # Keep original units for reference
+        pl_result_df['Original_Unit'] = packing_list_df[unit_col]  # Also keep in pl_result_df
         column_mappings['Unit'] = unit_col
     
     if net_weight_col:
@@ -747,14 +736,14 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
     
     cif_output_columns = cif_output_columns + ['G.W (KG)']
 
-    # Ensure Amount is included in the output columns
+    # Define output column sets for export invoice
     exportReimport_output_columns = [
         'NO.', 'Material code', 'DESCRIPTION', 'Model NO.', 'Unit Price', 'Qty', 'Unit', 'Amount'
     ]
-    
-    # 内部计算需要的完整列集合（包含Trade Type和Shipper）
-    internal_columns = cif_output_columns + ['Trade Type', 'Shipper']
-    
+
+    # Internal columns needed for calculations (including Trade Type and Shipper)
+    internal_columns = cif_output_columns + ['Trade Type', 'Shipper', 'Original_Unit']
+
     # Packing list internal columns - add project to pl_output_columns
     pl_output_columns.append('project')  # Add project to the output columns
     pl_internal_columns = pl_output_columns + ['Trade Type', 'Shipper', 'factory']
@@ -837,24 +826,25 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
         if 'Shipper' in packing_list.columns:
             packing_list = packing_list.drop(columns=['Shipper'])
         
-        # Create a copy for commercial invoice (Sheet2) - with only the required columns
+        # Use original Chinese units for export invoice
         export_invoice = general_trade_df[exportReimport_output_columns].copy()
+        # Keep original Chinese units from the source
+        if 'Original_Unit' in general_trade_df.columns:
+            export_invoice['Unit'] = general_trade_df['Original_Unit']
         
-        # Group by Material code, DESCRIPTION, Model NO., Unit Price, and Unit to merge entries
-        # This combines items with the same material code and price
-        export_grouped = export_invoice.groupby(['Material code', 'Unit Price', ], as_index=False).agg({
+        # Group by Material code and other fields, keeping original units
+        export_grouped = export_invoice.groupby(['Material code', 'Unit Price'], as_index=False).agg({
             'Qty': 'sum',
             'NO.': 'first',
-            'Unit': 'first',
+            'Unit': 'first',  # This will keep the original Chinese unit
             'Model NO.': 'first',
             'DESCRIPTION': 'first',
-
         })
         
-        # Recalculate Amount based on grouped quantities
-        export_grouped['Amount'] = export_grouped['Unit Price'] * export_grouped['Qty']
+        # Calculate Amount after grouping
+        export_grouped['Amount'] = (export_grouped['Unit Price'] * export_grouped['Qty']).round(2)
         
-        # Ensure all required columns exist
+        # Ensure all required columns exist and in correct order
         for col in exportReimport_output_columns:
             if col not in export_grouped.columns:
                 export_grouped[col] = None
