@@ -7,6 +7,7 @@ from openpyxl.styles import Alignment, Font, Border, Side, PatternFill, Color
 from openpyxl.utils import get_column_letter
 from openpyxl.utils.dataframe import dataframe_to_rows
 from openpyxl.utils.cell import coordinate_from_string, column_index_from_string
+import shutil
 
 # Make sure outputs directory exists
 if not os.path.exists('outputs'):
@@ -1001,6 +1002,118 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
             merge_packing_list_cells(export_file_path)
             
             print(f"Successfully saved and styled export file with multiple sheets: {export_file_path}")
+            
+            # After saving the export_invoice.xlsx, now merge it with h.xlsx and f.xlsx
+            print("Merging files: h.xlsx, export_invoice.xlsx, f.xlsx")
+            
+            # Temporarily save export_invoice.xlsx to a backup file
+            temp_export_file = os.path.join(output_dir, 'temp_export_invoice.xlsx')
+            try:
+                import shutil
+                shutil.copy(export_file_path, temp_export_file)
+                
+                # Prepare file paths for merging
+                h_file = 'h.xlsx'
+                f_file = 'f.xlsx'
+                
+                # Function to find a file in multiple locations
+                def find_file(filename):
+                    # Check in current directory
+                    if os.path.exists(filename):
+                        return filename
+                    
+                    # Check in output_dir
+                    file_in_output = os.path.join(output_dir, filename)
+                    if os.path.exists(file_in_output):
+                        return file_in_output
+                    
+                    # Check in the script's directory
+                    script_dir = os.path.dirname(os.path.abspath(__file__))
+                    file_in_script_dir = os.path.join(script_dir, filename)
+                    if os.path.exists(file_in_script_dir):
+                        return file_in_script_dir
+                    
+                    return None  # File not found
+                
+                # Find the files
+                h_file_path = find_file(h_file)
+                f_file_path = find_file(f_file)
+                
+                if h_file_path and f_file_path:
+                    print(f"Found files for merging:")
+                    print(f"  {h_file}: {h_file_path}")
+                    print(f"  {f_file}: {f_file_path}")
+                    
+                    # Import functions from merge.py
+                    import importlib.util
+                    import sys
+                    
+                    # Get the path to merge.py (checking multiple locations)
+                    merge_py_path = find_file('merge.py')
+                    
+                    if merge_py_path:
+                        print(f"Found merge.py at: {merge_py_path}")
+                        
+                        # Call merge.py with the files in specific order using subprocess
+                        import subprocess
+                        
+                        merge_cmd = [sys.executable, merge_py_path, h_file_path, temp_export_file, f_file_path, export_file_path]
+                        print(f"Running merge command: {' '.join(merge_cmd)}")
+                        
+                        try:
+                            # Use subprocess.run with stdout and stderr captured to diagnose issues
+                            result = subprocess.run(
+                                merge_cmd, 
+                                check=True,
+                                capture_output=True,
+                                text=True
+                            )
+                            
+                            # Print stdout and stderr for debugging
+                            if result.stdout:
+                                print("Merge output:")
+                                print(result.stdout)
+                            
+                            if result.stderr:
+                                print("Merge errors:")
+                                print(result.stderr)
+                            
+                            # If successful, verify the file exists
+                            if os.path.exists(export_file_path):
+                                print(f"Successfully merged files into: {export_file_path}")
+                            else:
+                                print(f"Error: Merged file not created at {export_file_path}")
+                        except subprocess.CalledProcessError as e:
+                            print(f"Error running merge script: {e}")
+                            if hasattr(e, 'stderr') and e.stderr:
+                                print(f"Error details: {e.stderr}")
+                        except Exception as e:
+                            print(f"Error during file merging: {e}")
+                            # Restore original export_invoice.xlsx if merging failed
+                            if os.path.exists(temp_export_file):
+                                shutil.copy(temp_export_file, export_file_path)
+                                print("Restored original export_invoice.xlsx")
+                    else:
+                        print(f"Error: merge.py not found")
+                else:
+                    missing_files = []
+                    if not h_file_path:
+                        missing_files.append(h_file)
+                    if not f_file_path:
+                        missing_files.append(f_file)
+                    if missing_files:
+                        print(f"Warning: Could not merge files. Missing files: {', '.join(missing_files)}")
+                    else:
+                        print("Unexpected error: All files found but merging could not proceed")
+            except Exception as e:
+                print(f"Error during file merging: {e}")
+            finally:
+                # Clean up temporary file
+                if os.path.exists(temp_export_file):
+                    try:
+                        os.remove(temp_export_file)
+                    except:
+                        pass
         except Exception as e:
             print(f"Warning: File saved but could not apply styling: {e}")
     else:
