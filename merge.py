@@ -74,6 +74,14 @@ def merge_three_excel_files(first_file, middle_file, last_file, output_file):
                     packing_list_sheet.row_dimensions[row_idx].height = source_sheet.row_dimensions[row_idx].height
                     
             print(f"Successfully copied first sheet from {middle_file}")
+            
+            # Preserve the column widths from the second sheet
+            if len(middle_wb.sheetnames) > 1:
+                ci_sheet = middle_wb[middle_wb.sheetnames[1]]
+                # Store header names and index from the commercial invoice
+                header_mapping = {}
+                for col_idx, cell in enumerate(ci_sheet[1], 1):
+                    header_mapping[cell.value] = col_idx
     except Exception as e:
         print(f"Warning: Could not copy first sheet from {middle_file}: {e}")
     
@@ -95,6 +103,13 @@ def merge_three_excel_files(first_file, middle_file, last_file, output_file):
         if len(wb2.sheetnames) > 1:
             sheet2 = wb2[wb2.sheetnames[1]]  # Second sheet
             file_data.append((wb2, sheet2, middle_file))
+            
+            # Store column widths from middle file's second sheet
+            ci_column_widths = {}
+            for col_idx, cell in enumerate(sheet2[1], 1):
+                col_letter = openpyxl.utils.get_column_letter(col_idx)
+                if col_letter in sheet2.column_dimensions:
+                    ci_column_widths[cell.value] = sheet2.column_dimensions[col_letter].width
         else:
             print(f"Warning: Middle file {middle_file} does not have a second sheet")
             return False
@@ -159,6 +174,28 @@ def merge_three_excel_files(first_file, middle_file, last_file, output_file):
         
         # Update row offset for the next file
         row_offset += sheet.max_row
+    
+    # Apply preserved column widths from the Commercial Invoice sheet
+    if 'ci_column_widths' in locals():
+        for col_idx, cell in enumerate(merged_sheet[1], 1):
+            col_name = cell.value
+            col_letter = openpyxl.utils.get_column_letter(col_idx)
+            
+            if col_name in ci_column_widths:
+                merged_sheet.column_dimensions[col_letter].width = ci_column_widths[col_name]
+            else:
+                # Apply default widths based on column names
+                if col_name == 'Material code':
+                    merged_sheet.column_dimensions[col_letter].width = 35  # Wider for Material code
+                elif col_name == 'Unit Price':
+                    merged_sheet.column_dimensions[col_letter].width = 20  # Wider for Unit Price
+                elif col_name == 'DESCRIPTION':
+                    merged_sheet.column_dimensions[col_letter].width = 30  # Wider for Description
+                elif col_name == 'Model NO.':
+                    merged_sheet.column_dimensions[col_letter].width = 20  # Wider for Model NO.
+                else:
+                    # Standard width for other columns
+                    merged_sheet.column_dimensions[col_letter].width = 15
     
     # Make sure the Packing List sheet is first in the workbook
     # Move sheets to correct order: Packing List first, then Commercial Invoice

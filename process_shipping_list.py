@@ -955,8 +955,18 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
                     col.fill = header_fill
                     col.alignment = header_alignment
                     
-                    # Set column width
-                    ws.column_dimensions[get_column_letter(col_idx)].width = 15
+                    # Set column width - customize widths for specific columns
+                    col_name = ws.cell(row=1, column=col_idx).value
+                    if col_name == 'Material code':
+                        ws.column_dimensions[get_column_letter(col_idx)].width = 35  # Wider for Material code
+                    elif col_name == 'Unit Price':
+                        ws.column_dimensions[get_column_letter(col_idx)].width = 20  # Wider for Unit Price
+                    elif col_name == 'DESCRIPTION':
+                        ws.column_dimensions[get_column_letter(col_idx)].width = 30  # Wider for Description
+                    elif col_name == 'Model NO.':
+                        ws.column_dimensions[get_column_letter(col_idx)].width = 20  # Wider for Model NO.
+                    else:
+                        ws.column_dimensions[get_column_letter(col_idx)].width = 15  # Default width
                 
                 # Apply borders to all cells
                 thin_border = Border(
