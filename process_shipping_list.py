@@ -745,6 +745,8 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
     internal_columns = cif_output_columns + ['Trade Type', 'Shipper', 'Original_Unit']
 
     # Packing list internal columns
+    pl_output_columns.append('project')  # Add project to the output columns but it will be removed before final export
+
     pl_internal_columns = pl_output_columns + ['Trade Type', 'Shipper', 'factory']
     
     # Ensure all required columns exist
@@ -819,11 +821,13 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
         # First, create a copy for packing list (Sheet1)
         packing_list = general_trade_df.copy()
         
-        # Remove Trade Type and Shipper columns before saving to Excel
+        # Remove Trade Type, Shipper, and project columns before saving to Excel
         if 'Trade Type' in packing_list.columns:
             packing_list = packing_list.drop(columns=['Trade Type'])
         if 'Shipper' in packing_list.columns:
             packing_list = packing_list.drop(columns=['Shipper'])
+        if 'project' in packing_list.columns:
+            packing_list = packing_list.drop(columns=['project'])
         
         # Use original Chinese units for export invoice
         export_invoice = general_trade_df[exportReimport_output_columns].copy()
@@ -882,8 +886,13 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
                         print(f"Warning: Column '{col}' not found in packing list data, adding empty column")
                         packing_df[col] = None
                 
-                # 确保正确的输出列顺序
-                packing_df = packing_df[pl_output_columns]
+                # 移除 project 列
+                if 'project' in packing_df.columns:
+                    packing_df = packing_df.drop(columns=['project'])
+                
+                # 确保正确的输出列顺序（不包含 project）
+                output_columns = [col for col in pl_output_columns if col != 'project']
+                packing_df = packing_df[output_columns]
                 
                 # 添加汇总行（只对数字列计算总和）
                 summary_cols = ['QUANTITY', 'G.W (KG)', 'N.W(KG)']
@@ -904,8 +913,8 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
                 
                 packing_df.to_excel(writer, sheet_name='Packing List', index=False)
             else:
-                # 如果没有pl_df数据，创建一个空的packing list with correct columns
-                empty_pl_df = pd.DataFrame(columns=pl_output_columns)
+                # 如果没有pl_df数据，创建一个空的packing list with correct columns (不包含 project)
+                empty_pl_df = pd.DataFrame(columns=[col for col in pl_output_columns if col != 'project'])
                 empty_pl_df.to_excel(writer, sheet_name='Packing List', index=False)
 
             # Commercial Invoice 工作表处理
