@@ -3,7 +3,6 @@ import openpyxl
 import copy
 import os
 import sys
-from openpyxl.styles import Border, Side
 
 def copy_cell_formatting(source_cell, target_cell):
     """Helper function to copy cell formatting."""
@@ -104,84 +103,16 @@ def load_workbook_safely(file_path):
         print(f"Error opening file {file_path}: {e}")
         return None
 
-def apply_outer_border(sheet):
-    """Apply outer border to the used range of the worksheet."""
-    from openpyxl.styles import Border, Side
-    
-    # Define thick border style
-    thick_border = Side(style='medium')
-    
-    # Find the actual content boundaries
-    min_row = 1  # Always start from first row as it contains the header
-    min_col = 1
-    
-    # Find the last row with content (looking for specific markers)
-    max_row = 1
-    for row in range(1, sheet.max_row + 1):
-        if sheet.cell(row=row, column=1).value == "COUNTRY OF ORIGIN: CHINA":
-            # Include a few more rows to capture payment terms and delivery info
-            max_row = row + 4
-            break
-        elif sheet.cell(row=row, column=1).value is not None:
-            max_row = row
-
-    # Find the last column with content
-    max_col = 1
-    for col in range(1, sheet.max_column + 1):
-        for row in range(1, max_row + 1):
-            if sheet.cell(row=row, column=col).value is not None:
-                max_col = max(max_col, col)
-    
-    # Apply borders to all cells on the edges
-    for row in range(min_row, max_row + 1):
-        # Left edge cell
-        left_cell = sheet.cell(row=row, column=min_col)
-        current_border = left_cell.border
-        left_cell.border = Border(
-            left=thick_border,
-            right=current_border.right if current_border else None,
-            top=current_border.top if current_border else None,
-            bottom=current_border.bottom if current_border else None
-        )
-        
-        # Right edge cell
-        right_cell = sheet.cell(row=row, column=max_col)
-        current_border = right_cell.border
-        right_cell.border = Border(
-            left=current_border.left if current_border else None,
-            right=thick_border,
-            top=current_border.top if current_border else None,
-            bottom=current_border.bottom if current_border else None
-        )
-    
-    for col in range(min_col, max_col + 1):
-        # Top edge cell
-        top_cell = sheet.cell(row=min_row, column=col)
-        current_border = top_cell.border
-        top_cell.border = Border(
-            left=current_border.left if current_border else None,
-            right=current_border.right if current_border else None,
-            top=thick_border,
-            bottom=current_border.bottom if current_border else None
-        )
-        
-        # Bottom edge cell
-        bottom_cell = sheet.cell(row=max_row, column=col)
-        current_border = bottom_cell.border
-        bottom_cell.border = Border(
-            left=current_border.left if current_border else None,
-            right=current_border.right if current_border else None,
-            top=current_border.top if current_border else None,
-            bottom=thick_border
-        )
-
-def merge_three_excel_files(first_file, middle_file, last_file, output_file):
+def merge_three_excel_files(first_file, middle_file, last_file, output_file, first_sheet_first_file=None, first_sheet_last_file=None):
     """
     Merge exactly three Excel files with specific requirements:
     - First file used entirely
     - Middle file - second sheet for merging, first sheet preserved
     - Last file used entirely
     - All merged cells and formatting preserved
+    
+    If first_sheet_first_file and first_sheet_last_file are provided, they will be used
+    to merge with the first sheet (Packing List) of the middle file.
     """
     print(f"Merging files: {first_file}, {middle_file}, {last_file}")
     
@@ -195,19 +126,25 @@ def merge_three_excel_files(first_file, middle_file, last_file, output_file):
     if not middle_wb or len(middle_wb.sheetnames) < 2:
         print(f"Error: Middle file must have at least 2 sheets")
         return False
-        
+    
     # Create and copy Packing List from middle file's first sheet
     packing_list_sheet = merged_wb.create_sheet('Packing List')
-    copy_sheet(middle_wb[middle_wb.sheetnames[0]], packing_list_sheet)
-    print(f"Copied first sheet from {middle_file}")
+    
+    # Extract column widths from middle file's first sheet
+    middle_pl_sheet = middle_wb[middle_wb.sheetnames[0]]
+    pl_column_widths = {}
+    for col_idx, cell in enumerate(middle_pl_sheet[1], 1):
+        col_letter = openpyxl.utils.get_column_letter(col_idx)
+        if cell.value and col_letter in middle_pl_sheet.column_dimensions:
+            pl_column_widths[cell.value] = middle_pl_sheet.column_dimensions[col_letter].width
     
     # Extract column widths from middle file's second sheet
     middle_ci_sheet = middle_wb[middle_wb.sheetnames[1]]
-    column_widths = {}
+    ci_column_widths = {}
     for col_idx, cell in enumerate(middle_ci_sheet[1], 1):
         col_letter = openpyxl.utils.get_column_letter(col_idx)
         if cell.value and col_letter in middle_ci_sheet.column_dimensions:
-            column_widths[cell.value] = middle_ci_sheet.column_dimensions[col_letter].width
+            ci_column_widths[cell.value] = middle_ci_sheet.column_dimensions[col_letter].width
     
     # Prepare data for merging Commercial Invoice
     files_to_merge = [
@@ -224,14 +161,40 @@ def merge_three_excel_files(first_file, middle_file, last_file, output_file):
             return False
             
         sheet = sheet_selector(wb)
-        print(f"Processing: {file_path}")
+        print(f"Processing Commercial Invoice: {file_path}")
         row_offset += append_sheet_with_offset(sheet, merged_sheet, row_offset, file_path)
     
-    # Apply column widths
-    apply_column_widths(merged_sheet, column_widths)
+    # Apply column widths to Commercial Invoice
+    apply_column_widths(merged_sheet, ci_column_widths)
     
-    # Apply outer border to Commercial Invoice sheet
-    apply_outer_border(merged_sheet)
+    # Handle Packing List sheet merging if first_sheet_first_file and first_sheet_last_file are provided
+    if first_sheet_first_file and first_sheet_last_file:
+        print(f"Merging Packing List with: {first_sheet_first_file}, {middle_file}, {first_sheet_last_file}")
+        
+        # Prepare data for merging Packing List
+        pl_files_to_merge = [
+            (first_sheet_first_file, lambda wb: wb.active),
+            (middle_file, lambda wb: wb[wb.sheetnames[0]]),
+            (first_sheet_last_file, lambda wb: wb.active)
+        ]
+        
+        # Merge Packing List sheets vertically
+        pl_row_offset = 0
+        for file_path, sheet_selector in pl_files_to_merge:
+            wb = load_workbook_safely(file_path)
+            if not wb:
+                return False
+                
+            sheet = sheet_selector(wb)
+            print(f"Processing Packing List: {file_path}")
+            pl_row_offset += append_sheet_with_offset(sheet, packing_list_sheet, pl_row_offset, file_path)
+        
+        # Apply column widths to Packing List
+        apply_column_widths(packing_list_sheet, pl_column_widths)
+    else:
+        # If no first sheet files provided, just copy the first sheet from middle file
+        print(f"Copying first sheet from {middle_file}")
+        copy_sheet(middle_wb[middle_wb.sheetnames[0]], packing_list_sheet)
     
     # Reorder sheets
     merged_wb._sheets = [merged_wb['Packing List'], merged_wb['Commercial Invoice']]
@@ -247,11 +210,19 @@ def merge_three_excel_files(first_file, middle_file, last_file, output_file):
 
 if __name__ == "__main__":
     if len(sys.argv) < 5:
-        print("Usage: python merge.py <first_file.xlsx> <middle_file.xlsx> <last_file.xlsx> <output_file.xlsx>")
+        print("Usage: python merge.py <first_file.xlsx> <middle_file.xlsx> <last_file.xlsx> <output_file.xlsx> [first_sheet_first_file.xlsx] [first_sheet_last_file.xlsx]")
         sys.exit(1)
     
     files = [os.path.abspath(sys.argv[i]) for i in range(1, 5)]
-    success = merge_three_excel_files(*files)
+    
+    # Check if first sheet files are provided
+    first_sheet_first_file = os.path.abspath(sys.argv[5]) if len(sys.argv) > 5 else None
+    first_sheet_last_file = os.path.abspath(sys.argv[6]) if len(sys.argv) > 6 else None
+    
+    success = merge_three_excel_files(
+        files[0], files[1], files[2], files[3], 
+        first_sheet_first_file, first_sheet_last_file
+    )
     
     if not success:
         print("Merge operation failed!")

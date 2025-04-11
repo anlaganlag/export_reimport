@@ -744,8 +744,7 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
     # Internal columns needed for calculations (including Trade Type and Shipper)
     internal_columns = cif_output_columns + ['Trade Type', 'Shipper', 'Original_Unit']
 
-    # Packing list internal columns - add project to pl_output_columns
-    pl_output_columns.append('project')  # Add project to the output columns
+    # Packing list internal columns
     pl_internal_columns = pl_output_columns + ['Trade Type', 'Shipper', 'factory']
     
     # Ensure all required columns exist
@@ -1016,6 +1015,10 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
                 h_file = 'h.xlsx'
                 f_file = 'f.xlsx'
                 
+                # For Packing List sheet, we need different files
+                pl_h_file = 'pl_h.xlsx'  # First file for Packing List sheet
+                pl_f_file = 'pl_f.xlsx'  # Last file for Packing List sheet
+                
                 # Function to find a file in multiple locations
                 def find_file(filename):
                     # Check in current directory
@@ -1038,11 +1041,20 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
                 # Find the files
                 h_file_path = find_file(h_file)
                 f_file_path = find_file(f_file)
+                pl_h_file_path = find_file(pl_h_file)
+                pl_f_file_path = find_file(pl_f_file)
                 
                 if h_file_path and f_file_path:
-                    print(f"Found files for merging:")
+                    print(f"Found files for merging Commercial Invoice:")
                     print(f"  {h_file}: {h_file_path}")
                     print(f"  {f_file}: {f_file_path}")
+                    
+                    if pl_h_file_path and pl_f_file_path:
+                        print(f"Found files for merging Packing List:")
+                        print(f"  {pl_h_file}: {pl_h_file_path}")
+                        print(f"  {pl_f_file}: {pl_f_file_path}")
+                    else:
+                        print("Warning: Packing List merge files not found, will only merge Commercial Invoice")
                     
                     # Import functions from merge.py
                     import importlib.util
@@ -1057,7 +1069,28 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
                         # Call merge.py with the files in specific order using subprocess
                         import subprocess
                         
-                        merge_cmd = [sys.executable, merge_py_path, h_file_path, temp_export_file, f_file_path, export_file_path]
+                        # Prepare command with or without Packing List files
+                        if pl_h_file_path and pl_f_file_path:
+                            merge_cmd = [
+                                sys.executable, 
+                                merge_py_path, 
+                                h_file_path, 
+                                temp_export_file, 
+                                f_file_path, 
+                                export_file_path,
+                                pl_h_file_path,
+                                pl_f_file_path
+                            ]
+                        else:
+                            merge_cmd = [
+                                sys.executable, 
+                                merge_py_path, 
+                                h_file_path, 
+                                temp_export_file, 
+                                f_file_path, 
+                                export_file_path
+                            ]
+                            
                         print(f"Running merge command: {' '.join(merge_cmd)}")
                         
                         try:
