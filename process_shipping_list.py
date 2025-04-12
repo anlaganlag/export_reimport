@@ -7,6 +7,7 @@ from openpyxl.styles import Alignment, Font, Border, Side, PatternFill, Color
 from openpyxl.utils import get_column_letter
 from openpyxl.utils.dataframe import dataframe_to_rows
 from openpyxl.utils.cell import coordinate_from_string, column_index_from_string
+from copy import copy
 import shutil
 
 # Make sure outputs directory exists
@@ -1257,6 +1258,143 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
         merge_packing_list_cells(reimport_invoice_path)
 
         print(f"Successfully saved and styled reimport invoice file: {reimport_invoice_path}")
+        
+        # After saving the reimport_invoice.xlsx, now merge it with header and footer Excel files
+        print("Merging files with reimport_invoice.xlsx")
+        
+        # Temporarily save reimport_invoice.xlsx to a backup file
+        temp_reimport_file = os.path.join(output_dir, 'temp_reimport_invoice.xlsx')
+        try:
+            import shutil
+            shutil.copy(reimport_invoice_path, temp_reimport_file)
+            
+            # Prepare file paths for merging
+            # For Packing List sheet
+            pl_h_file = 'pl_h.xlsx'  # Header file for Packing List sheet
+            pl_f_file = 'pl_f.xlsx'  # Footer file for Packing List sheet
+            
+            # For Commercial Invoice sheets
+            ci_h_file = 'h.xlsx'  # Header file for Commercial Invoice sheets
+            ci_f_file = 'f.xlsx'  # Footer file for Commercial Invoice sheets
+            
+            # Function to find a file in multiple locations (reuse the existing function)
+            def find_file(filename):
+                # Check in current directory
+                if os.path.exists(filename):
+                    return filename
+                
+                # Check in output_dir
+                file_in_output = os.path.join(output_dir, filename)
+                if os.path.exists(file_in_output):
+                    return file_in_output
+                
+                # Check in the script's directory
+                script_dir = os.path.dirname(os.path.abspath(__file__))
+                file_in_script_dir = os.path.join(script_dir, filename)
+                if os.path.exists(file_in_script_dir):
+                    return file_in_script_dir
+                
+                return None  # File not found
+            
+            # Find the files
+            pl_h_file_path = find_file(pl_h_file)
+            pl_f_file_path = find_file(pl_f_file)
+            ci_h_file_path = find_file(ci_h_file)
+            ci_f_file_path = find_file(ci_f_file)
+            
+            # Get the path to merge_reimport.py (checking multiple locations)
+            merge_reimport_py_path = find_file('merge_reimport.py')
+            
+            if merge_reimport_py_path:
+                print(f"Found merge_reimport.py at: {merge_reimport_py_path}")
+                
+                # Check if we have the necessary files
+                if not (pl_h_file_path and pl_f_file_path and ci_h_file_path and ci_f_file_path):
+                    missing_files = []
+                    if not pl_h_file_path:
+                        missing_files.append(pl_h_file)
+                    if not pl_f_file_path:
+                        missing_files.append(pl_f_file)
+                    if not ci_h_file_path:
+                        missing_files.append(ci_h_file)
+                    if not ci_f_file_path:
+                        missing_files.append(ci_f_file)
+                    print(f"Warning: Some merge files are missing: {', '.join(missing_files)}")
+                    print("Will proceed with available files only.")
+                
+                # Call merge_reimport.py with the files in specific order using subprocess
+                import subprocess
+                
+                # Prepare command for merging
+                merge_cmd = [
+                    sys.executable, 
+                    merge_reimport_py_path, 
+                    temp_reimport_file, 
+                    reimport_invoice_path, 
+                    pl_h_file_path or '', 
+                    pl_f_file_path or '', 
+                    ci_h_file_path or '', 
+                    ci_f_file_path or ''
+                ]
+                
+                print(f"Running merge command: {' '.join(merge_cmd)}")
+                
+                try:
+                    # Use subprocess.run with stdout and stderr captured to diagnose issues
+                    result = subprocess.run(
+                        merge_cmd, 
+                        check=False,  # Don't raise an exception on non-zero exit
+                        capture_output=True,
+                        text=True
+                    )
+                    
+                    # Print stdout and stderr for debugging
+                    if result.stdout:
+                        print("Merge output:")
+                        print(result.stdout)
+                    
+                    if result.stderr:
+                        print("Merge errors:")
+                        print(result.stderr)
+                    
+                    # Check if the merge was successful
+                    if result.returncode != 0:
+                        print(f"Merge failed with return code {result.returncode}")
+                        # Restore original reimport_invoice.xlsx if merging failed
+                        if os.path.exists(temp_reimport_file):
+                            shutil.copy(temp_reimport_file, reimport_invoice_path)
+                            print("Restored original reimport_invoice.xlsx")
+                    else:
+                        print(f"Successfully merged files into: {reimport_invoice_path}")
+                except subprocess.CalledProcessError as e:
+                    print(f"Error running merge script: {e}")
+                    if hasattr(e, 'stderr') and e.stderr:
+                        print(f"Error details: {e.stderr}")
+                    # Restore original reimport_invoice.xlsx if merging failed
+                    if os.path.exists(temp_reimport_file):
+                        shutil.copy(temp_reimport_file, reimport_invoice_path)
+                        print("Restored original reimport_invoice.xlsx")
+                except Exception as e:
+                    print(f"Error during file merging: {e}")
+                    # Restore original reimport_invoice.xlsx if merging failed
+                    if os.path.exists(temp_reimport_file):
+                        shutil.copy(temp_reimport_file, reimport_invoice_path)
+                        print("Restored original reimport_invoice.xlsx")
+            else:
+                print(f"Error: merge_reimport.py not found")
+        except Exception as e:
+            print(f"Error during file merging for reimport invoice: {e}")
+            # Restore original reimport_invoice.xlsx if merging failed
+            if os.path.exists(temp_reimport_file):
+                shutil.copy(temp_reimport_file, reimport_invoice_path)
+                print("Restored original reimport_invoice.xlsx")
+        finally:
+            # Clean up temporary file
+            if os.path.exists(temp_reimport_file):
+                try:
+                    os.remove(temp_reimport_file)
+                except:
+                    pass
         
     except Exception as e:
         print(f"Warning: Could not apply styling to reimport invoice file: {e}")
