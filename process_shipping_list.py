@@ -1166,10 +1166,10 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
     split_dfs, project_categories = split_by_project_and_factory(result_df)
     
     # Generate a single invoice file with multiple sheets for all splits
-    combined_invoice_path = os.path.join(output_dir, 'combined_invoice.xlsx')
+    reimport_invoice_path = os.path.join(output_dir, 'reimport_invoice.xlsx')
     
-    # Create a new Excel writer for the combined file
-    with pd.ExcelWriter(combined_invoice_path, engine='openpyxl') as writer:
+    # Create a new Excel writer for the reimport file
+    with pd.ExcelWriter(reimport_invoice_path, engine='openpyxl') as writer:
         # Process each split
         for (project, factory), df in split_dfs.items():
             if not df.empty:
@@ -1199,10 +1199,10 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
                 
                 print(f"Added sheets for project {project}, factory {factory}")
     
-    # Apply styling to the combined file
+    # Apply styling to the reimport file
     try:
         # Load the workbook
-        wb = load_workbook(combined_invoice_path)
+        wb = load_workbook(reimport_invoice_path)
         
         # Style each sheet
         for sheet_name in wb.sheetnames:
@@ -1260,11 +1260,11 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
                             cell.number_format = '#,##0.00'
         
         # Save the styled workbook
-        wb.save(combined_invoice_path)
-        print(f"Successfully saved and styled combined invoice file: {combined_invoice_path}")
+        wb.save(reimport_invoice_path)
+        print(f"Successfully saved and styled reimport invoice file: {reimport_invoice_path}")
         
     except Exception as e:
-        print(f"Warning: Could not apply styling to combined invoice file: {e}")
+        print(f"Warning: Could not apply styling to reimport invoice file: {e}")
 
     return result_df
 
