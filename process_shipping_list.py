@@ -1165,43 +1165,106 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
     # Split the data by project and factory
     split_dfs, project_categories = split_by_project_and_factory(result_df)
     
-    # Generate separate invoice files for each split
-    for (project, factory), df in split_dfs.items():
-        if not df.empty:
-            # Create filename
-            filename = f'invoice_{project}_{factory}.xlsx'
-            file_path = os.path.join(output_dir, filename)
-            
-            # Create a copy for the invoice
-            invoice_df = df[exportReimport_output_columns].copy()
-            
-            # Create a copy for the packing list
-            packing_df = pl_result_df[pl_result_df['factory'] == factory].copy()
-            project_filter = project_categories[project]
-            packing_df = packing_df[packing_df['project'].apply(project_filter)]
-            
-            # Save both sheets to the same Excel file
-            with pd.ExcelWriter(file_path, engine='openpyxl') as writer:
+    # Generate a single invoice file with multiple sheets for all splits
+    combined_invoice_path = os.path.join(output_dir, 'combined_invoice.xlsx')
+    
+    # Create a new Excel writer for the combined file
+    with pd.ExcelWriter(combined_invoice_path, engine='openpyxl') as writer:
+        # Process each split
+        for (project, factory), df in split_dfs.items():
+            if not df.empty:
+                # Create sheet names
+                pl_sheet_name = f'{project}_{factory}_PL'
+                ci_sheet_name = f'{project}_{factory}_CI'
+                
+                # Create a copy for the invoice
+                invoice_df = df[exportReimport_output_columns].copy()
+                
+                # Create a copy for the packing list
+                packing_df = pl_result_df[pl_result_df['factory'] == factory].copy()
+                project_filter = project_categories[project]
+                packing_df = packing_df[packing_df['project'].apply(project_filter)]
+                
                 # Save packing list
                 if not packing_df.empty:
                     # Remove internal columns before saving
                     save_columns = [col for col in pl_output_columns if col != 'project']  # Remove project from output
                     packing_df = packing_df[save_columns]
-                    packing_df.to_excel(writer, sheet_name='Packing List', index=False)
+                    packing_df.to_excel(writer, sheet_name=pl_sheet_name, index=False)
                 else:
-                    pd.DataFrame(columns=[col for col in pl_output_columns if col != 'project']).to_excel(writer, sheet_name='Packing List', index=False)
+                    pd.DataFrame(columns=[col for col in pl_output_columns if col != 'project']).to_excel(writer, sheet_name=pl_sheet_name, index=False)
                 
                 # Save commercial invoice
-                invoice_df.to_excel(writer, sheet_name='Commercial Invoice', index=False)
+                invoice_df.to_excel(writer, sheet_name=ci_sheet_name, index=False)
+                
+                print(f"Added sheets for project {project}, factory {factory}")
+    
+    # Apply styling to the combined file
+    try:
+        # Load the workbook
+        wb = load_workbook(combined_invoice_path)
+        
+        # Style each sheet
+        for sheet_name in wb.sheetnames:
+            ws = wb[sheet_name]
             
-            # Apply styling
-            try:
-                apply_excel_styling(file_path)
-                # Apply cell merging for packing list
-                merge_packing_list_cells(file_path)
-                print(f"Successfully generated invoice for project {project}, factory {factory}")
-            except Exception as e:
-                print(f"Warning: Could not apply styling to {filename}: {e}")
+            # Define styles
+            header_font = Font(name='Arial', size=11, bold=True, color='FFFFFF')
+            header_fill = PatternFill(start_color='366092', end_color='366092', fill_type='solid')
+            header_alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+            
+            # Apply styling to headers
+            for col_idx, col in enumerate(ws[1], 1):
+                col.font = header_font
+                col.fill = header_fill
+                col.alignment = header_alignment
+                
+                # Set column width - customize widths for specific columns
+                col_name = ws.cell(row=1, column=col_idx).value
+                if col_name == 'Material code':
+                    ws.column_dimensions[get_column_letter(col_idx)].width = 35  # Wider for Material code
+                elif col_name == 'Unit Price':
+                    ws.column_dimensions[get_column_letter(col_idx)].width = 20  # Wider for Unit Price
+                elif col_name == 'DESCRIPTION':
+                    ws.column_dimensions[get_column_letter(col_idx)].width = 30  # Wider for Description
+                elif col_name == 'Model NO.':
+                    ws.column_dimensions[get_column_letter(col_idx)].width = 20  # Wider for Model NO.
+                else:
+                    ws.column_dimensions[get_column_letter(col_idx)].width = 15  # Default width
+            
+            # Apply borders to all cells
+            thin_border = Border(
+                left=Side(style='thin'),
+                right=Side(style='thin'),
+                top=Side(style='thin'),
+                bottom=Side(style='thin')
+            )
+            
+            for row in ws.iter_rows():
+                for cell in row:
+                    cell.border = thin_border
+            
+            # Freeze the header row
+            ws.freeze_panes = 'A2'
+            
+            # Apply number formatting to specific columns if this is a Commercial Invoice sheet
+            if 'Commercial_Invoice' in sheet_name:
+                for col_idx, cell in enumerate(ws[1], 1):
+                    if cell.value == 'Unit Price':
+                        for row in range(2, ws.max_row + 1):
+                            cell = ws.cell(row=row, column=col_idx)
+                            cell.number_format = '#,##0.000000'
+                    elif cell.value == 'Amount':
+                        for row in range(2, ws.max_row + 1):
+                            cell = ws.cell(row=row, column=col_idx)
+                            cell.number_format = '#,##0.00'
+        
+        # Save the styled workbook
+        wb.save(combined_invoice_path)
+        print(f"Successfully saved and styled combined invoice file: {combined_invoice_path}")
+        
+    except Exception as e:
+        print(f"Warning: Could not apply styling to combined invoice file: {e}")
 
     return result_df
 
