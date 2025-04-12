@@ -840,11 +840,9 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
         pl_invoice = pl_invoice.drop(columns=['factory'])
         
     cif_file_path = os.path.join(output_dir, 'cif_original_invoice.xlsx')
-    pl_file_path = os.path.join(output_dir, 'pl_original_invoice.xlsx')
     
-    # Save CIF invoice
+    # Save only CIF invoice, remove pl_original_invoice generation
     safe_save_to_excel(cif_invoice, cif_file_path)
-    safe_save_to_excel(pl_invoice, pl_file_path)
     
     # 提取一般贸易的物料
     general_trade_df = result_df[result_df['Trade Type'] == '一般贸易'].copy()
