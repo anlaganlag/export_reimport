@@ -437,7 +437,38 @@ def split_by_project_and_factory(df):
     return split_dfs, project_categories
 
 # Main function to process the shipping list
-def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
+def process_shipping_list(packing_list_file, policy_file, output_dir='outputs', template_paths=None):
+    """
+    Process shipping list and generate invoices.
+    
+    Args:
+        packing_list_file: Path to the packing list Excel file
+        policy_file: Path to the policy Excel file
+        output_dir: Directory to save output files (default: 'outputs')
+        template_paths: Dictionary containing paths to custom templates:
+            {
+                'export_ci_header': path to export commercial invoice header,
+                'export_ci_footer': path to export commercial invoice footer,
+                'export_pl_header': path to export packing list header,
+                'export_pl_footer': path to export packing list footer,
+                'reimport_ci_header': path to reimport commercial invoice header,
+                'reimport_ci_footer': path to reimport commercial invoice footer,
+                'reimport_pl_header': path to reimport packing list header,
+                'reimport_pl_footer': path to reimport packing list footer
+            }
+    """
+    # Use default templates if none provided
+    template_paths = template_paths or {
+        'export_ci_header': 'h.xlsx',
+        'export_ci_footer': 'f.xlsx',
+        'export_pl_header': 'pl_h.xlsx',
+        'export_pl_footer': 'pl_f.xlsx',
+        'reimport_ci_header': 'h.xlsx',
+        'reimport_ci_footer': 'f.xlsx',
+        'reimport_pl_header': 'pl_h.xlsx',
+        'reimport_pl_footer': 'pl_f.xlsx'
+    }
+
     # Read the input files
     packing_list_df = read_excel_file(packing_list_file)
     policy_df = read_excel_file(policy_file)
@@ -1125,20 +1156,20 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
                             merge_cmd = [
                                 sys.executable, 
                                 merge_py_path, 
-                                h_file_path, 
+                                template_paths['export_ci_header'],
                                 temp_export_file, 
-                                f_file_path, 
+                                template_paths['export_ci_footer'],
                                 export_file_path,
-                                pl_h_file_path,
-                                pl_f_file_path
+                                template_paths['export_pl_header'],
+                                template_paths['export_pl_footer']
                             ]
                         else:
                             merge_cmd = [
                                 sys.executable, 
                                 merge_py_path, 
-                                h_file_path, 
+                                template_paths['export_ci_header'],
                                 temp_export_file, 
-                                f_file_path, 
+                                template_paths['export_ci_footer'],
                                 export_file_path
                             ]
                             
@@ -1376,10 +1407,10 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
                     merge_reimport_py_path, 
                     temp_reimport_file, 
                     reimport_invoice_path, 
-                    pl_h_file_path or '', 
-                    pl_f_file_path or '', 
-                    ci_h_file_path or '', 
-                    ci_f_file_path or ''
+                    template_paths['reimport_pl_header'],
+                    template_paths['reimport_pl_footer'],
+                    template_paths['reimport_ci_header'],
+                    template_paths['reimport_ci_footer']
                 ]
                 
                 print(f"Running merge command: {' '.join(merge_cmd)}")
@@ -1444,7 +1475,7 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
     except Exception as e:
         print(f"Warning: Could not apply styling to reimport invoice file: {e}")
 
-    return result_df
+    return True
 
 
     add_columns = [
