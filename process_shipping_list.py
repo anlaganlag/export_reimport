@@ -1170,34 +1170,26 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
     
     # Create a new Excel writer for the reimport file
     with pd.ExcelWriter(reimport_invoice_path, engine='openpyxl') as writer:
-        # Process each split
+        # First, add the complete Packing List sheet
+        complete_pl_df = pl_result_df.copy()
+        # Remove internal columns before saving
+        save_columns = [col for col in pl_output_columns if col != 'project']  # Remove project from output
+        complete_pl_df = complete_pl_df[save_columns]
+        complete_pl_df.to_excel(writer, sheet_name='Packing List', index=False)
+        
+        # Process each split for Commercial Invoice sheets only
         for (project, factory), df in split_dfs.items():
             if not df.empty:
-                # Create sheet names
-                pl_sheet_name = f'{project}_{factory}_PL'
+                # Create sheet name for Commercial Invoice only
                 ci_sheet_name = f'{project}_{factory}_CI'
                 
                 # Create a copy for the invoice
                 invoice_df = df[exportReimport_output_columns].copy()
                 
-                # Create a copy for the packing list
-                packing_df = pl_result_df[pl_result_df['factory'] == factory].copy()
-                project_filter = project_categories[project]
-                packing_df = packing_df[packing_df['project'].apply(project_filter)]
-                
-                # Save packing list
-                if not packing_df.empty:
-                    # Remove internal columns before saving
-                    save_columns = [col for col in pl_output_columns if col != 'project']  # Remove project from output
-                    packing_df = packing_df[save_columns]
-                    packing_df.to_excel(writer, sheet_name=pl_sheet_name, index=False)
-                else:
-                    pd.DataFrame(columns=[col for col in pl_output_columns if col != 'project']).to_excel(writer, sheet_name=pl_sheet_name, index=False)
-                
                 # Save commercial invoice
                 invoice_df.to_excel(writer, sheet_name=ci_sheet_name, index=False)
                 
-                print(f"Added sheets for project {project}, factory {factory}")
+                print(f"Added Commercial Invoice sheet for project {project}, factory {factory}")
     
     # Apply styling to the reimport file
     try:
@@ -1258,9 +1250,12 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
                         for row in range(2, ws.max_row + 1):
                             cell = ws.cell(row=row, column=col_idx)
                             cell.number_format = '#,##0.00'
+
         
         # Save the styled workbook
         wb.save(reimport_invoice_path)
+        merge_packing_list_cells(reimport_invoice_path)
+
         print(f"Successfully saved and styled reimport invoice file: {reimport_invoice_path}")
         
     except Exception as e:
