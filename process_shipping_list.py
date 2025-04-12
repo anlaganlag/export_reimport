@@ -19,6 +19,49 @@ if not os.path.exists('outputs'):
         print(f"Error creating outputs directory: {e}")
         raise
 
+# Add unit translation dictionary after imports
+UNIT_TRANSLATIONS = {
+    '个': 'PCS',
+    '件': 'PCS',
+    '只': 'PCS',
+    '片': 'PCS',
+    '套': 'SET',
+    '卷': 'ROLL',
+    '箱': 'BOX',
+    '米': 'M',
+    '千克': 'KG',
+    '公斤': 'KG',
+    '克': 'G',
+    '升': 'L',
+    '毫升': 'ML',
+    '包': 'PKG',
+    '盒': 'BOX',
+    '台': 'SET',
+    '支': 'PCS',
+    '张': 'PCS',
+    '块': 'PCS',
+    '根': 'PCS',
+    '条': 'PCS',
+    '组': 'SET',
+    '副': 'SET',
+    '对': 'PAIR',
+    '把': 'PCS',
+    '瓶': 'BTL',
+    '罐': 'CAN',
+    '桶': 'DRUM',
+    '袋': 'BAG',
+    '捆': 'BUNDLE',
+    '批': 'LOT',
+    '箱': 'CTN'
+}
+
+def translate_unit(chinese_unit):
+    """Translate Chinese unit to English."""
+    if pd.isna(chinese_unit):
+        return 'PCS'  # Default to PCS if unit is missing
+    chinese_unit = str(chinese_unit).strip()
+    return UNIT_TRANSLATIONS.get(chinese_unit, chinese_unit)  # Return original if no translation found
+
 # Function to read Excel files
 def read_excel_file(file_path):
     return pd.read_excel(file_path)
@@ -1186,6 +1229,10 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
                 
                 # Create a copy for the invoice
                 invoice_df = df[exportReimport_output_columns].copy()
+                
+                # Translate units to English for reimport invoice
+                if 'Unit' in invoice_df.columns:
+                    invoice_df['Unit'] = invoice_df['Unit'].apply(translate_unit)
                 
                 # Save commercial invoice
                 invoice_df.to_excel(writer, sheet_name=ci_sheet_name, index=False)
