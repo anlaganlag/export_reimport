@@ -31,6 +31,14 @@ def generate_report(results, report_path, args):
     with open(report_path, "w", encoding="utf-8") as f:
         f.write("# 进出口文件生成系统验收报告\n\n")
         
+        # 添加验证说明
+        f.write("## 验证说明\n\n")
+        f.write("本报告包含对进出口文件生成系统的完整验证结果。验证过程包括以下几个部分：\n\n")
+        f.write("1. **输入文件验证** - 检查装箱单和政策文件的格式和内容是否符合要求\n")
+        f.write("2. **处理逻辑验证** - 验证文件处理逻辑是否正确\n")
+        f.write("3. **输出文件验证** - 验证生成的输出文件是否符合要求\n\n")
+        f.write("如果任何验证项目失败，整体验收结果将被标记为\"不通过\"。请查看详细测试结果部分以找出具体问题。\n\n")
+        
         # 文件信息部分
         f.write("## 验证文件信息\n\n")
         f.write("### 输入文件\n")
@@ -83,10 +91,28 @@ def generate_report(results, report_path, args):
         
         # 按类别统计通过/失败数量
         categories = {
-            "输入文件验证": [k for k in results.keys() if k.startswith(("packing_list", "policy"))],
+            "输入文件验证": [k for k in results.keys() if k.startswith(("packing_list", "policy", "weights", "summary_data", "exchange_rate_decimal", "company_bank_info"))],
             "处理逻辑验证": [k for k in results.keys() if any(k.startswith(p) for p in ["trade_type", "price", "merge", "split", "fob", "insurance", "freight", "cif"])],
             "输出文件验证": [k for k in results.keys() if any(k.startswith(p) for p in ["export", "import", "file", "format"])]
         }
+        
+        # 将任何未分类的验证结果添加到适当的类别中
+        all_result_keys = set(results.keys())
+        categorized_keys = set()
+        for keys in categories.values():
+            categorized_keys.update(keys)
+        
+        uncategorized_keys = all_result_keys - categorized_keys
+        if uncategorized_keys:
+            # 尝试将未分类的键添加到合适的类别中
+            for key in uncategorized_keys:
+                if "file" in key or "packing" in key or "policy" in key:
+                    categories["输入文件验证"].append(key)
+                elif "process" in key:
+                    categories["处理逻辑验证"].append(key)
+                else:
+                    # 如果无法确定类别，添加到输入文件验证
+                    categories["输入文件验证"].append(key)
         
         f.write("## 验证结果统计\n\n")
         for category, keys in categories.items():
@@ -108,12 +134,30 @@ def generate_report(results, report_path, args):
                 continue
                 
             f.write(f"### {category}\n\n")
-            for key in sorted(keys):
-                if key in results:
+            
+            # 先显示失败的测试
+            failed_tests = [key for key in sorted(keys) if key in results and not results[key]["success"]]
+            passed_tests = [key for key in sorted(keys) if key in results and results[key]["success"]]
+            
+            if failed_tests:
+                f.write("#### ❌ 失败的测试\n\n")
+                for key in failed_tests:
                     result = results[key]
-                    status = "✅ 通过" if result["success"] else "❌ 失败"
-                    f.write(f"#### {key}: {status}\n")
+                    f.write(f"##### {key}: ❌ 失败\n")
                     f.write(f"- 结果: {result['message']}\n\n")
+            
+            if passed_tests:
+                f.write("#### ✅ 通过的测试\n\n")
+                for key in passed_tests:
+                    result = results[key]
+                    f.write(f"##### {key}: ✅ 通过\n")
+                    f.write(f"- 结果: {result['message']}\n\n")
+            
+            # 显示有关本类别测试的统计信息
+            category_results = {k: results[k] for k in keys if k in results}
+            passed = sum(1 for v in category_results.values() if v["success"])
+            total = len(category_results)
+            f.write(f"**统计**: {passed}/{total} 测试通过\n\n")
         
         # 添加解决方案建议
         if not all_passed:
@@ -146,8 +190,29 @@ def generate_report(results, report_path, args):
                         elif "验证表头时出错" in result["message"] or "验证字段头时出错" in result["message"]:
                             f.write("- **建议**: 检查文件格式是否正确，特别是表头部分的格式\n")
                             f.write("- **注意**: 如果第一行是文件信息或版本信息，应确保实际表头内容从第二行开始\n")
+                        elif "净重大于毛重" in result["message"] or "以下行的净重大于毛重" in result["message"]:
+                            f.write("- **建议**: 检查指定行的毛重和净重值，确保每行的净重小于或等于毛重\n")
+                            f.write("- **原因**: 根据物理原则，毛重（含包装重量）应大于等于净重（不含包装）\n")
+                        elif "汇总数据有误" in result["message"]:
+                            f.write("- **建议**: 检查表底汇总行的计算，确保数量、体积、净重和毛重的总和正确\n")
+                            f.write("- **解决方法**: 重新计算各列的总和，并更新汇总行的值\n")
+                        elif "汇率未保留4位小数" in result["message"] or "以下汇率未保留4位小数" in result["message"]:
+                            f.write("- **建议**: 修改政策文件中的汇率值，确保所有汇率保留4位小数\n")
+                            f.write("- **正确示例**: 6.8976 (四位小数)\n")
+                        elif "未找到汇率列" in result["message"] or "汇率列无数据" in result["message"]:
+                            f.write("- **建议**: 检查政策文件中是否包含汇率列，并确保有正确的数据\n")
+                            f.write("- **列名示例**: '汇率' 或 'Exchange Rate'\n")
+                        elif "政策文件未包含公司信息" in result["message"]:
+                            f.write("- **建议**: 在政策文件中添加必要的公司信息\n")
+                            f.write("- **必要信息**: 公司名称、地址、联系方式等\n")
+                        elif "政策文件未包含银行信息" in result["message"]:
+                            f.write("- **建议**: 在政策文件中添加必要的银行信息\n")
+                            f.write("- **必要信息**: 银行名称、账号、Swift代码等\n")
+                        elif "验证汇总数据时出错" in result["message"]:
+                            f.write("- **建议**: 检查装箱单格式，确保汇总行正确且可被识别\n")
+                            f.write("- **注意**: 汇总行通常在表格底部，包含'合计'或'总计'字样\n")
                         else:
-                            f.write(f"- **建议**: 根据错误信息修复问题\n")
+                            f.write(f"- **建议**: 根据错误信息修复问题: {result['message']}\n")
                         
                         f.write("\n")
         
@@ -213,6 +278,7 @@ def main():
     parser.add_argument("--template-dir", default="Template", help="模板目录")
     parser.add_argument("--report-path", default="reports/validation_report.md", help="报告输出路径")
     parser.add_argument("--skip-processing", action="store_true", help="跳过文件处理，仅验证已生成的文件")
+    parser.add_argument("--debug", action="store_true", help="启用调试模式，打印更多调试信息")
     
     args = parser.parse_args()
     
@@ -233,9 +299,24 @@ def main():
     input_results = input_validator.validate_all(args.packing_list, args.policy_file)
     results.update(input_results)
     
+    # 如果启用了调试模式，打印所有验证结果
+    if args.debug:
+        print("\n调试信息 - 所有输入验证结果:")
+        for k, v in input_results.items():
+            status = "成功" if v["success"] else "失败"
+            print(f"  - {k}: {status}")
+            print(f"    消息: {v['message']}")
+        print()
+    
     # 检查输入验证是否通过
     input_valid = all(v["success"] for k, v in input_results.items())
     if not input_valid:
+        # 打印哪些输入验证失败了
+        print("输入文件验证失败的项目:")
+        for k, v in input_results.items():
+            if not v["success"]:
+                print(f"  - {k}: {v['message']}")
+        
         print("输入文件验证失败，生成报告并退出...")
         generate_report(results, args.report_path, args)
         return

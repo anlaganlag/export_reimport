@@ -445,17 +445,29 @@ class InputValidator:
             dict: 含success和message的验证结果
         """
         try:
-            # 读取整个政策文件为文本
-            with open(policy_file_path, 'rb') as f:
-                content = f.read().decode('utf-8', errors='ignore')
+            # 读取政策文件为DataFrame
+            policy_df = pd.read_excel(policy_file_path)
+            
+            # 将DataFrame转换为字符串以便于搜索
+            # 合并所有单元格内容为一个大字符串
+            all_text = ""
+            
+            # 检查所有列名
+            for col in policy_df.columns:
+                all_text += str(col) + " "
+            
+            # 检查所有单元格内容
+            for _, row in policy_df.iterrows():
+                for item in row:
+                    all_text += str(item) + " "
             
             # 检查公司信息
             company_patterns = ["公司", "Company", "企业", "Enterprise"]
-            has_company_info = any(pattern in content for pattern in company_patterns)
+            has_company_info = any(pattern in all_text for pattern in company_patterns)
             
             # 检查银行信息
             bank_patterns = ["银行", "Bank", "账号", "Account"]
-            has_bank_info = any(pattern in content for pattern in bank_patterns)
+            has_bank_info = any(pattern in all_text for pattern in bank_patterns)
             
             if not has_company_info:
                 return {"success": False, "message": "政策文件未包含公司信息"}

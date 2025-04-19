@@ -21,6 +21,7 @@ def main():
     parser.add_argument("--template-dir", help="指定模板目录")
     parser.add_argument("--report-path", help="指定报告输出路径")
     parser.add_argument("--skip-processing", action="store_true", help="跳过文件处理，仅验证已生成的文件")
+    parser.add_argument("--debug", action="store_true", help="启用调试模式，打印更多调试信息")
     args = parser.parse_args()
     
     # 获取当前目录
@@ -95,6 +96,9 @@ def main():
     
     if args.skip_processing:
         cmd.append("--skip-processing")
+    
+    if args.debug:
+        cmd.append("--debug")
     
     # 显示执行的命令
     print("执行命令:", " ".join(cmd))
