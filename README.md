@@ -66,3 +66,120 @@
 
 3. **如何自定义Excel样式？**  
    修改`apply_excel_styling`函数中的样式设置，如字体、颜色、对齐方式等。
+
+# 出口转内销验收程序
+
+这个程序用于验证出口转内销文件生成系统的输入和输出文件是否符合要求，并生成详细的验收报告。
+
+## 功能特点
+
+- 完整验证输入文件格式和内容
+- 验证处理逻辑的正确性
+- 验证输出文件的格式和内容
+- 生成详细的验收报告
+- 支持多种输出格式
+- 可自定义验证规则
+- 支持生成HTML、Excel、JSON等格式的报告
+
+## 使用方法
+
+### 1. 基本用法
+
+最简单的使用方法是运行示例脚本：
+
+```bash
+python validation_program/run_validation.py
+```
+
+这将使用默认路径查找输入文件并执行验证。
+
+### 2. 指定文件路径
+
+可以通过命令行参数指定具体的输入和输出文件路径：
+
+```bash
+python validation_program/run_validation.py --packing-list path/to/packing_list.xlsx --policy-file path/to/policy.xlsx --output-dir path/to/outputs
+```
+
+### 3. 完整参数说明
+
+```
+--packing-list    指定采购装箱单文件路径
+--policy-file     指定政策文件路径
+--output-dir      指定输出目录
+--template-dir    指定模板目录
+--report-path     指定报告输出路径
+--skip-processing 跳过文件处理，仅验证已生成的文件
+```
+
+### 4. 直接使用主程序
+
+也可以直接使用主程序，完全自定义验证选项：
+
+```bash
+python validation_program/main.py --packing-list path/to/packing_list.xlsx --policy-file path/to/policy.xlsx --output-dir path/to/outputs --template-dir path/to/templates --report-path path/to/report.md
+```
+
+## 配置文件说明
+
+程序使用以下配置文件来控制验证行为：
+
+- `validation_program/config/validation_rules.json` - 验证规则配置
+- `validation_program/config/integration_rules.json` - 系统集成配置
+- `validation_program/config/file_paths.json` - 文件路径配置
+- `validation_program/config/error_messages.json` - 错误消息配置
+- `validation_program/config/reporting_config.json` - 报告生成配置
+
+## 验证报告
+
+验证完成后，程序会生成详细的验证报告，内容包括：
+
+1. 验证文件信息
+   - 输入文件路径
+   - 输出目录路径
+   - 检测到的输出文件
+
+2. 验收结果
+   - 整体验收结果（通过/不通过）
+   - 各类别验证结果统计
+
+3. 详细测试结果
+   - 输入文件验证结果
+   - 处理逻辑验证结果
+   - 输出文件验证结果
+
+4. 错误详情和建议修复方法
+
+## 常见问题
+
+### 找不到输入文件
+
+如果程序无法找到输入文件，它会搜索可能的文件并提供建议：
+
+```
+错误: 采购装箱单文件不存在: D:\project\export_reimport\testfiles\original_packing_list.xlsx
+请使用 --packing-list 指定正确的文件路径
+
+可能的装箱单文件:
+  - D:\project\export_reimport\other_files\packing_list_sample.xlsx
+```
+
+### 验证失败
+
+如果验证失败，查看生成的报告了解详细原因：
+
+```
+验收结果: 不通过
+详细报告已生成: D:\project\export_reimport\reports\validation_report.md
+```
+
+## 代码结构
+
+- `validation_program/main.py` - 主程序
+- `validation_program/run_validation.py` - 示例运行脚本
+- `validation_program/validators/` - 验证器模块
+  - `input_validator.py` - 输入文件验证器
+  - `output_validator.py` - 输出文件验证器
+  - `process_validator.py` - 处理逻辑验证器
+  - `utils.py` - 工具函数
+- `validation_program/config/` - 配置文件目录

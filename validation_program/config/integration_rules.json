@@ -1,0 +1,263 @@
+{
+  "file_integrations": {
+    "input_sources": {
+      "local_directory": {
+        "path": "${WORKSPACE_ROOT}/input_files",
+        "file_patterns": ["*.xlsx", "*.csv", "*.xml"],
+        "watch_directory": true,
+        "processing_order": "filename_ascending"
+      },
+      "ftp_server": {
+        "enabled": false,
+        "hostname": "ftp.example.com",
+        "port": 21,
+        "username": "${FTP_USERNAME}",
+        "password": "${FTP_PASSWORD}",
+        "remote_directory": "/uploads/incoming",
+        "file_patterns": ["*.xlsx", "*.csv"],
+        "polling_interval_seconds": 300
+      },
+      "email_attachments": {
+        "enabled": false,
+        "mail_server": "imap.example.com",
+        "port": 993,
+        "use_ssl": true,
+        "username": "${EMAIL_USERNAME}",
+        "password": "${EMAIL_PASSWORD}",
+        "folder": "INBOX",
+        "subject_filter": "Export Document",
+        "sender_filter": "trading@partner.com",
+        "attachment_patterns": ["*.xlsx", "*.csv", "*.pdf"],
+        "polling_interval_seconds": 600,
+        "mark_as_read": true
+      }
+    },
+    "output_destinations": {
+      "local_directory": {
+        "path": "${WORKSPACE_ROOT}/output_files",
+        "create_if_missing": true,
+        "subfolder_by_date": true,
+        "date_format": "YYYY-MM-DD"
+      },
+      "ftp_server": {
+        "enabled": false,
+        "hostname": "ftp.example.com",
+        "port": 21,
+        "username": "${FTP_USERNAME}",
+        "password": "${FTP_PASSWORD}",
+        "remote_directory": "/uploads/processed",
+        "create_if_missing": true
+      },
+      "email_notification": {
+        "enabled": false,
+        "smtp_server": "smtp.example.com",
+        "port": 587,
+        "use_tls": true,
+        "username": "${EMAIL_USERNAME}",
+        "password": "${EMAIL_PASSWORD}",
+        "from_address": "system@company.com",
+        "to_addresses": ["trading@company.com", "finance@company.com"],
+        "cc_addresses": [],
+        "bcc_addresses": ["archive@company.com"],
+        "subject_template": "Validation Report: ${FILENAME} - ${STATUS}",
+        "body_template_file": "email_templates/validation_report.html",
+        "include_attachments": true,
+        "max_attachment_size_mb": 10
+      }
+    }
+  },
+  "api_integrations": {
+    "erp_system": {
+      "enabled": false,
+      "base_url": "https://erp.company.com/api/v1",
+      "auth_type": "oauth2",
+      "client_id": "${ERP_CLIENT_ID}",
+      "client_secret": "${ERP_CLIENT_SECRET}",
+      "token_url": "https://erp.company.com/oauth/token",
+      "scope": "read write",
+      "endpoints": {
+        "validate_order": "/orders/validate",
+        "submit_order": "/orders/submit",
+        "check_inventory": "/inventory/check"
+      },
+      "timeout_seconds": 30,
+      "retry_attempts": 3,
+      "retry_delay_seconds": 5
+    },
+    "exchange_rate_service": {
+      "enabled": true,
+      "base_url": "https://api.exchangerate.host",
+      "auth_type": "api_key",
+      "api_key": "${EXCHANGE_RATE_API_KEY}",
+      "api_key_header": "X-API-Key",
+      "endpoints": {
+        "latest_rates": "/latest",
+        "historical_rates": "/historical"
+      },
+      "default_base_currency": "USD",
+      "cache_duration_minutes": 60,
+      "timeout_seconds": 10,
+      "fallback_to_cached": true,
+      "retry_attempts": 3
+    },
+    "customs_database": {
+      "enabled": false,
+      "base_url": "https://customs.gov/api",
+      "auth_type": "basic",
+      "username": "${CUSTOMS_USERNAME}",
+      "password": "${CUSTOMS_PASSWORD}",
+      "endpoints": {
+        "hs_code_validation": "/hscode/validate",
+        "duty_calculation": "/duty/calculate"
+      },
+      "timeout_seconds": 20,
+      "retry_attempts": 2
+    }
+  },
+  "database_integration": {
+    "enabled": false,
+    "type": "postgresql",
+    "host": "localhost",
+    "port": 5432,
+    "database_name": "validation_db",
+    "username": "${DB_USERNAME}",
+    "password": "${DB_PASSWORD}",
+    "connection_pool_size": 5,
+    "tables": {
+      "validation_results": "validation_results",
+      "validation_details": "validation_details",
+      "processed_files": "processed_files",
+      "audit_log": "audit_log"
+    },
+    "retention_policy": {
+      "validation_results_days": 90,
+      "validation_details_days": 30,
+      "processed_files_days": 180,
+      "audit_log_days": 365
+    },
+    "batch_insert_size": 100
+  },
+  "messaging_integration": {
+    "enabled": false,
+    "type": "rabbitmq",
+    "connection": {
+      "host": "localhost",
+      "port": 5672,
+      "virtual_host": "/",
+      "username": "${RABBITMQ_USERNAME}",
+      "password": "${RABBITMQ_PASSWORD}",
+      "use_ssl": false
+    },
+    "exchanges": {
+      "validation_events": {
+        "name": "validation.events",
+        "type": "topic",
+        "durable": true
+      }
+    },
+    "queues": {
+      "validation_results": {
+        "name": "validation.results",
+        "binding_key": "validation.result.*",
+        "durable": true,
+        "auto_delete": false
+      },
+      "critical_errors": {
+        "name": "validation.errors.critical",
+        "binding_key": "validation.error.critical",
+        "durable": true,
+        "auto_delete": false
+      }
+    },
+    "publishing": {
+      "persistent": true,
+      "mandatory": true,
+      "content_type": "application/json"
+    }
+  },
+  "logging_integration": {
+    "console": {
+      "enabled": true,
+      "level": "info",
+      "format": "text",
+      "include_timestamp": true,
+      "colorize": true
+    },
+    "file": {
+      "enabled": true,
+      "level": "debug",
+      "format": "json",
+      "path": "logs/validation.log",
+      "max_size_mb": 10,
+      "max_files": 5,
+      "compress": true
+    },
+    "syslog": {
+      "enabled": false,
+      "level": "warning",
+      "facility": "local0",
+      "host": "localhost",
+      "port": 514,
+      "protocol": "udp"
+    },
+    "elasticsearch": {
+      "enabled": false,
+      "level": "info",
+      "host": "elasticsearch.example.com",
+      "port": 9200,
+      "index_prefix": "validation-logs",
+      "index_suffix_pattern": "YYYY.MM.DD",
+      "username": "${ES_USERNAME}",
+      "password": "${ES_PASSWORD}"
+    }
+  },
+  "monitoring_integration": {
+    "metrics": {
+      "enabled": false,
+      "type": "prometheus",
+      "endpoint": "/metrics",
+      "port": 9090,
+      "collection_interval_seconds": 15,
+      "labels": {
+        "service": "validation-service",
+        "environment": "${ENV:production}"
+      }
+    },
+    "health_check": {
+      "enabled": true,
+      "endpoint": "/health",
+      "port": 8080,
+      "include_details": true,
+      "checks": {
+        "database": true,
+        "api_dependencies": true,
+        "file_system": true,
+        "message_queue": true
+      }
+    },
+    "alerting": {
+      "enabled": false,
+      "channels": {
+        "email": {
+          "enabled": true,
+          "recipients": ["ops@company.com"]
+        },
+        "slack": {
+          "enabled": true,
+          "webhook_url": "${SLACK_WEBHOOK_URL}",
+          "channel": "#validation-alerts"
+        },
+        "pagerduty": {
+          "enabled": false,
+          "service_key": "${PAGERDUTY_SERVICE_KEY}"
+        }
+      },
+      "thresholds": {
+        "critical_error_count": 5,
+        "processing_time_seconds": 300,
+        "queue_depth": 100,
+        "disk_space_percentage": 90
+      }
+    }
+  }
+} 

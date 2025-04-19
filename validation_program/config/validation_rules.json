@@ -1,0 +1,220 @@
+{
+  "input_validation": {
+    "packing_list_header": {
+      "required_text": ["PACKING LIST", "装箱单"],
+      "id_regex": "PL-\\d{8}-\\d{4}"
+    },
+    "field_headers": {
+      "required_chinese": ["序号", "零件号", "描述", "数量", "单位", "净重", "毛重", "单价", "总金额"],
+      "required_english": ["No.", "Part No.", "Description", "Quantity", "Unit", "Net Weight", "Gross Weight", "Unit Price", "Amount"]
+    },
+    "weights": {
+      "net_weight_less_than_gross": true,
+      "tolerance": 0.01
+    },
+    "summary_data": {
+      "required_fields": ["Total", "合计"]
+    },
+    "exchange_rate": {
+      "decimal_places": 4
+    },
+    "company_bank_info": {
+      "required_fields": ["Company Name", "Bank", "Account"]
+    }
+  },
+  "output_validation": {
+    "field_mapping": {
+      "check_required_fields": true
+    },
+    "quantity_match": {
+      "tolerance": 0.01
+    },
+    "price_increases": {
+      "minimum_percentage": 5.0
+    },
+    "totals_match": {
+      "tolerance": 0.01
+    },
+    "file_naming": {
+      "patterns": {
+        "export_invoice": "EXP_INV_[A-Z0-9]{10}",
+        "import_invoice": "IMP_INV_[A-Z0-9]{10}_(P\\d+)_(F\\d+)",
+        "cif_invoice": "CIF_INV_[A-Z0-9]{10}"
+      }
+    }
+  },
+  "process_validation": {
+    "trade_type": {
+      "columns": ["Trade Type", "贸易方式"]
+    },
+    "fob_price": {
+      "calculation_check": true
+    },
+    "insurance": {
+      "calculation_check": true,
+      "default_rate": 0.005
+    },
+    "freight": {
+      "calculation_check": true
+    },
+    "cif_price": {
+      "calculation_check": true,
+      "formula": "FOB + Insurance + Freight"
+    },
+    "merge_logic": {
+      "merge_identical_part_numbers": true,
+      "merge_identical_prices": true
+    },
+    "split_logic": {
+      "by_project": true,
+      "by_factory": true
+    }
+  },
+  "input_validation_rules": [
+    {
+      "id": "required_headers",
+      "description": "Check for required headers in packing list",
+      "error_code": "E001",
+      "required_fields": ["ItemID", "Description", "Quantity", "UnitPrice", "TotalAmount", "Weight", "Dimensions"],
+      "severity": "critical"
+    },
+    {
+      "id": "id_format",
+      "description": "Validate ID format",
+      "error_code": "E002",
+      "pattern": "^[A-Z]{2}\\d{6}$",
+      "severity": "critical"
+    },
+    {
+      "id": "required_fields",
+      "description": "Check for missing required fields",
+      "error_code": "E003",
+      "empty_allowed": false,
+      "severity": "critical"
+    },
+    {
+      "id": "weight_validation",
+      "description": "Validate weight consistency",
+      "error_code": "E004",
+      "tolerance_percentage": 2.5,
+      "severity": "high"
+    },
+    {
+      "id": "summary_validation",
+      "description": "Validate summary data matches details",
+      "error_code": "E005",
+      "tolerance_percentage": 0.1,
+      "severity": "high"
+    }
+  ],
+  "output_validation_rules": [
+    {
+      "id": "output_fields",
+      "description": "Check for required output fields",
+      "error_code": "E101",
+      "required_fields": ["OrderID", "ShipmentID", "ItemID", "Quantity", "UnitPrice", "TotalAmount", "ExchangeRate", "LocalCurrency"],
+      "severity": "critical"
+    },
+    {
+      "id": "quantity_match",
+      "description": "Validate quantity matching between input and output",
+      "error_code": "E102",
+      "tolerance_percentage": 0.0,
+      "severity": "critical"
+    },
+    {
+      "id": "price_validation",
+      "description": "Validate price increases meet minimum percentage",
+      "error_code": "E103",
+      "minimum_percentage": 5.0,
+      "severity": "medium"
+    },
+    {
+      "id": "total_amount_validation",
+      "description": "Validate total amount calculations",
+      "error_code": "E104",
+      "tolerance_percentage": 0.01,
+      "severity": "high"
+    },
+    {
+      "id": "file_naming",
+      "description": "Validate output file naming patterns",
+      "error_code": "E105",
+      "pattern": "^[A-Z]{2}\\d{6}_\\d{8}$",
+      "severity": "medium"
+    }
+  ],
+  "process_validation_rules": [
+    {
+      "id": "trade_type_validation",
+      "description": "Validate trade type entries",
+      "error_code": "E201",
+      "allowed_values": ["FOB", "CIF", "EXW", "DAP"],
+      "severity": "high"
+    },
+    {
+      "id": "fob_calculation",
+      "description": "Validate FOB price calculations",
+      "error_code": "E202",
+      "formula": "UnitPrice + PackagingCost",
+      "tolerance_percentage": 0.01,
+      "severity": "high"
+    },
+    {
+      "id": "insurance_calculation",
+      "description": "Validate insurance calculations",
+      "error_code": "E203",
+      "formula": "FOBPrice * 0.01",
+      "tolerance_percentage": 0.01,
+      "severity": "medium"
+    },
+    {
+      "id": "freight_calculation",
+      "description": "Validate freight calculations",
+      "error_code": "E204",
+      "formula": "Weight * FreightRate",
+      "tolerance_percentage": 0.05,
+      "severity": "medium"
+    },
+    {
+      "id": "cif_calculation",
+      "description": "Validate CIF price calculations",
+      "error_code": "E205",
+      "formula": "FOBPrice + Insurance + Freight",
+      "tolerance_percentage": 0.01,
+      "severity": "high"
+    }
+  ],
+  "report_rules": {
+    "include_warnings": true,
+    "error_severity_thresholds": {
+      "fail_on_critical": true,
+      "fail_on_high": false,
+      "fail_on_medium": false,
+      "fail_on_low": false
+    },
+    "summary_statistics": {
+      "include_error_count_by_type": true,
+      "include_error_count_by_severity": true,
+      "include_processing_time": true
+    },
+    "detailed_results": {
+      "include_line_numbers": true,
+      "include_cell_references": true,
+      "max_examples_per_error": 5
+    }
+  },
+  "validation_thresholds": {
+    "maximum_allowed_errors": {
+      "critical": 0,
+      "high": 5,
+      "medium": 10,
+      "low": 25
+    },
+    "warning_thresholds": {
+      "high_error_percentage": 2.0,
+      "medium_error_percentage": 5.0,
+      "low_error_percentage": 10.0
+    }
+  }
+} 

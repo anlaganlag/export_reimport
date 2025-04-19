@@ -1,0 +1,330 @@
+{
+  "report_formats": {
+    "json": {
+      "enabled": true,
+      "pretty_print": true,
+      "include_summary": true,
+      "include_details": true,
+      "max_detail_items": 1000,
+      "file_extension": ".json"
+    },
+    "csv": {
+      "enabled": true,
+      "delimiter": ",",
+      "include_headers": true,
+      "quote_all_fields": false,
+      "encoding": "utf-8",
+      "file_extension": ".csv"
+    },
+    "excel": {
+      "enabled": true,
+      "template_file": "templates/report_template.xlsx",
+      "sheet_name": "Validation Results",
+      "summary_sheet_name": "Summary",
+      "add_filters": true,
+      "add_conditional_formatting": true,
+      "auto_column_width": true,
+      "file_extension": ".xlsx"
+    },
+    "pdf": {
+      "enabled": false,
+      "template_file": "templates/report_template.html",
+      "page_size": "A4",
+      "orientation": "portrait",
+      "include_company_logo": true,
+      "company_logo_path": "assets/company_logo.png",
+      "file_extension": ".pdf"
+    },
+    "html": {
+      "enabled": true,
+      "template_file": "templates/report_template.html",
+      "include_css": true,
+      "css_file": "templates/styles.css",
+      "include_javascript": true,
+      "javascript_file": "templates/report.js",
+      "file_extension": ".html"
+    },
+    "xml": {
+      "enabled": false,
+      "include_schema": true,
+      "schema_file": "templates/report_schema.xsd",
+      "root_element": "ValidationReport",
+      "file_extension": ".xml"
+    }
+  },
+  "report_content": {
+    "include_metadata": true,
+    "metadata_fields": [
+      "filename",
+      "validation_timestamp",
+      "validation_duration_ms",
+      "validation_user",
+      "validation_program_version",
+      "file_hash"
+    ],
+    "summary_sections": [
+      {
+        "name": "overall_status",
+        "title": "Overall Validation Status",
+        "include": true
+      },
+      {
+        "name": "error_count_by_severity",
+        "title": "Error Count by Severity",
+        "include": true
+      },
+      {
+        "name": "error_count_by_category",
+        "title": "Error Count by Category",
+        "include": true
+      },
+      {
+        "name": "error_count_by_rule",
+        "title": "Error Count by Rule",
+        "include": true,
+        "max_items": 10
+      },
+      {
+        "name": "most_affected_records",
+        "title": "Most Affected Records",
+        "include": true,
+        "max_items": 5
+      }
+    ],
+    "detail_sections": [
+      {
+        "name": "input_validation_details",
+        "title": "Input Validation Details",
+        "include": true,
+        "filter_by_severity": ["critical", "error", "warning", "info"]
+      },
+      {
+        "name": "output_validation_details",
+        "title": "Output Validation Details",
+        "include": true,
+        "filter_by_severity": ["critical", "error", "warning", "info"]
+      },
+      {
+        "name": "process_validation_details",
+        "title": "Process Validation Details",
+        "include": true,
+        "filter_by_severity": ["critical", "error", "warning", "info"]
+      }
+    ],
+    "sorting": {
+      "detail_sort_field": "severity",
+      "detail_sort_direction": "desc",
+      "secondary_sort_field": "record_id",
+      "secondary_sort_direction": "asc"
+    },
+    "filtering": {
+      "exclude_severity_levels": ["debug"],
+      "include_rules": [],
+      "exclude_rules": [],
+      "include_categories": [],
+      "exclude_categories": []
+    }
+  },
+  "report_delivery": {
+    "file_output": {
+      "enabled": true,
+      "path": "${WORKSPACE_ROOT}/reports",
+      "filename_template": "${INPUT_FILENAME}_validation_report_${TIMESTAMP}",
+      "timestamp_format": "YYYY-MM-DD_HHmmss",
+      "create_directory_if_missing": true,
+      "overwrite_existing": false
+    },
+    "email": {
+      "enabled": false,
+      "recipients": {
+        "to": ["manager@company.com", "analyst@company.com"],
+        "cc": [],
+        "bcc": ["records@company.com"]
+      },
+      "subject_template": "Validation Report: ${INPUT_FILENAME} - ${STATUS}",
+      "body_template_file": "templates/email_body.html",
+      "include_attachments": true,
+      "max_attachment_size_mb": 10,
+      "attachment_formats": ["excel", "pdf"],
+      "send_on_status": ["failed", "warning", "passed"]
+    },
+    "api_webhook": {
+      "enabled": false,
+      "url": "https://api.company.com/webhooks/validation",
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer ${API_TOKEN}"
+      },
+      "include_report_data": true,
+      "report_formats": ["json"],
+      "retry_attempts": 3,
+      "retry_delay_seconds": 5
+    },
+    "database": {
+      "enabled": false,
+      "store_summary": true,
+      "store_details": true,
+      "detail_retention_days": 30,
+      "summary_retention_days": 90
+    }
+  },
+  "visualization": {
+    "charts": [
+      {
+        "type": "pie",
+        "title": "Errors by Severity",
+        "data_source": "error_count_by_severity",
+        "include": true
+      },
+      {
+        "type": "bar",
+        "title": "Top 10 Validation Rules with Errors",
+        "data_source": "error_count_by_rule",
+        "include": true,
+        "max_items": 10,
+        "sort_by": "count",
+        "sort_direction": "desc"
+      },
+      {
+        "type": "line",
+        "title": "Validation Error Trend",
+        "data_source": "historical_error_count",
+        "include": false,
+        "time_period": "last_30_days",
+        "group_by": "day"
+      }
+    ],
+    "tables": [
+      {
+        "title": "Validation Error Details",
+        "data_source": "all_validation_details",
+        "include": true,
+        "columns": [
+          "rule_id",
+          "rule_description",
+          "severity",
+          "record_id",
+          "field_name",
+          "error_message"
+        ],
+        "sort_by": "severity",
+        "sort_direction": "desc",
+        "page_size": 25
+      }
+    ],
+    "dashboard": {
+      "enabled": false,
+      "refresh_interval_seconds": 300,
+      "layout": [
+        {
+          "component": "chart",
+          "reference": "Errors by Severity",
+          "position": {
+            "row": 0,
+            "col": 0,
+            "width": 6,
+            "height": 4
+          }
+        },
+        {
+          "component": "chart",
+          "reference": "Top 10 Validation Rules with Errors",
+          "position": {
+            "row": 0,
+            "col": 6,
+            "width": 6,
+            "height": 4
+          }
+        },
+        {
+          "component": "table",
+          "reference": "Validation Error Details",
+          "position": {
+            "row": 4,
+            "col": 0,
+            "width": 12,
+            "height": 6
+          }
+        }
+      ]
+    }
+  },
+  "notification_rules": [
+    {
+      "name": "critical_errors",
+      "description": "Notify when critical errors are found",
+      "condition": {
+        "severity": ["critical"],
+        "min_count": 1
+      },
+      "channels": ["email", "slack"],
+      "message_template": "CRITICAL: ${count} critical validation errors found in ${filename}",
+      "include_details": true,
+      "max_details": 10
+    },
+    {
+      "name": "high_error_count",
+      "description": "Notify when error count exceeds threshold",
+      "condition": {
+        "severity": ["error"],
+        "min_count": 50
+      },
+      "channels": ["email"],
+      "message_template": "WARNING: High number of errors (${count}) found in ${filename}",
+      "include_details": false
+    },
+    {
+      "name": "validation_success",
+      "description": "Notify on successful validation with no errors",
+      "condition": {
+        "status": "passed",
+        "error_count": 0
+      },
+      "channels": ["slack"],
+      "message_template": "SUCCESS: Validation passed for ${filename} with no errors",
+      "include_details": false
+    }
+  ],
+  "localization": {
+    "default_language": "en",
+    "supported_languages": ["en", "es", "fr", "de", "zh"],
+    "date_format": {
+      "en": "MM/DD/YYYY",
+      "es": "DD/MM/YYYY",
+      "fr": "DD/MM/YYYY",
+      "de": "DD.MM.YYYY",
+      "zh": "YYYY-MM-DD"
+    },
+    "number_format": {
+      "thousands_separator": {
+        "en": ",",
+        "es": ".",
+        "fr": " ",
+        "de": ".",
+        "zh": ","
+      },
+      "decimal_separator": {
+        "en": ".",
+        "es": ",",
+        "fr": ",",
+        "de": ",",
+        "zh": "."
+      },
+      "currency_symbol": {
+        "en": "$",
+        "es": "€",
+        "fr": "€",
+        "de": "€",
+        "zh": "¥"
+      }
+    },
+    "translation_files": {
+      "en": "locales/en.json",
+      "es": "locales/es.json",
+      "fr": "locales/fr.json",
+      "de": "locales/de.json",
+      "zh": "locales/zh.json"
+    }
+  }
+} 

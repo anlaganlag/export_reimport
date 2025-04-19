@@ -1,0 +1,26 @@
+{
+  "default_paths": {
+    "packing_list": "./data/sample_packing_list.xlsx",
+    "policy_file": "./data/trade_policy.xml",
+    "templates_dir": "./templates",
+    "output_dir": "./output",
+    "report_path": "./output/validation_report.html"
+  },
+  "backup_paths": {
+    "archive_dir": "./archive",
+    "logs_dir": "./logs"
+  },
+  "validation_program": {
+    "main_script": "./validation_program/validate.py",
+    "utils_dir": "./validation_program/utils",
+    "config_dir": "./validation_program/config"
+  },
+  "file_extensions": {
+    "allowed_input": [".xlsx", ".xls", ".csv", ".xml", ".json"],
+    "allowed_output": [".xlsx", ".pdf", ".html", ".xml", ".json"]
+  },
+  "temp_files": {
+    "dir": "./temp",
+    "lifetime_hours": 24
+  }
+} 

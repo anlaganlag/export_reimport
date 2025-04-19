@@ -6,11 +6,12 @@
     "configurations": [
         
         {
-            "name": "Python 调试程序: 当前文件",
+            "name": "运行验证程序",
             "type": "debugpy",
             "request": "launch",
-            "program": "process_shipping_list.py",
-            "console": "integratedTerminal"
+            "program": "${workspaceFolder}/validation_program/run_validation.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}"
         }
     ]
 }

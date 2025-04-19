@@ -1,0 +1,136 @@
+{
+  "input_validation_errors": {
+    "E001": {
+      "en": "Missing required header in packing list",
+      "zh": "装箱单中缺少必需的标题"
+    },
+    "E002": {
+      "en": "Invalid ID format",
+      "zh": "ID格式无效"
+    },
+    "E003": {
+      "en": "Missing required field",
+      "zh": "缺少必填字段"
+    },
+    "E004": {
+      "en": "Weight discrepancy detected",
+      "zh": "检测到重量差异"
+    },
+    "E005": {
+      "en": "Summary data mismatch",
+      "zh": "汇总数据不匹配"
+    },
+    "E006": {
+      "en": "Invalid exchange rate format",
+      "zh": "汇率格式无效"
+    },
+    "E007": {
+      "en": "Missing company bank information",
+      "zh": "缺少公司银行信息"
+    }
+  },
+  "output_validation_errors": {
+    "E101": {
+      "en": "Missing required output field",
+      "zh": "缺少必需的输出字段"
+    },
+    "E102": {
+      "en": "Quantity matching exceeds tolerance",
+      "zh": "数量匹配超出容忍度"
+    },
+    "E103": {
+      "en": "Price increase below minimum percentage",
+      "zh": "价格增长低于最低百分比"
+    },
+    "E104": {
+      "en": "Total amount mismatch exceeds tolerance",
+      "zh": "总金额不匹配超出容忍度"
+    },
+    "E105": {
+      "en": "Invalid file naming pattern",
+      "zh": "文件命名模式无效"
+    }
+  },
+  "process_validation_errors": {
+    "E201": {
+      "en": "Invalid trade type in column",
+      "zh": "列中的贸易类型无效"
+    },
+    "E202": {
+      "en": "FOB price calculation error",
+      "zh": "FOB价格计算错误"
+    },
+    "E203": {
+      "en": "Insurance calculation error",
+      "zh": "保险计算错误"
+    },
+    "E204": {
+      "en": "Freight calculation error",
+      "zh": "运费计算错误"
+    },
+    "E205": {
+      "en": "CIF price formula error",
+      "zh": "CIF价格公式错误"
+    },
+    "E206": {
+      "en": "Project merge error",
+      "zh": "项目合并错误"
+    },
+    "E207": {
+      "en": "Factory split error",
+      "zh": "工厂拆分错误"
+    }
+  },
+  "system_errors": {
+    "S001": {
+      "en": "File not found",
+      "zh": "找不到文件"
+    },
+    "S002": {
+      "en": "Permission denied",
+      "zh": "权限被拒绝"
+    },
+    "S003": {
+      "en": "Invalid file format",
+      "zh": "文件格式无效"
+    },
+    "S004": {
+      "en": "Configuration file error",
+      "zh": "配置文件错误"
+    },
+    "S005": {
+      "en": "Database connection error",
+      "zh": "数据库连接错误"
+    },
+    "S006": {
+      "en": "Timeout error",
+      "zh": "超时错误"
+    },
+    "S007": {
+      "en": "Memory limit exceeded",
+      "zh": "内存限制超出"
+    }
+  },
+  "warning_messages": {
+    "W001": {
+      "en": "Unusual price fluctuation detected",
+      "zh": "检测到异常价格波动"
+    },
+    "W002": {
+      "en": "Multiple shipments for same order",
+      "zh": "同一订单的多次发货"
+    },
+    "W003": {
+      "en": "Exchange rate differs from standard rate",
+      "zh": "汇率与标准汇率不同"
+    },
+    "W004": {
+      "en": "Unusual shipping quantity",
+      "zh": "异常发货数量"
+    },
+    "W005": {
+      "en": "Mixed trade types in one shipment",
+      "zh": "一次发货中混合贸易类型"
+    }
+  }
+} 
