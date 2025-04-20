@@ -67,13 +67,23 @@
 
 ## 验证结果统计
 
-### 输入文件验证: 7/7 通过
+### 输入文件验证: 7/9 通过
 
-### 处理逻辑验证: 0/1 通过
+### 处理逻辑验证: 5/7 通过
+
+### 输出文件验证: 3/12 通过
 
 ## 详细测试结果
 
 ### 输入文件验证
+
+#### ❌ 失败的测试
+
+##### factory_split: ❌ 失败
+- 结果: 未找到工厂列，无法验证工厂拆分
+
+##### project_split: ❌ 失败
+- 结果: 以下项目未找到对应的进口发票: 工厂
 
 #### ✅ 通过的测试
 
@@ -98,25 +108,129 @@
 ##### weights: ✅ 通过
 - 结果: 净重毛重验证通过
 
-**统计**: 7/7 测试通过
+**统计**: 7/9 测试通过
 
 ### 处理逻辑验证
 
 #### ❌ 失败的测试
 
-##### process_error: ❌ 失败
-- 结果: 处理文件时出错: 'net weight'
+##### cif_price_calculation: ❌ 失败
+- 结果: 未找到所有需要的价格列，无法验证CIF价格计算
 
-**统计**: 0/1 测试通过
+##### merge_logic: ❌ 失败
+- 结果: 未找到所有需要的列，无法验证合并逻辑
+
+#### ✅ 通过的测试
+
+##### fob_price_calculation: ✅ 通过
+- 结果: FOB价格计算验证通过
+
+##### freight_calculation: ✅ 通过
+- 结果: 运费计算验证通过
+
+##### insurance_calculation: ✅ 通过
+- 结果: 保险费计算验证通过
+
+##### trade_type_identification: ✅ 通过
+- 结果: 贸易类型识别逻辑验证通过
+
+##### trade_type_split: ✅ 通过
+- 结果: 贸易类型拆分验证通过
+
+**统计**: 5/7 测试通过
+
+### 输出文件验证
+
+#### ❌ 失败的测试
+
+##### export_invoice_field_mapping: ❌ 失败
+- 结果: 输出文件缺少字段: Part Number, 名称, Quantity
+
+##### export_invoice_prices: ❌ 失败
+- 结果: 未找到单价列
+
+##### export_invoice_quantity: ❌ 失败
+- 结果: 未找到数量列
+
+##### export_packing_list_field_mapping: ❌ 失败
+- 结果: 验证字段映射时出错: Worksheet named 'PL' not found
+
+##### export_packing_list_totals: ❌ 失败
+- 结果: 验证出口装箱单汇总数据时出错: Worksheet named 'PL' not found
+
+##### import_invoice_quantity: ❌ 失败
+- 结果: 未找到原始文件的数量列
+
+##### import_invoice_split: ❌ 失败
+- 结果: 未找到项目列或工厂列
+
+##### import_packing_list_field_mapping_reimport_invoice.xlsx: ❌ 失败
+- 结果: 验证字段映射时出错: Worksheet named 'PL' not found
+
+##### import_packing_list_totals: ❌ 失败
+- 结果: 未在原始采购装箱单中找到汇总行
+
+#### ✅ 通过的测试
+
+##### file_naming: ✅ 通过
+- 结果: 文件命名格式验证通过
+
+##### format_compliance: ✅ 通过
+- 结果: 文件格式一致性验证通过
+
+##### import_invoice_field_mapping_reimport_invoice.xlsx: ✅ 通过
+- 结果: 字段映射验证通过
+
+**统计**: 3/12 测试通过
 
 ## 解决方案建议
 
+### 输入文件验证问题修复建议
+
+#### project_split:
+- **建议**: 根据错误信息修复问题: 以下项目未找到对应的进口发票: 工厂
+
+#### factory_split:
+- **建议**: 根据错误信息修复问题: 未找到工厂列，无法验证工厂拆分
+
 ### 处理逻辑验证问题修复建议
 
-#### process_error:
-- **建议**: 根据错误信息修复问题: 处理文件时出错: 'net weight'
+#### cif_price_calculation:
+- **建议**: 根据错误信息修复问题: 未找到所有需要的价格列，无法验证CIF价格计算
+
+#### merge_logic:
+- **建议**: 根据错误信息修复问题: 未找到所有需要的列，无法验证合并逻辑
+
+### 输出文件验证问题修复建议
+
+#### export_invoice_field_mapping:
+- **建议**: 根据错误信息修复问题: 输出文件缺少字段: Part Number, 名称, Quantity
+
+#### export_invoice_quantity:
+- **建议**: 根据错误信息修复问题: 未找到数量列
+
+#### export_invoice_prices:
+- **建议**: 根据错误信息修复问题: 未找到单价列
+
+#### export_packing_list_field_mapping:
+- **建议**: 根据错误信息修复问题: 验证字段映射时出错: Worksheet named 'PL' not found
+
+#### export_packing_list_totals:
+- **建议**: 根据错误信息修复问题: 验证出口装箱单汇总数据时出错: Worksheet named 'PL' not found
+
+#### import_invoice_split:
+- **建议**: 根据错误信息修复问题: 未找到项目列或工厂列
+
+#### import_packing_list_field_mapping_reimport_invoice.xlsx:
+- **建议**: 根据错误信息修复问题: 验证字段映射时出错: Worksheet named 'PL' not found
+
+#### import_invoice_quantity:
+- **建议**: 根据错误信息修复问题: 未找到原始文件的数量列
+
+#### import_packing_list_totals:
+- **建议**: 根据错误信息修复问题: 未在原始采购装箱单中找到汇总行
 
 
 
 ---
-生成时间: 2025-04-20 17:55:31
+生成时间: 2025-04-21 00:03:55

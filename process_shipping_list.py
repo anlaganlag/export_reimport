@@ -19,8 +19,55 @@ if not os.path.exists('outputs'):
         raise
 
 # Function to read Excel files
-def read_excel_file(file_path):
-    return pd.read_excel(file_path)
+def read_excel_file(file_path, skip=0):
+    """
+    Read Excel file with proper header handling.
+    
+    Args:
+        file_path: Path to the Excel file
+        skip: Number of rows to skip before reading (default: 0)
+        
+    Returns:
+        DataFrame with properly processed headers
+    """
+    try:
+        # Try reading with multi-level headers (English + Chinese)
+        # First row (0) is table title, second row (1) is English headers, 
+        # third row (2) is Chinese headers, data starts at row 4
+        print(f"Reading Excel file: {file_path}")
+        
+        # If skip is provided, use it (used to skip specific number of rows)
+        if skip > 0:
+            print(f"Skipping {skip} rows as specified")
+            return pd.read_excel(file_path, skiprows=skip)
+            
+        # Default behavior for packing lists - handle multi-level headers
+        # Read first few rows to check structure
+        header_peek = pd.read_excel(file_path, nrows=4)
+        print(f"First 4 rows preview:")
+        for i, row in enumerate(header_peek.values.tolist()):
+            print(f"  Row {i+1}: {row[:5]}...")
+        
+        # Use multi-level headers (English row + Chinese row)
+        # Skip the first row (table title)
+        df = pd.read_excel(file_path, header=[1, 2], skiprows=[0])
+        
+        # Debug column names
+        print(f"Column names after reading with multi-level headers: {df.columns.tolist()[:5]}...")
+        
+        # Convert multi-level columns to single level for easier processing
+        # Combine English and Chinese header names with a separator
+        df.columns = [f"{col[0]}|{col[1]}" if isinstance(col, tuple) and len(col) > 1 
+                      else col for col in df.columns]
+        
+        print(f"Simplified column names: {df.columns.tolist()[:5]}...")
+        return df
+        
+    except Exception as e:
+        print(f"Error reading with multi-level headers: {e}")
+        print("Falling back to standard Excel reading...")
+        # Fallback to standard reading
+        return pd.read_excel(file_path)
 
 
 
@@ -303,11 +350,26 @@ def find_column_with_pattern(df, patterns, target_col_name=None):
     """Find a column that contains any of the given patterns."""
     for col in df.columns:
         col_str = str(col).lower()
-        for pattern in patterns:
-            if pattern.lower() in col_str:
-                if target_col_name:
-                    print(f"Found column '{col}' for {target_col_name}")
-                return col
+        
+        # For multi-level headers that were combined with separator
+        if '|' in col_str:
+            # Split the combined name to check both English and Chinese parts
+            parts = col_str.split('|')
+            for pattern in patterns:
+                pattern_lower = pattern.lower()
+                # Check if pattern matches any part of the column name
+                if any(pattern_lower in part for part in parts):
+                    if target_col_name:
+                        print(f"Found column '{col}' for {target_col_name}")
+                    return col
+        else:
+            # Regular column name check
+            for pattern in patterns:
+                if pattern.lower() in col_str:
+                    if target_col_name:
+                        print(f"Found column '{col}' for {target_col_name}")
+                    return col
+    
     if target_col_name:
         print(f"WARNING: Could not find a column matching patterns {patterns} for {target_col_name}")
     return None
@@ -432,17 +494,45 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
     # Find key columns by pattern matching
     print("\nFinding column mappings...")
     # Main invoice columns
-    sr_no_col = find_column_with_pattern(packing_list_df, ['sr no', '序号', '序列号'], 'NO.')
-    material_code_col = find_column_with_pattern(packing_list_df, ['p/n', '料号', 'material code', '系统料号'], 'Material code')
-    description_col = find_column_with_pattern(packing_list_df, ['清关英文货描', '清关英文货描(关务提供)'], 'DESCRIPTION')
-    model_col = find_column_with_pattern(packing_list_df, ['model', '型号', '物料型号', '货物型号'], 'Model NO.')
-    unit_price_col = find_column_with_pattern(packing_list_df, ['单价', 'unit price', 'price', '不含税单价'], 'Unit Price')
-    qty_col = find_column_with_pattern(packing_list_df, ['qty', 'quantity', '数量'], 'Qty')
-    unit_col = find_column_with_pattern(packing_list_df, ['unit', '单位', '单位中文'], 'Unit')
-    net_weight_col = find_column_with_pattern(packing_list_df, ['net weight', 'N.W  (KG)总净重', 'n.w', '总净重', 'N.W(KG)', 'N.W  (KG)总净重'], 'net weight')
-    gross_weight_col = find_column_with_pattern(packing_list_df, ['G.W（KG)\n总毛重','gross weight', 'G.W  (KG)总毛重', 'g.w', '总毛重', 'G.W (KG)', 'G.W  (KG)总毛重'], 'gross weight')
-    factory_col = find_column_with_pattern(packing_list_df, ['factory', '工厂', 'daman/silvass'], 'factory')
-    project_col = find_column_with_pattern(packing_list_df, ['project', '项目名称', '项目'], 'project')
+    sr_no_col = find_column_with_pattern(packing_list_df, ['S/N', '序号', '序列号'], 'NO.')
+    material_code_col = find_column_with_pattern(packing_list_df, ['p/n', 'Part Number', 'material code', '系统料号', '料号'], 'Material code')
+    description_col = find_column_with_pattern(packing_list_df, ['Commercial Invoice Description', '清关英文货描(关务提供)', '描述', 'description'], 'DESCRIPTION')
+    model_col = find_column_with_pattern(packing_list_df, ['Model Number', '型号', '物料型号', '货物型号', 'model'], 'Model NO.')
+    unit_price_col = find_column_with_pattern(packing_list_df, ['Unit Price (Excl. Tax, CNY)()', 'unit price', '采购单价不含税', '不含税单价', '单价'], 'Unit Price')
+    qty_col = find_column_with_pattern(packing_list_df, ['Quantity', 'quantity', '数量', 'qty'], 'Qty')
+    unit_col = find_column_with_pattern(packing_list_df, ['Unit', '单位', '单位中文'], 'Unit')
+    
+    # Enhanced patterns for net weight and gross weight
+    net_weight_patterns = [
+        'Total Net Weight (kg)', 
+        'N.W  (KG)总净重', 
+        'n.w', 
+        '总净重', 
+        'N.W(KG)', 
+        'N.W  (KG)', 
+        'net weight',
+        'n/w',
+        '净重',
+        'Net Weight',
+        'net wt'
+    ]
+    net_weight_col = find_column_with_pattern(packing_list_df, net_weight_patterns, 'net weight')
+    
+    gross_weight_patterns = [
+        'Total Gross Weight (kg)',
+        'gross weight', 
+        'G.W  (KG)总毛重', 
+        'g.w', 
+        '总毛重', 
+        'G.W (KG)', 
+        'G.W  (KG)',
+        'gross wt',
+        '毛重'
+    ]
+    gross_weight_col = find_column_with_pattern(packing_list_df, gross_weight_patterns, 'gross weight')
+    
+    factory_col = find_column_with_pattern(packing_list_df, ['Plant Location', '工厂', 'daman/silvass'], 'factory')
+    project_col = find_column_with_pattern(packing_list_df, ['Project', '项目名称', '项目'], 'project')
     end_use_col = find_column_with_pattern(packing_list_df, ['end use', '用途'], 'end use')
     
     # Additional packing list columns
@@ -463,27 +553,55 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
     if sr_no_col:
         result_df['NO.'] = packing_list_df[sr_no_col]
         column_mappings['NO.'] = sr_no_col
+    else:
+        # Create a default sequence number
+        result_df['NO.'] = range(1, len(packing_list_df) + 1)
+        print("WARNING: S/N column not found, generating sequence numbers")
     
     if material_code_col:
         result_df['Material code'] = packing_list_df[material_code_col]
         column_mappings['Material code'] = material_code_col
+    else:
+        # Material code is essential - set to empty if not found
+        result_df['Material code'] = ""
+        print("WARNING: Material code column not found, using empty values")
     
     if description_col:
         result_df['DESCRIPTION'] = packing_list_df[description_col]
         column_mappings['DESCRIPTION'] = description_col
         print(f"Using '{description_col}' as the source for DESCRIPTION")
+    else:
+        # Description is essential - default to Material code if not found
+        if material_code_col:
+            result_df['DESCRIPTION'] = packing_list_df[material_code_col]
+            print("WARNING: Description column not found, using Material code as Description")
+        else:
+            result_df['DESCRIPTION'] = "Unknown Material"
+            print("WARNING: Description and Material code columns not found")
     
     if model_col:
         result_df['Model NO.'] = packing_list_df[model_col]
         column_mappings['Model NO.'] = model_col
+    else:
+        # Default to empty model number
+        result_df['Model NO.'] = ""
+        print("WARNING: Model Number column not found")
     
     if unit_price_col:
         result_df['Unit Price'] = packing_list_df[unit_price_col]
         column_mappings['Unit Price'] = unit_price_col
+    else:
+        # Unit price is essential for calculations - set default
+        result_df['Unit Price'] = 0
+        print("WARNING: Unit Price column not found, using zeros")
     
     if qty_col:
         result_df['Qty'] = packing_list_df[qty_col]
         column_mappings['Qty'] = qty_col
+    else:
+        # Quantity is essential - set default
+        result_df['Qty'] = 1
+        print("WARNING: Quantity column not found, using default of 1")
     
     if unit_col:
         # First, copy the original units to both dataframes
@@ -589,6 +707,19 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
     # Print found mappings for debugging
     print_column_mappings(column_mappings)
     
+    # Debug print for net weight column specifically
+    if net_weight_col:
+        print(f"\nFound net weight column: {net_weight_col}")
+        # Print some sample values
+        print("Sample net weight values:")
+        for i, val in enumerate(packing_list_df[net_weight_col].head(5)):
+            print(f"  Row {i+1}: {val}")
+    else:
+        print("\nWARNING: Net weight column not found!")
+        print("Available columns:")
+        for col in packing_list_df.columns:
+            print(f"  {col}")
+    
     # Apply trade type determination
     def determine_trade_type(row_type):
         if pd.isna(row_type):
@@ -625,28 +756,55 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
         result_df['Amount'] = None
         
     # Convert columns to numeric for calculations
-    result_df['net weight'] = pd.to_numeric(result_df['net weight'], errors='coerce')
-    result_df['Qty'] = pd.to_numeric(result_df['Qty'], errors='coerce')
-    result_df['Unit Price'] = pd.to_numeric(result_df['Unit Price'], errors='coerce')
-    
-    # Also convert packing list numeric columns
-    pl_result_df['QUANTITY'] = pd.to_numeric(pl_result_df['QUANTITY'], errors='coerce')
-    pl_result_df['G.W (KG)'] = pd.to_numeric(pl_result_df['G.W (KG)'], errors='coerce')
-    pl_result_df['N.W(KG)'] = pd.to_numeric(pl_result_df['N.W(KG)'], errors='coerce')
-    
-    # Fill NaN values with 0 for numerical calculations
-    result_df['net weight'] = result_df['net weight'].fillna(0)
-    result_df['Qty'] = result_df['Qty'].fillna(0)
-    result_df['Unit Price'] = result_df['Unit Price'].fillna(0)
-    
-    pl_result_df['QUANTITY'] = pl_result_df['QUANTITY'].fillna(0)
-    pl_result_df['G.W (KG)'] = pl_result_df['G.W (KG)'].fillna(0)
-    pl_result_df['N.W(KG)'] = pl_result_df['N.W(KG)'].fillna(0)
-    
-    # Calculate total net weight
-    net_weight = result_df['net weight']
-    total_net_weight = result_df['net weight'].sum()
-    
+    try:
+        if net_weight_col:
+            result_df['net weight'] = pd.to_numeric(result_df['net weight'], errors='coerce')
+            print(f"Converted net weight to numeric. Example values: {result_df['net weight'].head()}")
+        else:
+            # If net weight column not found, set to default value
+            print("WARNING: Setting default values for missing net weight column")
+            result_df['net weight'] = 0
+            
+        result_df['Qty'] = pd.to_numeric(result_df['Qty'], errors='coerce')
+        result_df['Unit Price'] = pd.to_numeric(result_df['Unit Price'], errors='coerce')
+        
+        # Also convert packing list numeric columns
+        pl_result_df['QUANTITY'] = pd.to_numeric(pl_result_df['QUANTITY'], errors='coerce')
+        if 'G.W (KG)' in pl_result_df.columns:
+            pl_result_df['G.W (KG)'] = pd.to_numeric(pl_result_df['G.W (KG)'], errors='coerce')
+        if 'N.W(KG)' in pl_result_df.columns:
+            pl_result_df['N.W(KG)'] = pd.to_numeric(pl_result_df['N.W(KG)'], errors='coerce')
+        
+        # Fill NaN values with 0 for numerical calculations
+        result_df['net weight'] = result_df['net weight'].fillna(0)
+        result_df['Qty'] = result_df['Qty'].fillna(0)
+        result_df['Unit Price'] = result_df['Unit Price'].fillna(0)
+        
+        pl_result_df['QUANTITY'] = pl_result_df['QUANTITY'].fillna(0)
+        if 'G.W (KG)' in pl_result_df.columns:
+            pl_result_df['G.W (KG)'] = pl_result_df['G.W (KG)'].fillna(0)
+        if 'N.W(KG)' in pl_result_df.columns:
+            pl_result_df['N.W(KG)'] = pl_result_df['N.W(KG)'].fillna(0)
+        
+        # Calculate total net weight
+        net_weight = result_df['net weight']
+        total_net_weight = result_df['net weight'].sum()
+        print(f"Total net weight calculated: {total_net_weight} kg")
+        
+        # Safety check for total_net_weight
+        if total_net_weight <= 0:
+            print("WARNING: Total net weight is zero or negative!")
+            # Set a default non-zero value to prevent division by zero later
+            total_net_weight = 1
+            print(f"Using default weight value: {total_net_weight} kg")
+            
+    except Exception as e:
+        print(f"ERROR in numeric conversion: {e}")
+        # Set default values to prevent calculation failures
+        total_net_weight = 1
+        net_weight = pd.Series([0] * len(result_df))
+        print(f"Using default values due to error")
+
     # Calculate total cost (采购总价) for each row and sum
     result_df['采购总价']  = result_df['Unit Price'] * result_df['Qty'] 
     total_amount =  result_df['采购总价'].sum()
@@ -1286,6 +1444,9 @@ if __name__ == "__main__":
     parser.add_argument('--output-dir', type=str, default='outputs',
                       help='输出目录 (默认: outputs)')
     
+    parser.add_argument('--debug', action='store_true', 
+                      help='启用调试模式，显示详细错误信息')
+                      
     args = parser.parse_args()
     
     # Create output directory if it doesn't exist
@@ -1309,24 +1470,80 @@ if __name__ == "__main__":
         if not os.path.exists(policy_file):
             raise FileNotFoundError(f"政策文件不存在: {policy_file}")
         
+        # Check file formats
+        if not packing_list_file.lower().endswith('.xlsx'):
+            print(f"警告: 装箱单文件 '{packing_list_file}' 可能不是Excel格式")
+        
+        if not policy_file.lower().endswith('.xlsx'):
+            print(f"警告: 政策文件 '{policy_file}' 可能不是Excel格式")
+        
+        print(f"开始处理文件:")
+        print(f"- 装箱单: {packing_list_file}")
+        print(f"- 政策文件: {policy_file}")
+        print(f"- 输出目录: {args.output_dir}")
+        
         result = process_shipping_list(packing_list_file, policy_file, args.output_dir)
         print(f"处理完成！输出文件已保存到 '{args.output_dir}' 目录。")
     except FileNotFoundError as e:
         print(f"错误: {e}")
     except Exception as e:
         print(f"处理文件时出错: {e}")
-        import traceback
-        traceback.print_exc()
+        
+        # 打印详细错误信息
+        if args.debug:
+            import traceback
+            traceback.print_exc()
+        else:
+            import traceback
+            print(f"错误位置: {traceback.format_exc().splitlines()[-2]}")
+            print("使用 --debug 参数可以查看详细错误信息")
         
         # 打印列名进行调试
         try:
-            policy_df = read_excel_file(policy_file)
-            print("可用的政策列名:", list(policy_df.columns))
-        except:
-            print("无法读取政策文件")
+            # Test reading with different skiprows
+            for skip in [0, 1, 2, 3]:
+                try:
+                    print(f"\n尝试跳过 {skip} 行读取政策文件:")
+                    policy_df = pd.read_excel(policy_file, skiprows=skip, nrows=5)
+                    print(f"前5行: {policy_df.head().values.tolist()}")
+                    print(f"列名: {list(policy_df.columns)}")
+                except Exception as skip_err:
+                    print(f"  - 跳过 {skip} 行时出错: {skip_err}")
+        except Exception as read_err:
+            print(f"读取政策文件时出错: {read_err}")
             
         try:
-            packing_list_df = read_excel_file(packing_list_file)
-            print("可用的装箱单列名:", list(packing_list_df.columns))
-        except:
-            print("无法读取装箱单文件")
+            print("\n装箱单文件结构:")
+            packing_list_peek = pd.read_excel(packing_list_file, nrows=5, header=None)
+            for i, row in enumerate(packing_list_peek.values.tolist()):
+                print(f"第 {i+1} 行: {row[:5]}...")
+            
+            # Try reading with different header configurations
+            print("\n尝试不同的表头配置读取装箱单:")
+            
+            # Standard read
+            try:
+                print("\n标准读取:")
+                packing_list_df = pd.read_excel(packing_list_file)
+                print(f"列名: {list(packing_list_df.columns)[:5]}...")
+            except Exception as e:
+                print(f"标准读取出错: {e}")
+                
+            # With header=[1,2]
+            try:
+                print("\n多级表头读取 [第2-3行]:")
+                packing_list_df = pd.read_excel(packing_list_file, header=[1,2])
+                print(f"列名: {list(packing_list_df.columns)[:5]}...")
+            except Exception as e:
+                print(f"多级表头读取出错: {e}")
+                
+            # Skip first row, use header=[0,1]
+            try:
+                print("\n跳过首行，多级表头读取:")
+                packing_list_df = pd.read_excel(packing_list_file, header=[0,1], skiprows=[0])
+                print(f"列名: {list(packing_list_df.columns)[:5]}...")
+            except Exception as e:
+                print(f"跳过首行多级表头读取出错: {e}")
+                
+        except Exception as peek_err:
+            print(f"检查装箱单文件结构时出错: {peek_err}")

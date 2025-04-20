@@ -14,13 +14,16 @@ class ProcessValidator:
             # 默认配置路径
             current_dir = os.path.dirname(os.path.abspath(__file__))
             config_path = os.path.join(os.path.dirname(current_dir), "config", "validation_rules.json")
+            print(f"DEBUG: 使用默认配置路径: {config_path}")
         
         # 如果配置文件不存在，使用默认配置
         if os.path.exists(config_path):
             with open(config_path, "r", encoding="utf-8") as f:
                 self.rules = json.load(f)
+                print(f"DEBUG: 已加载配置: {self.rules}")
         else:
             self.rules = {"price_validation": {"decimal_places": {"unit_price": 6, "total_amount": 2}}}
+            print(f"DEBUG: 配置文件不存在，使用默认配置: {self.rules}")
     
     def validate_trade_type_identification(self, original_packing_list_path):
         """验证贸易类型识别逻辑
@@ -32,17 +35,33 @@ class ProcessValidator:
             dict: 含success和message的验证结果
         """
         try:
-            # 读取采购装箱单
-            df = pd.read_excel(original_packing_list_path, skiprows=3)
+            # 读取采购装箱单，正确处理表头结构
+            try:
+                # 第一行是表格标题，第二行是英文表头，第三行是中文表头
+                df = pd.read_excel(original_packing_list_path, header=[1,2], skiprows=[0])
+                print(f"DEBUG: 贸易类型识别 - 正确加载后的列名: {df.columns.tolist()}")
+            except Exception as e:
+                print(f"DEBUG: 使用多级表头读取失败，尝试替代方法: {str(e)}")
+                # 如果上面的方法失败，使用传统方法
+                df = pd.read_excel(original_packing_list_path, skiprows=3)
             
             # 查找贸易类型列
             trade_type_columns = ["出口报关方式", "export declaration", "贸易类型", "trade type"]
             trade_type_col = None
             
-            for col in trade_type_columns:
-                if col in df.columns:
-                    trade_type_col = col
-                    break
+            # 尝试直接匹配列名
+            for col in df.columns:
+                # 对于多层次表头，需要特殊处理
+                if isinstance(col, tuple):
+                    for part in col:
+                        part_str = str(part).lower()
+                        if any(name.lower() in part_str for name in trade_type_columns):
+                            trade_type_col = col
+                            break
+                else:
+                    if any(name.lower() in str(col).lower() for name in trade_type_columns):
+                        trade_type_col = col
+                        break
                     
             if trade_type_col is None:
                 trade_type_col = find_column_with_pattern(df, trade_type_columns)
@@ -66,7 +85,9 @@ class ProcessValidator:
                 
             return {"success": True, "message": "贸易类型识别逻辑验证通过"}
         except Exception as e:
-            return {"success": False, "message": f"验证贸易类型识别时出错: {str(e)}"}
+            import traceback
+            error_line = traceback.extract_tb(e.__traceback__)[-1][1]
+            return {"success": False, "message": f"验证贸易类型识别时出错: {str(e)}, 行号: {error_line}"}
     
     def validate_trade_type_split(self, original_packing_list_path, cif_invoice_path):
         """验证按贸易类型拆分结果
@@ -80,7 +101,13 @@ class ProcessValidator:
         """
         try:
             # 读取采购装箱单
-            original_df = pd.read_excel(original_packing_list_path, skiprows=3)
+            try:
+                # 正确处理多层表头
+                original_df = pd.read_excel(original_packing_list_path, header=[1,2], skiprows=[0])
+                print(f"DEBUG: 贸易类型拆分 - 装箱单列名: {original_df.columns.tolist()}")
+            except Exception as e:
+                print(f"DEBUG: 多层表头读取失败，尝试替代方法: {str(e)}")
+                original_df = pd.read_excel(original_packing_list_path, skiprows=3)
             
             # 查找贸易类型列
             trade_type_col = find_column_with_pattern(original_df, ["出口报关方式", "export declaration", "贸易类型"])
@@ -112,7 +139,9 @@ class ProcessValidator:
             # 实际验证需要比较物料编号等，这里简化处理
             return {"success": True, "message": "贸易类型拆分验证通过"}
         except Exception as e:
-            return {"success": False, "message": f"验证贸易类型拆分时出错: {str(e)}"}
+            import traceback
+            error_line = traceback.extract_tb(e.__traceback__)[-1][1]
+            return {"success": False, "message": f"验证贸易类型拆分时出错: {str(e)}, 行号: {error_line}"}
     
     def validate_fob_price_calculation(self, original_packing_list_path, policy_file_path, cif_invoice_path):
         """验证FOB价格计算
@@ -127,7 +156,13 @@ class ProcessValidator:
         """
         try:
             # 读取采购装箱单
-            original_df = pd.read_excel(original_packing_list_path, skiprows=3)
+            try:
+                # 正确处理多层表头
+                original_df = pd.read_excel(original_packing_list_path, header=[1,2], skiprows=[0])
+                print(f"DEBUG: FOB价格计算 - 装箱单列名: {original_df.columns.tolist()}")
+            except Exception as e:
+                print(f"DEBUG: 多层表头读取失败，尝试替代方法: {str(e)}")
+                original_df = pd.read_excel(original_packing_list_path, skiprows=3)
             
             # 读取政策文件
             policy_df = pd.read_excel(policy_file_path)
@@ -167,7 +202,9 @@ class ProcessValidator:
             # 这里假设CIF发票中的FOB单价是根据加价计算得出的
             return {"success": True, "message": "FOB价格计算验证通过"}
         except Exception as e:
-            return {"success": False, "message": f"验证FOB价格计算时出错: {str(e)}"}
+            import traceback
+            error_line = traceback.extract_tb(e.__traceback__)[-1][1]
+            return {"success": False, "message": f"验证FOB价格计算时出错: {str(e)}, 行号: {error_line}"}
     
     def validate_insurance_calculation(self, original_packing_list_path, policy_file_path, cif_invoice_path):
         """验证保险费计算
@@ -224,20 +261,75 @@ class ProcessValidator:
             dict: 含success和message的验证结果
         """
         try:
-            # 读取采购装箱单
-            original_df = pd.read_excel(original_packing_list_path, skiprows=3)
+            # 读取采购装箱单 - 跳过前三行，而不是之前的skiprows=3
+            # 根据图片显示，第一行是表名，第二行是英文，第三行是中文，从第四行开始才是数据行
+            # 所以正确的读取方式应该是header=[0,1]或更精确的处理
+            try:
+                # 先读取前几行以获取表头信息
+                header_df = pd.read_excel(original_packing_list_path, nrows=3)
+                print(f"DEBUG: 表格前3行: {header_df.values.tolist()}")
+                
+                # 正确读取整个表格，指定英文和中文表头行
+                original_df = pd.read_excel(original_packing_list_path, header=[1,2], skiprows=[0])
+                
+                # 打印列名用于调试
+                print(f"DEBUG: 正确加载后的列名: {original_df.columns.tolist()}")
+            except Exception as e:
+                return {"success": False, "message": f"读取采购装箱单时出错: {str(e)}, 尝试采用替代方法"}
+                
+                # 如果上面的方法失败，尝试直接跳过前3行
+                original_df = pd.read_excel(original_packing_list_path, skiprows=3)
             
             # 读取政策文件
             policy_df = pd.read_excel(policy_file_path)
             
             # 找到政策文件中的总运费
-            total_freight_col = find_column_with_pattern(policy_df, ["总运费", "Total Freight"])
+            total_freight_col = find_column_with_pattern(policy_df, ["总运费", "Total Freight", "Freight", "运费"])
             
             # 找到采购装箱单中的净重列
-            net_weight_col = find_column_with_pattern(original_df, ["净重", "Net Weight"])
+            try:
+                # 扩展净重列的可能模式
+                net_weight_patterns = [
+                    "Total Net Weight (kg)", 
+                    "Net Weight", 
+                    "N.W.", 
+                    "N/W", 
+                    "净重", 
+                    "N.W (kg)",
+                    "Net Weight (kg)",
+                    "Total N.W.",
+                    "Net Weight (KGS)",
+                    "N.W(KG)"
+                ]
+                
+                # 打印列名用于调试
+                print(f"DEBUG: 查找净重列，当前列名: {original_df.columns.tolist()}")
+                
+                # 尝试查找列
+                net_weight_col = find_column_with_pattern(original_df, net_weight_patterns)
+                
+                # 如果没找到，尝试手动查找包含'net'和'weight'的列或'n.w'
+                if net_weight_col is None:
+                    for col in original_df.columns:
+                        col_str = str(col).lower()
+                        # 检查多层次索引的情况
+                        if isinstance(col, tuple):
+                            col_str = ' '.join([str(c).lower() for c in col])
+                        
+                        if ('net' in col_str and 'weight' in col_str) or 'n.w' in col_str or '净重' in col_str:
+                            net_weight_col = col
+                            print(f"DEBUG: 找到净重列: {col}")
+                            break
+                
+                # 如果仍然没找到，输出所有列名以便调试
+                if net_weight_col is None:
+                    column_names = list(original_df.columns)
+                    return {"success": False, "message": f"未找到净重列。可用列: {column_names}"}
+            except Exception as e:
+                return {"success": False, "message": f"查找净重列时出错: {str(e)}, 行号: {e.__traceback__.tb_lineno}"}
             
-            if total_freight_col is None or net_weight_col is None:
-                return {"success": False, "message": "未找到总运费或净重列，无法验证运费计算"}
+            if total_freight_col is None:
+                return {"success": False, "message": "未找到总运费列，无法验证运费计算"}
             
             # 获取总运费
             total_freight = None
@@ -250,10 +342,21 @@ class ProcessValidator:
                 return {"success": False, "message": "未找到总运费值"}
             
             # 计算总净重
-            total_net_weight = 0
-            for _, row in original_df.iterrows():
-                if pd.notna(row[net_weight_col]) and not isinstance(row[0], str):  # 排除汇总行
-                    total_net_weight += row[net_weight_col]
+            try:
+                total_net_weight = 0
+                for idx, row in original_df.iterrows():
+                    # 跳过非数字行和表头总结行
+                    if pd.isna(row[net_weight_col]) or (isinstance(row.iloc[0], str) and ('total' in str(row.iloc[0]).lower() or '合计' in str(row.iloc[0]))):
+                        continue
+                    
+                    try:
+                        # 确保是数值类型
+                        weight_value = float(row[net_weight_col])
+                        total_net_weight += weight_value
+                    except (ValueError, TypeError) as e:
+                        return {"success": False, "message": f"第{idx+1}行的净重值'{row[net_weight_col]}'无法转换为数字: {str(e)}"}
+            except Exception as e:
+                return {"success": False, "message": f"计算总净重时出错: {str(e)}, 行号: {e.__traceback__.tb_lineno}"}
             
             if total_net_weight == 0:
                 return {"success": False, "message": "总净重为0，无法验证运费计算"}
@@ -264,7 +367,9 @@ class ProcessValidator:
             # 简化验证，实际应比较每个物料
             return {"success": True, "message": "运费计算验证通过"}
         except Exception as e:
-            return {"success": False, "message": f"验证运费计算时出错: {str(e)}"}
+            import traceback
+            error_line = traceback.extract_tb(e.__traceback__)[-1][1]
+            return {"success": False, "message": f"验证运费计算时出错: {str(e)}, 行号: {error_line}"}
     
     def validate_cif_price_calculation(self, cif_invoice_path):
         """验证CIF价格计算

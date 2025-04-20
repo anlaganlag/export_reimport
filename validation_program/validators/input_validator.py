@@ -226,20 +226,82 @@ class InputValidator:
             df = pd.read_excel(file_path, skiprows=1)
             
             # 查找净重和毛重列
-            net_weight_col = find_column_with_pattern(df, ["Total Gross Weight (kg)"])
+            net_weight_col = find_column_with_pattern(df, ["Total Net Weight (kg)"])
             gross_weight_col = find_column_with_pattern(df, ["Total Gross Weight (kg)"])
+            carton_number_col = find_column_with_pattern(df, ["Carton Number"])
             
             if net_weight_col is None or gross_weight_col is None:
                 return {"success": False, "message": "未找到净重或毛重列"}
             
+            # 安全转换函数 - 将任何值转换为浮点数
+            def safe_convert_to_float(val):
+                if pd.isna(val):
+                    return 0.0
+                try:
+                    return float(val)
+                except (ValueError, TypeError):
+                    try:
+                        # 尝试移除所有非数字字符
+                        clean_str = ''.join(c for c in str(val) if c.isdigit() or c == '.')
+                        if clean_str:
+                            return float(clean_str)
+                        return 0.0
+                    except:
+                        return 0.0
+            
+            # 为每个箱号记录最近的有效毛重值
+            last_valid_gross_weight = None
+            current_carton = None
+            carton_gross_weights = {}
+            
+            # 第一遍扫描：记录每个箱号的毛重值
+            for idx, row in df.iterrows():
+                # 获取当前箱号
+                if carton_number_col is not None and pd.notna(row[carton_number_col]):
+                    current_carton = row[carton_number_col]
+                
+                # 记录箱号对应的有效毛重
+                gross_weight_value = safe_convert_to_float(row[gross_weight_col])
+                if current_carton is not None and gross_weight_value > 0:
+                    carton_gross_weights[current_carton] = gross_weight_value
+                    last_valid_gross_weight = gross_weight_value  # 同时更新最近有效毛重
+            
             # 检查每行净重是否小于毛重
             invalid_rows = []
+            current_carton = None
+            last_valid_gross_weight = None
+            
             for idx, row in df.iterrows():
-                # 跳过汇总行和空行
-                if pd.isna(row[net_weight_col]) or pd.isna(row[gross_weight_col]):
+                # 转换净重值
+                net_weight_value = safe_convert_to_float(row[net_weight_col])
+                
+                # 跳过净重为空或0的行
+                if net_weight_value <= 0:
                     continue
-                    
-                if row[net_weight_col] > row[gross_weight_col]:
+                
+                # 获取当前箱号
+                if carton_number_col is not None and pd.notna(row[carton_number_col]):
+                    current_carton = row[carton_number_col]
+                    if current_carton in carton_gross_weights:
+                        last_valid_gross_weight = carton_gross_weights[current_carton]
+                
+                # 获取适用的毛重值
+                applicable_gross_weight = None
+                
+                # 如果行中有毛重值，直接使用
+                gross_weight_value = safe_convert_to_float(row[gross_weight_col])
+                if gross_weight_value > 0:
+                    applicable_gross_weight = gross_weight_value
+                    last_valid_gross_weight = applicable_gross_weight
+                # 否则使用当前箱号的毛重值或最近的有效毛重
+                elif last_valid_gross_weight is not None:
+                    applicable_gross_weight = last_valid_gross_weight
+                else:
+                    # 如果找不到适用的毛重值，跳过此行
+                    continue
+                
+                # 检查净重是否大于适用的毛重
+                if net_weight_value > applicable_gross_weight:
                     invalid_rows.append(idx + 4)  # +4是因为跳过了3行表头，再加上1行零基索引
             
             if invalid_rows:
@@ -250,7 +312,7 @@ class InputValidator:
                 
             return {"success": True, "message": "净重毛重验证通过"}
         except Exception as e:
-            return {"success": False, "message": f"验证净重毛重时出错: {str(e)}"}
+            return {"success": False, "message": f"验证净重毛重时出错: {str(e)}，错误行: {idx if 'idx' in locals() else 'N/A'}，净重值: {net_weight_value if 'net_weight_value' in locals() else 'N/A'}，毛重值: {applicable_gross_weight if 'applicable_gross_weight' in locals() else 'N/A'}"}
     
     def validate_summary_data(self, file_path):
         """验证表尾汇总数据正确性
