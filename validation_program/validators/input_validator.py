@@ -223,11 +223,11 @@ class InputValidator:
         """
         try:
             # 跳过表头，读取数据行
-            df = pd.read_excel(file_path, skiprows=3)
+            df = pd.read_excel(file_path, skiprows=1)
             
             # 查找净重和毛重列
-            net_weight_col = find_column_with_pattern(df, ["净重", "Net Weight"])
-            gross_weight_col = find_column_with_pattern(df, ["毛重", "Gross Weight"])
+            net_weight_col = find_column_with_pattern(df, ["Total Gross Weight (kg)"])
+            gross_weight_col = find_column_with_pattern(df, ["Total Gross Weight (kg)"])
             
             if net_weight_col is None or gross_weight_col is None:
                 return {"success": False, "message": "未找到净重或毛重列"}

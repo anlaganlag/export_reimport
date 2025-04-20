@@ -278,7 +278,6 @@ def main():
     parser.add_argument("--template-dir", default="Template", help="模板目录")
     parser.add_argument("--report-path", default="reports/validation_report.md", help="报告输出路径")
     parser.add_argument("--skip-processing", action="store_true", help="跳过文件处理，仅验证已生成的文件")
-    parser.add_argument("--debug", action="store_true", help="启用调试模式，打印更多调试信息")
     
     args = parser.parse_args()
     
@@ -299,24 +298,9 @@ def main():
     input_results = input_validator.validate_all(args.packing_list, args.policy_file)
     results.update(input_results)
     
-    # 如果启用了调试模式，打印所有验证结果
-    if args.debug:
-        print("\n调试信息 - 所有输入验证结果:")
-        for k, v in input_results.items():
-            status = "成功" if v["success"] else "失败"
-            print(f"  - {k}: {status}")
-            print(f"    消息: {v['message']}")
-        print()
-    
     # 检查输入验证是否通过
     input_valid = all(v["success"] for k, v in input_results.items())
     if not input_valid:
-        # 打印哪些输入验证失败了
-        print("输入文件验证失败的项目:")
-        for k, v in input_results.items():
-            if not v["success"]:
-                print(f"  - {k}: {v['message']}")
-        
         print("输入文件验证失败，生成报告并退出...")
         generate_report(results, args.report_path, args)
         return
