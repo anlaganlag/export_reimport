@@ -116,22 +116,28 @@ def merge_three_excel_files(first_file, middle_file, last_file, output_file, fir
     """
     print(f"Merging files: {first_file}, {middle_file}, {last_file}")
     
-    # Create output workbook
-    merged_wb = openpyxl.Workbook()
-    merged_sheet = merged_wb.active
-    merged_sheet.title = 'Commercial Invoice'
-    
     # Process middle file first to extract both sheets
     middle_wb = load_workbook_safely(middle_file)
     if not middle_wb or len(middle_wb.sheetnames) < 2:
         print(f"Error: Middle file must have at least 2 sheets")
         return False
     
+    # Get original sheet names from middle file to preserve them
+    pl_sheet_name = middle_wb.sheetnames[0]  # First sheet (Packing List)
+    invoice_sheet_name = middle_wb.sheetnames[1]  # Second sheet (Invoice)
+    
+    print(f"Using sheet names from middle file: '{pl_sheet_name}' and '{invoice_sheet_name}'")
+    
+    # Create output workbook
+    merged_wb = openpyxl.Workbook()
+    merged_sheet = merged_wb.active
+    merged_sheet.title = invoice_sheet_name  # Use original invoice sheet name instead of hardcoding
+    
     # Create and copy Packing List from middle file's first sheet
-    packing_list_sheet = merged_wb.create_sheet('PL')
+    packing_list_sheet = merged_wb.create_sheet(pl_sheet_name)
     
     # Extract column widths from middle file's first sheet
-    middle_pl_sheet = middle_wb[middle_wb.sheetnames[0]]
+    middle_pl_sheet = middle_wb[pl_sheet_name]
     pl_column_widths = {}
     for col_idx, cell in enumerate(middle_pl_sheet[1], 1):
         col_letter = openpyxl.utils.get_column_letter(col_idx)
@@ -139,7 +145,7 @@ def merge_three_excel_files(first_file, middle_file, last_file, output_file, fir
             pl_column_widths[cell.value] = middle_pl_sheet.column_dimensions[col_letter].width
     
     # Extract column widths from middle file's second sheet
-    middle_ci_sheet = middle_wb[middle_wb.sheetnames[1]]
+    middle_ci_sheet = middle_wb[invoice_sheet_name]
     ci_column_widths = {}
     for col_idx, cell in enumerate(middle_ci_sheet[1], 1):
         col_letter = openpyxl.utils.get_column_letter(col_idx)
@@ -161,7 +167,7 @@ def merge_three_excel_files(first_file, middle_file, last_file, output_file, fir
             return False
             
         sheet = sheet_selector(wb)
-        print(f"Processing Commercial Invoice: {file_path}")
+        print(f"Processing {invoice_sheet_name}: {file_path}")
         row_offset += append_sheet_with_offset(sheet, merged_sheet, row_offset, file_path)
     
     # Apply column widths to Commercial Invoice
@@ -169,7 +175,7 @@ def merge_three_excel_files(first_file, middle_file, last_file, output_file, fir
     
     # Handle Packing List sheet merging if first_sheet_first_file and first_sheet_last_file are provided
     if first_sheet_first_file and first_sheet_last_file:
-        print(f"Merging Packing List with: {first_sheet_first_file}, {middle_file}, {first_sheet_last_file}")
+        print(f"Merging {pl_sheet_name} with: {first_sheet_first_file}, {middle_file}, {first_sheet_last_file}")
         
         # Prepare data for merging Packing List
         pl_files_to_merge = [
@@ -186,7 +192,7 @@ def merge_three_excel_files(first_file, middle_file, last_file, output_file, fir
                 return False
                 
             sheet = sheet_selector(wb)
-            print(f"Processing Packing List: {file_path}")
+            print(f"Processing {pl_sheet_name}: {file_path}")
             pl_row_offset += append_sheet_with_offset(sheet, packing_list_sheet, pl_row_offset, file_path)
         
         # Apply column widths to Packing List
@@ -194,10 +200,10 @@ def merge_three_excel_files(first_file, middle_file, last_file, output_file, fir
     else:
         # If no first sheet files provided, just copy the first sheet from middle file
         print(f"Copying first sheet from {middle_file}")
-        copy_sheet(middle_wb[middle_wb.sheetnames[0]], packing_list_sheet)
+        copy_sheet(middle_wb[pl_sheet_name], packing_list_sheet)
     
     # Reorder sheets
-    merged_wb._sheets = [merged_wb['PL'], merged_wb['Commercial Invoice']]
+    merged_wb._sheets = [merged_wb[pl_sheet_name], merged_wb[invoice_sheet_name]]
     
     # Save result
     try:

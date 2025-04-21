@@ -9,6 +9,7 @@ from openpyxl.utils.dataframe import dataframe_to_rows
 from openpyxl.utils.cell import coordinate_from_string, column_index_from_string
 import shutil
 import logging
+import datetime
 
 # Make sure outputs directory exists
 if not os.path.exists('outputs'):
@@ -441,23 +442,24 @@ def split_by_project_and_factory(df):
         print("WARNING: 'factory'列不存在，添加默认值'默认工厂'")
         df['factory'] = '默认工厂'
     
+    # Clean up project and factory values
+    # Convert NaN, None and empty strings to default values
+    df['project'] = df['project'].apply(lambda x: '大华' if pd.isna(x) or str(x).strip() == '' else str(x).strip())
+    df['factory'] = df['factory'].apply(lambda x: '默认工厂' if pd.isna(x) or str(x).strip() == '' else str(x).strip())
+    
     print("Unique project values:", df['project'].unique())
     print("Unique factory values:", df['factory'].unique())
     
-    # 确保工厂和项目值不是NaN
-    df['project'] = df['project'].fillna('大华')
-    df['factory'] = df['factory'].fillna('默认工厂')
-    
     # Define the project categories with more robust string handling
     project_categories = {
-        '大华': lambda x: str(x).strip() in ['大华', ''] or pd.isna(x),
+        '大华': lambda x: str(x).strip() == '大华',
         '麦格米特': lambda x: str(x).strip() == '麦格米特',
-        '工厂': lambda x: str(x).strip() not in ['大华', '麦格米特', ''] and not pd.isna(x)
+        '工厂': lambda x: str(x).strip() not in ['大华', '麦格米特']
     }
     
     # Get unique factories
-    factories = df['factory'].unique()
-    if len(factories) == 0 or (len(factories) == 1 and pd.isna(factories[0])):
+    factories = sorted(df['factory'].unique())
+    if len(factories) == 0:
         factories = ['默认工厂']
         df['factory'] = '默认工厂'
         print("WARNING: 没有有效的工厂值，使用'默认工厂'")
@@ -473,17 +475,10 @@ def split_by_project_and_factory(df):
             
             for factory in factories:
                 key = (project_name, factory)
-                factory_value = factory if not pd.isna(factory) else '默认工厂'
-                
-                if pd.isna(factory):
-                    # 处理NaN工厂值
-                    factory_df = project_df[project_df['factory'].isna()]
-                else:
-                    # 正常处理
-                    factory_df = project_df[project_df['factory'] == factory]
+                factory_df = project_df[project_df['factory'] == factory]
                 
                 split_dfs[key] = factory_df
-                print(f"Found {len(split_dfs[key])} rows for {project_name} - {factory_value}")
+                print(f"Found {len(split_dfs[key])} rows for {project_name} - {factory}")
         except Exception as e:
             print(f"Error processing project {project_name}: {e}")
             continue
@@ -505,6 +500,30 @@ def split_by_project_and_factory(df):
                 print(f"Added empty DataFrame for {project} - {factory}")
     
     return split_dfs, project_categories
+
+# Function to generate valid invoice sheet name
+def generate_invoice_sheet_name(prefix="CXCI"):
+    """Generate a valid invoice sheet name in the format XXXX20230101####"""
+    import datetime
+    today = datetime.datetime.now()
+    date_part = today.strftime("%Y%m%d")
+
+    
+    import datetime
+
+# 获取当前时间
+    now = datetime.datetime.now()
+    # 获取当天 0 点的时间
+    midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    # 计算当前时间与当天 0 点的时间差
+    delta = now - midnight
+    # 获取时间差的总秒数
+    seconds = delta.total_seconds()
+
+    serial = int((seconds / 86400) * 10000)
+
+    # Use a serial number starting with 0001
+    return f"{prefix}{date_part}{serial}"
 
 # Main function to process the shipping list
 def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
@@ -1226,17 +1245,34 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
             # Commercial Invoice 工作表处理
             commercial_df = export_grouped.copy()
             # 添加汇总行
-            summary_commercial = commercial_df[['Qty', 'Amount']].sum()
-            commercial_df = pd.concat([commercial_df, summary_commercial.to_frame().T], ignore_index=True)
-            commercial_df.to_excel(writer, sheet_name='Commercial Invoice', index=False)
+            summary_commercial = {'DESCRIPTION': 'Total', 'Material code': ''}
+            for col in ['Qty', 'Amount']:
+                if col in commercial_df.columns:
+                    summary_commercial[col] = pd.to_numeric(commercial_df[col], errors='coerce').fillna(0).sum()
+            
+            # Create new row with just the sums for Qty and Amount
+            summary_row = pd.DataFrame([summary_commercial])
+            
+            # Proper column order for the summary row
+            for col in exportReimport_output_columns:
+                if col not in summary_row.columns:
+                    summary_row[col] = None
+            
+            summary_row = summary_row[exportReimport_output_columns]
+            commercial_df = pd.concat([commercial_df, summary_row], ignore_index=True)
+            
+            # 使用正确的发票号码格式作为工作表名
+            invoice_sheet_name = generate_invoice_sheet_name()
+            print(f"Using invoice sheet name: {invoice_sheet_name}")
+            commercial_df.to_excel(writer, sheet_name=invoice_sheet_name, index=False)
 
             # 确保至少一个工作表可见
             workbook = writer.book
             for sheet in workbook.worksheets:
                 sheet.sheet_state = "visible"  # 显式设置所有工作表可见
             
-            # 设置默认打开第二个sheet
-            worksheet = workbook['Commercial Invoice']
+            # 设置默认打开发票工作表
+            worksheet = workbook[invoice_sheet_name]
             workbook.active = workbook.index(worksheet)
         
         # Apply styling to both sheets
@@ -1381,6 +1417,22 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
                     if merge_py_path:
                         print(f"Found merge.py at: {merge_py_path}")
                         
+                        # Before merging, let's rename our sheet in the temporary file to match the invoice sheet name
+                        try:
+                            # Make a backup of the temporary file
+                            book = load_workbook(temp_export_file)
+                            
+                            # Check if 'Commercial Invoice' sheet exists and rename it to invoice_sheet_name
+                            if 'Commercial Invoice' in book.sheetnames:
+                                print(f"Renaming 'Commercial Invoice' sheet to '{invoice_sheet_name}' before merging")
+                                ci_sheet = book['Commercial Invoice']
+                                ci_sheet.title = invoice_sheet_name
+                                book.save(temp_export_file)
+                            
+                        except Exception as e:
+                            print(f"Warning: Could not rename sheet in temporary file: {e}")
+                        
+                        # Now continue with the merge operation
                         # Call merge.py with the files in specific order using subprocess
                         import subprocess
                         
@@ -1474,6 +1526,15 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
     # Generate a single invoice file with multiple sheets for all splits
     reimport_invoice_path = os.path.join(output_dir, 'reimport_invoice.xlsx')
     
+    # Delete existing reimport_invoice.xlsx file if it exists
+    if os.path.exists(reimport_invoice_path):
+        try:
+            os.remove(reimport_invoice_path)
+            print(f"Removed existing file: {reimport_invoice_path}")
+            time.sleep(1)  # Give the OS time to fully release the file
+        except Exception as e:
+            print(f"Warning: Could not remove existing file: {e}")
+    
     # Create a new Excel writer for the reimport file
     with pd.ExcelWriter(reimport_invoice_path, engine='openpyxl') as writer:
         # First, add the complete Packing List sheet
@@ -1481,24 +1542,78 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
         # Remove internal columns before saving
         save_columns = [col for col in pl_output_columns if col != 'project']  # Remove project from output
         complete_pl_df = complete_pl_df[save_columns]
+        
+        # Add summary row to packing list
+        summary_cols = ['QUANTITY', 'G.W (KG)', 'N.W(KG)']
+        summary_packing = {'DESCRIPTION': 'Total'}
+        for col in summary_cols:
+            if col in complete_pl_df.columns:
+                # Calculate sum without modifying the original column in place
+                # Coerce to numeric, fill NA with 0 JUST for the sum calculation
+                summary_packing[col] = pd.to_numeric(complete_pl_df[col], errors='coerce').fillna(0).sum()
+        
+        summary_row = pd.DataFrame([summary_packing])
+        complete_pl_df = pd.concat([complete_pl_df, summary_row], ignore_index=True)
+        
+        # Save packing list sheet
         complete_pl_df.to_excel(writer, sheet_name='PL', index=False)
         
         # Process each split for Commercial Invoice sheets only
-        for (project, factory), df in split_dfs.items():
+        # Generate base invoice number and increment for each sheet
+        base_invoice_name = generate_invoice_sheet_name(prefix="RIMP")
+        # Extract the numeric part for incrementing 
+        invoice_prefix = base_invoice_name[:-4]  # Everything except last 4 digits
+        invoice_number = int(base_invoice_name[-4:])  # Last 4 digits as integer
+        
+        print(f"Base invoice name: {base_invoice_name}")
+        print(f"Prefix: {invoice_prefix}, Starting number: {invoice_number}")
+        
+        # Sort keys to ensure consistent ordering
+        sorted_keys = sorted(split_dfs.keys())
+        
+        # Track sheet names being created
+        created_sheet_names = []
+        
+        for key in sorted_keys:
+            project, factory = key
+            df = split_dfs[key]
+            
             if not df.empty:
-                # Create sheet name for Commercial Invoice only
-                ci_sheet_name = f'{project}_{factory}_CI'
+                # Create sequential invoice sheet name
+                ci_sheet_name = f"{invoice_prefix}{invoice_number:04d}"
+                created_sheet_names.append(ci_sheet_name)
+                print(f"Using sheet name '{ci_sheet_name}' for project '{project}', factory '{factory}'")
+                
+                # Increment for next sheet
+                invoice_number += 1
                 
                 # 确保文件名中的工厂和项目值是有效的字符串
                 project_safe = str(project).strip().replace(' ', '_')
                 factory_safe = str(factory).strip().replace(' ', '_')
                 
                 # 创建独立的进口发票文件
-                reimport_file_name = f'xreimport_{project_safe}_{factory_safe}.xlsx'
+                reimport_file_name = f'reimport_{project_safe}_{factory_safe}.xlsx'
                 reimport_file_path = os.path.join(output_dir, reimport_file_name)
                 
                 # Create a copy for the invoice
                 invoice_df = df[exportReimport_output_columns].copy()
+                
+                # Add summary row to invoice
+                summary_invoice = {'DESCRIPTION': 'Total', 'Material code': ''}
+                for col in ['Qty', 'Amount']:
+                    if col in invoice_df.columns:
+                        summary_invoice[col] = pd.to_numeric(invoice_df[col], errors='coerce').fillna(0).sum()
+                
+                # Create new row with just the sums for Qty and Amount
+                summary_row = pd.DataFrame([summary_invoice])
+                
+                # Proper column order for the summary row
+                for col in exportReimport_output_columns:
+                    if col not in summary_row.columns:
+                        summary_row[col] = None
+                
+                summary_row = summary_row[exportReimport_output_columns]
+                invoice_df = pd.concat([invoice_df, summary_row], ignore_index=True)
                 
                 # Save as individual reimport file
                 print(f"Saving individual reimport file for {project}_{factory}: {reimport_file_path}")
@@ -1508,6 +1623,15 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
                 invoice_df.to_excel(writer, sheet_name=ci_sheet_name, index=False)
                 
                 print(f"Added Commercial Invoice sheet for project {project}, factory {factory}")
+        
+        print(f"Created reimport invoice sheets: {created_sheet_names}")
+    
+    # Verify the sheet names in the saved file
+    try:
+        verification_xls = pd.ExcelFile(reimport_invoice_path)
+        print(f"VERIFICATION - Sheets in saved reimport_invoice.xlsx: {verification_xls.sheet_names}")
+    except Exception as e:
+        print(f"Error verifying sheet names: {e}")
     
     # Apply styling to the reimport file
     try:
@@ -1558,7 +1682,7 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
             ws.freeze_panes = 'A2'
             
             # Apply number formatting to specific columns if this is a Commercial Invoice sheet
-            if 'Commercial_Invoice' in sheet_name:
+            if sheet_name != 'PL':
                 for col_idx, cell in enumerate(ws[1], 1):
                     if cell.value == 'Unit Price':
                         for row in range(2, ws.max_row + 1):
