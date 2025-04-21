@@ -1,3 +1,32 @@
+# 解决GitHub账号选择问题
+
+如果您在使用`git push`时总是看到账号选择对话框，可以按以下步骤解决：
+
+1. 运行`delete_github_credentials.ps1`脚本清除现有的GitHub凭据:
+   ```
+   .\delete_github_credentials.ps1
+   ```
+
+2. 运行`fix_github_account.ps1`脚本设置Git配置:
+   ```
+   .\fix_github_account.ps1
+   ```
+
+3. 按照脚本提示完成操作，下次推送代码时应该不再出现账号选择对话框
+
+如果问题仍然存在，可以尝试以下手动方法：
+- 打开`控制面板` -> `用户账户` -> `凭据管理器`
+- 找到并删除所有与GitHub相关的Windows凭据
+- 在PowerShell中运行以下命令：
+  ```
+  git config --global credential.helper store
+  git config --global --unset credential.helper manager
+  git config --global --unset credential.manager
+  ```
+- 然后尝试`git push`，输入您想默认使用的账号和密码
+
+---
+
 # 装运清单处理工具
 
 ## 简介

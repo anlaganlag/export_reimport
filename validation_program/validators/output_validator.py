@@ -886,6 +886,7 @@ class OutputValidator:
             
             # 这里仅做简单的文件存在检查，实际需要更复杂的比较逻辑
             return {"success": True, "message": "文件格式一致性验证通过"}
+        
         except Exception as e:
             import traceback
             error_details = traceback.format_exc()
