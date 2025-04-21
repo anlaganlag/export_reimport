@@ -385,25 +385,24 @@ class ProcessValidator:
             cif_df = pd.read_excel(cif_invoice_path)
             
             # 找到FOB单价、单个物料保险费、单个物料运费、CIF单价列
-            fob_price_col = find_column_with_pattern(cif_df, ["FOB Unit Price", "FOB单价"])
-            insurance_col = find_column_with_pattern(cif_df, ["Insurance", "保险费"])
-            freight_col = find_column_with_pattern(cif_df, ["Freight", "运费"])
-            cif_price_col = find_column_with_pattern(cif_df, ["CIF Unit Price", "CIF单价"])
+            fob_price_col = find_column_with_pattern(cif_df, ["FOB Unit Price", "FOB总价"])
+            insurance_freight_col = find_column_with_pattern(cif_df, ["Insurance", "该项对应的运保费"])
+            cif_price_col = find_column_with_pattern(cif_df, ["CIF Unit Price", "CIF总价(FOB总价+运保费)"])
             
-            if None in [fob_price_col, insurance_col, freight_col, cif_price_col]:
+            if None in [fob_price_col, insurance_freight_col,  cif_price_col]:
                 return {"success": False, "message": "未找到所有需要的价格列，无法验证CIF价格计算"}
             
             # 验证每行CIF单价是否等于FOB单价+单个物料保险费+单个物料运费
             invalid_rows = []
             for idx, row in cif_df.iterrows():
-                if pd.isna(row[fob_price_col]) or pd.isna(row[insurance_col]) or pd.isna(row[freight_col]) or pd.isna(row[cif_price_col]):
+                if pd.isna(row[fob_price_col]) or pd.isna(row[insurance_freight_col])  or pd.isna(row[cif_price_col]):
                     continue
                 
-                expected_cif = row[fob_price_col] + row[insurance_col] + row[freight_col]
+                expected_cif = row[fob_price_col] + row[insurance_freight_col] 
                 actual_cif = row[cif_price_col]
                 
                 # 允许小误差
-                if not compare_numeric_values(expected_cif, actual_cif, 0.0001):
+                if not compare_numeric_values(expected_cif, actual_cif, 0.01):
                     invalid_rows.append(idx + 1)  # +1是因为0基索引
             
             if invalid_rows:
