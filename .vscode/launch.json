@@ -4,12 +4,29 @@
     // 欲了解更多信息，请访问: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
-        
         {
             "name": "运行验证程序",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/validation_program/run_validation.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "name": "运行验证程序(调试模式)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/validation_program/run_validation.py",
+            "args": ["--debug", "--skip-processing"],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "name": "运行验证程序(指定输出目录)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/validation_program/run_validation.py",
+            "args": ["--output-dir", "${workspaceFolder}/outputs"],
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}"
         }

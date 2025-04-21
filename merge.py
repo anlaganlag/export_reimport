@@ -128,7 +128,7 @@ def merge_three_excel_files(first_file, middle_file, last_file, output_file, fir
         return False
     
     # Create and copy Packing List from middle file's first sheet
-    packing_list_sheet = merged_wb.create_sheet('Packing List')
+    packing_list_sheet = merged_wb.create_sheet('PL')
     
     # Extract column widths from middle file's first sheet
     middle_pl_sheet = middle_wb[middle_wb.sheetnames[0]]
@@ -197,7 +197,7 @@ def merge_three_excel_files(first_file, middle_file, last_file, output_file, fir
         copy_sheet(middle_wb[middle_wb.sheetnames[0]], packing_list_sheet)
     
     # Reorder sheets
-    merged_wb._sheets = [merged_wb['Packing List'], merged_wb['Commercial Invoice']]
+    merged_wb._sheets = [merged_wb['PL'], merged_wb['Commercial Invoice']]
     
     # Save result
     try:

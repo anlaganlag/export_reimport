@@ -6,6 +6,11 @@ __pycache__/
 # C extensions
 *.so
 
+# output
+output/
+
+# dependency
+node_modules/
 # Distribution / packaging
 .Python
 build/
@@ -78,8 +83,6 @@ target/
 # Jupyter Notebook
 .ipynb_checkpoints
 
-#node module
-.\node_modules\
 
 # IPython
 profile_default/

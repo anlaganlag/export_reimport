@@ -28,26 +28,17 @@
 - `cif_original_invoice.xlsx`
 - `deduped_list.xlsx`
 - `export_invoice - 副本 (2).xlsx`
+- `export_invoice - 副本 (3).xlsx`
 - `export_invoice - 副本.xlsx`
 - `export_invoice.xlsx`
 - `output1-export.xlsx`
 - `output2-reimport.xlsx`
 - `pl_original_invoice.xlsx`
 - `reimport_invoice.xlsx`
-- `reimport_大华_SMT工厂月度辅耗材.xlsx`
-- `reimport_大华_SMT工厂设备配件.xlsx`
-- `reimport_大华_TP-LINK.xlsx`
-- `reimport_大华_组装厂月度辅耗材.xlsx`
-- `reimport_大华_麦格米特.xlsx`
-- `reimport_大华_默认工厂.xlsx`
-- `reimport_工厂_Daman.xlsx`
-- `reimport_工厂_SMT工厂月度辅耗材.xlsx`
-- `reimport_工厂_SMT工厂设备配件.xlsx`
-- `reimport_工厂_Silvass.xlsx`
-- `reimport_工厂_TP-LINK.xlsx`
-- `reimport_工厂_组装厂月度辅耗材.xlsx`
-- `reimport_麦格米特_Silvass.xlsx`
-- `reimport_麦格米特_麦格米特.xlsx`
+- `xreimport_工厂_Daman.xlsx`
+- `xreimport_工厂_Silvass.xlsx`
+- `xreimport_麦格米特_Silvass.xlsx`
+- `~$export_invoice - 副本 (3).xlsx`
 
 ## 验收标准
 
@@ -73,11 +64,11 @@
 
 ## 验证结果统计
 
-### 输入文件验证: 9/10 通过
+### 输入文件验证: 8/10 通过
 
 ### 处理逻辑验证: 7/7 通过
 
-### 输出文件验证: 3/40 通过
+### 输出文件验证: 5/12 通过
 
 ## 详细测试结果
 
@@ -85,43 +76,14 @@
 
 #### ❌ 失败的测试
 
+##### project_split: ❌ 失败
+- 结果: 以下项目未找到对应的进口发票: 组装厂月度辅耗材, SMT工厂设备配件, SMT工厂月度辅耗材, TP-LINK
+
 ##### sheet_naming: ❌ 失败
-- 结果: 出口文件export_invoice - 副本 (2).xlsx中缺少'PL'工作表
-出口文件export_invoice - 副本 (2).xlsx中的工作表'Packing List'不符合发票号码命名格式
-出口文件export_invoice - 副本 (2).xlsx中的工作表'Commercial Invoice'不符合发票号码命名格式
-进口文件reimport_invoice.xlsx中缺少'PL'工作表
-进口文件reimport_invoice.xlsx中的工作表'Packing List'不符合发票号码命名格式
+- 结果: 出口文件export_invoice.xlsx中的工作表'Commercial Invoice'不符合发票号码命名格式
 进口文件reimport_invoice.xlsx中的工作表'麦格米特_Silvass_CI'不符合发票号码命名格式
 进口文件reimport_invoice.xlsx中的工作表'工厂_Silvass_CI'不符合发票号码命名格式
 进口文件reimport_invoice.xlsx中的工作表'工厂_Daman_CI'不符合发票号码命名格式
-进口文件reimport_大华_SMT工厂月度辅耗材.xlsx中缺少'PL'工作表
-进口文件reimport_大华_SMT工厂月度辅耗材.xlsx中的工作表'Sheet1'不符合发票号码命名格式
-进口文件reimport_大华_SMT工厂设备配件.xlsx中缺少'PL'工作表
-进口文件reimport_大华_SMT工厂设备配件.xlsx中的工作表'Sheet1'不符合发票号码命名格式
-进口文件reimport_大华_TP-LINK.xlsx中缺少'PL'工作表
-进口文件reimport_大华_TP-LINK.xlsx中的工作表'Sheet1'不符合发票号码命名格式
-进口文件reimport_大华_组装厂月度辅耗材.xlsx中缺少'PL'工作表
-进口文件reimport_大华_组装厂月度辅耗材.xlsx中的工作表'Sheet1'不符合发票号码命名格式
-进口文件reimport_大华_麦格米特.xlsx中缺少'PL'工作表
-进口文件reimport_大华_麦格米特.xlsx中的工作表'Sheet1'不符合发票号码命名格式
-进口文件reimport_大华_默认工厂.xlsx中缺少'PL'工作表
-进口文件reimport_大华_默认工厂.xlsx中的工作表'Sheet1'不符合发票号码命名格式
-进口文件reimport_工厂_Daman.xlsx中缺少'PL'工作表
-进口文件reimport_工厂_Daman.xlsx中的工作表'Sheet1'不符合发票号码命名格式
-进口文件reimport_工厂_Silvass.xlsx中缺少'PL'工作表
-进口文件reimport_工厂_Silvass.xlsx中的工作表'Sheet1'不符合发票号码命名格式
-进口文件reimport_工厂_SMT工厂月度辅耗材.xlsx中缺少'PL'工作表
-进口文件reimport_工厂_SMT工厂月度辅耗材.xlsx中的工作表'Sheet1'不符合发票号码命名格式
-进口文件reimport_工厂_SMT工厂设备配件.xlsx中缺少'PL'工作表
-进口文件reimport_工厂_SMT工厂设备配件.xlsx中的工作表'Sheet1'不符合发票号码命名格式
-进口文件reimport_工厂_TP-LINK.xlsx中缺少'PL'工作表
-进口文件reimport_工厂_TP-LINK.xlsx中的工作表'Sheet1'不符合发票号码命名格式
-进口文件reimport_工厂_组装厂月度辅耗材.xlsx中缺少'PL'工作表
-进口文件reimport_工厂_组装厂月度辅耗材.xlsx中的工作表'Sheet1'不符合发票号码命名格式
-进口文件reimport_麦格米特_Silvass.xlsx中缺少'PL'工作表
-进口文件reimport_麦格米特_Silvass.xlsx中的工作表'Sheet1'不符合发票号码命名格式
-进口文件reimport_麦格米特_麦格米特.xlsx中缺少'PL'工作表
-进口文件reimport_麦格米特_麦格米特.xlsx中的工作表'Sheet1'不符合发票号码命名格式
 
 #### ✅ 通过的测试
 
@@ -143,16 +105,13 @@
 ##### policy_file_id: ✅ 通过
 - 结果: 政策文件编号验证通过
 
-##### project_split: ✅ 通过
-- 结果: 项目拆分验证通过
-
 ##### summary_data: ✅ 通过
 - 结果: 汇总数据验证通过
 
 ##### weights: ✅ 通过
 - 结果: 净重毛重验证通过
 
-**统计**: 9/10 测试通过
+**统计**: 8/10 测试通过
 
 ### 处理逻辑验证
 
@@ -185,15 +144,8 @@
 
 #### ❌ 失败的测试
 
-##### export_invoice_quantity: ❌ 失败
-- 结果: 出口发票总数量(9006.0)与采购装箱单总数量(9506.0)不一致
-存在差异的物料: C100.C05-032-04-00(原始:500.0, 出口:0, 差异:-500.0)
-
 ##### export_packing_list_field_mapping: ❌ 失败
-- 结果: 无法读取输出文件: Worksheet named 'PL' not found
-
-##### export_packing_list_totals: ❌ 失败
-- 结果: 出口装箱单工作表名应为'PL'，而不是'Packing List'。请修改工作表名以符合验收要求。
+- 结果: 输出文件缺少字段: Material code, DESCRIPTION, Model NO., Unit Price, Qty, Unit
 
 ##### format_compliance: ❌ 失败
 - 结果: 未找到模板文件
@@ -201,99 +153,15 @@
 ##### import_invoice_field_mapping_reimport_invoice.xlsx: ❌ 失败
 - 结果: 输出文件缺少字段: NO., Material code, DESCRIPTION, Model NO., Unit Price, Qty, Unit, Amount
 
-##### import_invoice_field_mapping_reimport_大华_SMT工厂月度辅耗材.xlsx: ❌ 失败
-- 结果: 验证字段映射时出错: Worksheet index 1 is invalid, 1 worksheets found
-
-##### import_invoice_field_mapping_reimport_大华_SMT工厂设备配件.xlsx: ❌ 失败
-- 结果: 验证字段映射时出错: Worksheet index 1 is invalid, 1 worksheets found
-
-##### import_invoice_field_mapping_reimport_大华_TP-LINK.xlsx: ❌ 失败
-- 结果: 验证字段映射时出错: Worksheet index 1 is invalid, 1 worksheets found
-
-##### import_invoice_field_mapping_reimport_大华_组装厂月度辅耗材.xlsx: ❌ 失败
-- 结果: 验证字段映射时出错: Worksheet index 1 is invalid, 1 worksheets found
-
-##### import_invoice_field_mapping_reimport_大华_麦格米特.xlsx: ❌ 失败
-- 结果: 验证字段映射时出错: Worksheet index 1 is invalid, 1 worksheets found
-
-##### import_invoice_field_mapping_reimport_大华_默认工厂.xlsx: ❌ 失败
-- 结果: 验证字段映射时出错: Worksheet index 1 is invalid, 1 worksheets found
-
-##### import_invoice_field_mapping_reimport_工厂_Daman.xlsx: ❌ 失败
-- 结果: 验证字段映射时出错: Worksheet index 1 is invalid, 1 worksheets found
-
-##### import_invoice_field_mapping_reimport_工厂_SMT工厂月度辅耗材.xlsx: ❌ 失败
-- 结果: 验证字段映射时出错: Worksheet index 1 is invalid, 1 worksheets found
-
-##### import_invoice_field_mapping_reimport_工厂_SMT工厂设备配件.xlsx: ❌ 失败
-- 结果: 验证字段映射时出错: Worksheet index 1 is invalid, 1 worksheets found
-
-##### import_invoice_field_mapping_reimport_工厂_Silvass.xlsx: ❌ 失败
-- 结果: 验证字段映射时出错: Worksheet index 1 is invalid, 1 worksheets found
-
-##### import_invoice_field_mapping_reimport_工厂_TP-LINK.xlsx: ❌ 失败
-- 结果: 验证字段映射时出错: Worksheet index 1 is invalid, 1 worksheets found
-
-##### import_invoice_field_mapping_reimport_工厂_组装厂月度辅耗材.xlsx: ❌ 失败
-- 结果: 验证字段映射时出错: Worksheet index 1 is invalid, 1 worksheets found
-
-##### import_invoice_field_mapping_reimport_麦格米特_Silvass.xlsx: ❌ 失败
-- 结果: 验证字段映射时出错: Worksheet index 1 is invalid, 1 worksheets found
-
-##### import_invoice_field_mapping_reimport_麦格米特_麦格米特.xlsx: ❌ 失败
-- 结果: 验证字段映射时出错: Worksheet index 1 is invalid, 1 worksheets found
-
 ##### import_invoice_quantity: ❌ 失败
 - 结果: 进口发票总数量(0)与采购装箱单总数量(9506.0)不一致
 进口发票数量明细: 
 
 ##### import_invoice_split: ❌ 失败
-- 结果: 以下项目和工厂组合未找到对应的进口发票: 项目:TP-LINK 工厂:Silvass, 项目:SMT工厂设备配件 工厂:Silvass, 项目:组装厂月度辅耗材 工厂:Daman, 项目:TP-LINK 工厂:Daman, 项目:SMT工厂月度辅耗材 工厂:Silvass
+- 结果: 以下项目和工厂组合未找到对应的进口发票: 项目:TP-LINK 工厂:Silvass, 项目:SMT工厂月度辅耗材 工厂:Silvass, 项目:组装厂月度辅耗材 工厂:Daman, 项目:SMT工厂设备配件 工厂:Silvass, 项目:TP-LINK 工厂:Daman, 项目:麦格米特 工厂:Silvass
 
 ##### import_packing_list_field_mapping_reimport_invoice.xlsx: ❌ 失败
-- 结果: 无法读取输出文件: Worksheet named 'PL' not found
-
-##### import_packing_list_field_mapping_reimport_大华_SMT工厂月度辅耗材.xlsx: ❌ 失败
-- 结果: 无法读取输出文件: Worksheet named 'PL' not found
-
-##### import_packing_list_field_mapping_reimport_大华_SMT工厂设备配件.xlsx: ❌ 失败
-- 结果: 无法读取输出文件: Worksheet named 'PL' not found
-
-##### import_packing_list_field_mapping_reimport_大华_TP-LINK.xlsx: ❌ 失败
-- 结果: 无法读取输出文件: Worksheet named 'PL' not found
-
-##### import_packing_list_field_mapping_reimport_大华_组装厂月度辅耗材.xlsx: ❌ 失败
-- 结果: 无法读取输出文件: Worksheet named 'PL' not found
-
-##### import_packing_list_field_mapping_reimport_大华_麦格米特.xlsx: ❌ 失败
-- 结果: 无法读取输出文件: Worksheet named 'PL' not found
-
-##### import_packing_list_field_mapping_reimport_大华_默认工厂.xlsx: ❌ 失败
-- 结果: 无法读取输出文件: Worksheet named 'PL' not found
-
-##### import_packing_list_field_mapping_reimport_工厂_Daman.xlsx: ❌ 失败
-- 结果: 无法读取输出文件: Worksheet named 'PL' not found
-
-##### import_packing_list_field_mapping_reimport_工厂_SMT工厂月度辅耗材.xlsx: ❌ 失败
-- 结果: 无法读取输出文件: Worksheet named 'PL' not found
-
-##### import_packing_list_field_mapping_reimport_工厂_SMT工厂设备配件.xlsx: ❌ 失败
-- 结果: 无法读取输出文件: Worksheet named 'PL' not found
-
-##### import_packing_list_field_mapping_reimport_工厂_Silvass.xlsx: ❌ 失败
-- 结果: 无法读取输出文件: Worksheet named 'PL' not found
-
-##### import_packing_list_field_mapping_reimport_工厂_TP-LINK.xlsx: ❌ 失败
-- 结果: 无法读取输出文件: Worksheet named 'PL' not found
-
-##### import_packing_list_field_mapping_reimport_工厂_组装厂月度辅耗材.xlsx: ❌ 失败
-- 结果: 无法读取输出文件: Worksheet named 'PL' not found
-
-##### import_packing_list_field_mapping_reimport_麦格米特_Silvass.xlsx: ❌ 失败
-- 结果: 无法读取输出文件: Worksheet named 'PL' not found
-
-##### import_packing_list_field_mapping_reimport_麦格米特_麦格米特.xlsx: ❌ 失败
-- 结果: 无法读取输出文件: Worksheet named 'PL' not found
+- 结果: 输出文件缺少字段: NO., Material code, Quantity, Unit, Net Weight(KG), Gross Weight(KG)
 
 ##### import_packing_list_totals: ❌ 失败
 - 结果: 进口装箱单汇总数据不一致: Quantity不一致: 进口总计(9506) vs 原始(19012.0); Total Carton Quantity不一致: 进口总计(0) vs 原始(336.0); Total Volume不一致: 进口总计(0) vs 原始(36.64); Total Gross Weight不一致: 进口总计(288.15999999999997) vs 原始(9630.92); Total Net Weight不一致: 进口总计(2953.5599999999995) vs 原始(6313.32)
@@ -306,157 +174,43 @@
 ##### export_invoice_prices: ✅ 通过
 - 结果: 出口发票价格验证通过
 
+##### export_invoice_quantity: ✅ 通过
+- 结果: 出口发票数量验证通过
+
+##### export_packing_list_totals: ✅ 通过
+- 结果: 出口装箱单汇总数据验证通过
+
 ##### file_naming: ✅ 通过
 - 结果: 文件命名格式验证通过
 
-**统计**: 3/40 测试通过
+**统计**: 5/12 测试通过
 
 ## 解决方案建议
 
 ### 输入文件验证问题修复建议
 
 #### sheet_naming:
-- **建议**: 根据错误信息修复问题: 出口文件export_invoice - 副本 (2).xlsx中缺少'PL'工作表
-出口文件export_invoice - 副本 (2).xlsx中的工作表'Packing List'不符合发票号码命名格式
-出口文件export_invoice - 副本 (2).xlsx中的工作表'Commercial Invoice'不符合发票号码命名格式
-进口文件reimport_invoice.xlsx中缺少'PL'工作表
-进口文件reimport_invoice.xlsx中的工作表'Packing List'不符合发票号码命名格式
+- **建议**: 根据错误信息修复问题: 出口文件export_invoice.xlsx中的工作表'Commercial Invoice'不符合发票号码命名格式
 进口文件reimport_invoice.xlsx中的工作表'麦格米特_Silvass_CI'不符合发票号码命名格式
 进口文件reimport_invoice.xlsx中的工作表'工厂_Silvass_CI'不符合发票号码命名格式
 进口文件reimport_invoice.xlsx中的工作表'工厂_Daman_CI'不符合发票号码命名格式
-进口文件reimport_大华_SMT工厂月度辅耗材.xlsx中缺少'PL'工作表
-进口文件reimport_大华_SMT工厂月度辅耗材.xlsx中的工作表'Sheet1'不符合发票号码命名格式
-进口文件reimport_大华_SMT工厂设备配件.xlsx中缺少'PL'工作表
-进口文件reimport_大华_SMT工厂设备配件.xlsx中的工作表'Sheet1'不符合发票号码命名格式
-进口文件reimport_大华_TP-LINK.xlsx中缺少'PL'工作表
-进口文件reimport_大华_TP-LINK.xlsx中的工作表'Sheet1'不符合发票号码命名格式
-进口文件reimport_大华_组装厂月度辅耗材.xlsx中缺少'PL'工作表
-进口文件reimport_大华_组装厂月度辅耗材.xlsx中的工作表'Sheet1'不符合发票号码命名格式
-进口文件reimport_大华_麦格米特.xlsx中缺少'PL'工作表
-进口文件reimport_大华_麦格米特.xlsx中的工作表'Sheet1'不符合发票号码命名格式
-进口文件reimport_大华_默认工厂.xlsx中缺少'PL'工作表
-进口文件reimport_大华_默认工厂.xlsx中的工作表'Sheet1'不符合发票号码命名格式
-进口文件reimport_工厂_Daman.xlsx中缺少'PL'工作表
-进口文件reimport_工厂_Daman.xlsx中的工作表'Sheet1'不符合发票号码命名格式
-进口文件reimport_工厂_Silvass.xlsx中缺少'PL'工作表
-进口文件reimport_工厂_Silvass.xlsx中的工作表'Sheet1'不符合发票号码命名格式
-进口文件reimport_工厂_SMT工厂月度辅耗材.xlsx中缺少'PL'工作表
-进口文件reimport_工厂_SMT工厂月度辅耗材.xlsx中的工作表'Sheet1'不符合发票号码命名格式
-进口文件reimport_工厂_SMT工厂设备配件.xlsx中缺少'PL'工作表
-进口文件reimport_工厂_SMT工厂设备配件.xlsx中的工作表'Sheet1'不符合发票号码命名格式
-进口文件reimport_工厂_TP-LINK.xlsx中缺少'PL'工作表
-进口文件reimport_工厂_TP-LINK.xlsx中的工作表'Sheet1'不符合发票号码命名格式
-进口文件reimport_工厂_组装厂月度辅耗材.xlsx中缺少'PL'工作表
-进口文件reimport_工厂_组装厂月度辅耗材.xlsx中的工作表'Sheet1'不符合发票号码命名格式
-进口文件reimport_麦格米特_Silvass.xlsx中缺少'PL'工作表
-进口文件reimport_麦格米特_Silvass.xlsx中的工作表'Sheet1'不符合发票号码命名格式
-进口文件reimport_麦格米特_麦格米特.xlsx中缺少'PL'工作表
-进口文件reimport_麦格米特_麦格米特.xlsx中的工作表'Sheet1'不符合发票号码命名格式
+
+#### project_split:
+- **建议**: 根据错误信息修复问题: 以下项目未找到对应的进口发票: 组装厂月度辅耗材, SMT工厂设备配件, SMT工厂月度辅耗材, TP-LINK
 
 ### 输出文件验证问题修复建议
 
-#### export_invoice_quantity:
-- **建议**: 根据错误信息修复问题: 出口发票总数量(9006.0)与采购装箱单总数量(9506.0)不一致
-存在差异的物料: C100.C05-032-04-00(原始:500.0, 出口:0, 差异:-500.0)
-
 #### export_packing_list_field_mapping:
-- **建议**: 根据错误信息修复问题: 无法读取输出文件: Worksheet named 'PL' not found
-
-#### export_packing_list_totals:
-- **建议**: 根据错误信息修复问题: 出口装箱单工作表名应为'PL'，而不是'Packing List'。请修改工作表名以符合验收要求。
+- **建议**: 根据错误信息修复问题: 输出文件缺少字段: Material code, DESCRIPTION, Model NO., Unit Price, Qty, Unit
 
 #### import_invoice_split:
-- **建议**: 根据错误信息修复问题: 以下项目和工厂组合未找到对应的进口发票: 项目:TP-LINK 工厂:Silvass, 项目:SMT工厂设备配件 工厂:Silvass, 项目:组装厂月度辅耗材 工厂:Daman, 项目:TP-LINK 工厂:Daman, 项目:SMT工厂月度辅耗材 工厂:Silvass
+- **建议**: 根据错误信息修复问题: 以下项目和工厂组合未找到对应的进口发票: 项目:TP-LINK 工厂:Silvass, 项目:SMT工厂月度辅耗材 工厂:Silvass, 项目:组装厂月度辅耗材 工厂:Daman, 项目:SMT工厂设备配件 工厂:Silvass, 项目:TP-LINK 工厂:Daman, 项目:麦格米特 工厂:Silvass
 
 #### import_invoice_field_mapping_reimport_invoice.xlsx:
 - **建议**: 根据错误信息修复问题: 输出文件缺少字段: NO., Material code, DESCRIPTION, Model NO., Unit Price, Qty, Unit, Amount
 
 #### import_packing_list_field_mapping_reimport_invoice.xlsx:
-- **建议**: 根据错误信息修复问题: 无法读取输出文件: Worksheet named 'PL' not found
-
-#### import_invoice_field_mapping_reimport_大华_SMT工厂月度辅耗材.xlsx:
-- **建议**: 根据错误信息修复问题: 验证字段映射时出错: Worksheet index 1 is invalid, 1 worksheets found
-
-#### import_packing_list_field_mapping_reimport_大华_SMT工厂月度辅耗材.xlsx:
-- **建议**: 根据错误信息修复问题: 无法读取输出文件: Worksheet named 'PL' not found
-
-#### import_invoice_field_mapping_reimport_大华_SMT工厂设备配件.xlsx:
-- **建议**: 根据错误信息修复问题: 验证字段映射时出错: Worksheet index 1 is invalid, 1 worksheets found
-
-#### import_packing_list_field_mapping_reimport_大华_SMT工厂设备配件.xlsx:
-- **建议**: 根据错误信息修复问题: 无法读取输出文件: Worksheet named 'PL' not found
-
-#### import_invoice_field_mapping_reimport_大华_TP-LINK.xlsx:
-- **建议**: 根据错误信息修复问题: 验证字段映射时出错: Worksheet index 1 is invalid, 1 worksheets found
-
-#### import_packing_list_field_mapping_reimport_大华_TP-LINK.xlsx:
-- **建议**: 根据错误信息修复问题: 无法读取输出文件: Worksheet named 'PL' not found
-
-#### import_invoice_field_mapping_reimport_大华_组装厂月度辅耗材.xlsx:
-- **建议**: 根据错误信息修复问题: 验证字段映射时出错: Worksheet index 1 is invalid, 1 worksheets found
-
-#### import_packing_list_field_mapping_reimport_大华_组装厂月度辅耗材.xlsx:
-- **建议**: 根据错误信息修复问题: 无法读取输出文件: Worksheet named 'PL' not found
-
-#### import_invoice_field_mapping_reimport_大华_麦格米特.xlsx:
-- **建议**: 根据错误信息修复问题: 验证字段映射时出错: Worksheet index 1 is invalid, 1 worksheets found
-
-#### import_packing_list_field_mapping_reimport_大华_麦格米特.xlsx:
-- **建议**: 根据错误信息修复问题: 无法读取输出文件: Worksheet named 'PL' not found
-
-#### import_invoice_field_mapping_reimport_大华_默认工厂.xlsx:
-- **建议**: 根据错误信息修复问题: 验证字段映射时出错: Worksheet index 1 is invalid, 1 worksheets found
-
-#### import_packing_list_field_mapping_reimport_大华_默认工厂.xlsx:
-- **建议**: 根据错误信息修复问题: 无法读取输出文件: Worksheet named 'PL' not found
-
-#### import_invoice_field_mapping_reimport_工厂_Daman.xlsx:
-- **建议**: 根据错误信息修复问题: 验证字段映射时出错: Worksheet index 1 is invalid, 1 worksheets found
-
-#### import_packing_list_field_mapping_reimport_工厂_Daman.xlsx:
-- **建议**: 根据错误信息修复问题: 无法读取输出文件: Worksheet named 'PL' not found
-
-#### import_invoice_field_mapping_reimport_工厂_Silvass.xlsx:
-- **建议**: 根据错误信息修复问题: 验证字段映射时出错: Worksheet index 1 is invalid, 1 worksheets found
-
-#### import_packing_list_field_mapping_reimport_工厂_Silvass.xlsx:
-- **建议**: 根据错误信息修复问题: 无法读取输出文件: Worksheet named 'PL' not found
-
-#### import_invoice_field_mapping_reimport_工厂_SMT工厂月度辅耗材.xlsx:
-- **建议**: 根据错误信息修复问题: 验证字段映射时出错: Worksheet index 1 is invalid, 1 worksheets found
-
-#### import_packing_list_field_mapping_reimport_工厂_SMT工厂月度辅耗材.xlsx:
-- **建议**: 根据错误信息修复问题: 无法读取输出文件: Worksheet named 'PL' not found
-
-#### import_invoice_field_mapping_reimport_工厂_SMT工厂设备配件.xlsx:
-- **建议**: 根据错误信息修复问题: 验证字段映射时出错: Worksheet index 1 is invalid, 1 worksheets found
-
-#### import_packing_list_field_mapping_reimport_工厂_SMT工厂设备配件.xlsx:
-- **建议**: 根据错误信息修复问题: 无法读取输出文件: Worksheet named 'PL' not found
-
-#### import_invoice_field_mapping_reimport_工厂_TP-LINK.xlsx:
-- **建议**: 根据错误信息修复问题: 验证字段映射时出错: Worksheet index 1 is invalid, 1 worksheets found
-
-#### import_packing_list_field_mapping_reimport_工厂_TP-LINK.xlsx:
-- **建议**: 根据错误信息修复问题: 无法读取输出文件: Worksheet named 'PL' not found
-
-#### import_invoice_field_mapping_reimport_工厂_组装厂月度辅耗材.xlsx:
-- **建议**: 根据错误信息修复问题: 验证字段映射时出错: Worksheet index 1 is invalid, 1 worksheets found
-
-#### import_packing_list_field_mapping_reimport_工厂_组装厂月度辅耗材.xlsx:
-- **建议**: 根据错误信息修复问题: 无法读取输出文件: Worksheet named 'PL' not found
-
-#### import_invoice_field_mapping_reimport_麦格米特_Silvass.xlsx:
-- **建议**: 根据错误信息修复问题: 验证字段映射时出错: Worksheet index 1 is invalid, 1 worksheets found
-
-#### import_packing_list_field_mapping_reimport_麦格米特_Silvass.xlsx:
-- **建议**: 根据错误信息修复问题: 无法读取输出文件: Worksheet named 'PL' not found
-
-#### import_invoice_field_mapping_reimport_麦格米特_麦格米特.xlsx:
-- **建议**: 根据错误信息修复问题: 验证字段映射时出错: Worksheet index 1 is invalid, 1 worksheets found
-
-#### import_packing_list_field_mapping_reimport_麦格米特_麦格米特.xlsx:
-- **建议**: 根据错误信息修复问题: 无法读取输出文件: Worksheet named 'PL' not found
+- **建议**: 根据错误信息修复问题: 输出文件缺少字段: NO., Material code, Quantity, Unit, Net Weight(KG), Gross Weight(KG)
 
 #### import_invoice_quantity:
 - **建议**: 根据错误信息修复问题: 进口发票总数量(0)与采购装箱单总数量(9506.0)不一致
@@ -471,4 +225,4 @@
 
 
 ---
-生成时间: 2025-04-21 15:37:08
+生成时间: 2025-04-21 17:36:28

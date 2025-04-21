@@ -37,9 +37,12 @@ class OutputValidator:
         else:
             self.field_mappings = {
                 "export_invoice_mapping": {
-                    "Material code": "Material code",
-                    "DESCRIPTION": "DESCRIPTION",
-                    "Qty": "Qty"
+                    "Material code": "料号",
+                    "DESCRIPTION": "供应商开票名称",
+                    "Model NO.":"型号",
+                    "Unit Price":"采购单价",
+                    "Qty": "每箱数量",
+                    "Unit":"单位",
                 }
             }
             
@@ -48,10 +51,10 @@ class OutputValidator:
         
         Args:
             output_file: 输出文件路径
-            mapping_type: 映射类型(export_invoice_mapping, export_packing_list_mapping等)
+            mapping_type: 映射类型（export_invoice_mapping, export_packing_list_mapping等）
             original_file: 原始文件路径
             sheet_name: 工作表名称或索引
-            skiprows: 要跳过的行数，用于处理含有标题行的Excel文件
+            skiprows: 跳过的行数
             
         Returns:
             dict: 含success和message的验证结果
@@ -731,7 +734,9 @@ class OutputValidator:
                         for alt_name in alternate_sheet_names:
                             try:
                                 import_pl_df = pd.read_excel(file_path, sheet_name=alt_name)
-                                print(f"WARNING: 进口文件{file_path}中未找到'PL'工作表，但找到了'{alt_name}'工作表。根据验收文档，应将工作表名改为'PL'")
+                                print(f"WARNING: 进口文件{os.path.basename(file_path)}中未找到'PL'工作表，但找到了'{alt_name}'工作表。根据验收文档，应将工作表名改为'PL'")
+                                # 返回验证失败，提示用户需要修改工作表名为"PL"
+                                return {"success": False, "message": f"进口文件{os.path.basename(file_path)}中的工作表名应为'PL'，而不是'{alt_name}'。请修改工作表名以符合验收要求。"}
                                 found = True
                                 break
                             except:
@@ -993,7 +998,7 @@ class OutputValidator:
         
         # 验证工作表命名
         if export_invoice_files or import_invoice_files:
-            export_invoice_path = export_invoice_files[0] if export_invoice_files else None
+            export_invoice_path = export_invoice_files[-1] if export_invoice_files else None
             results["sheet_naming"] = self.validate_sheet_naming(
                 export_invoice_path,
                 import_invoice_files
@@ -1001,7 +1006,7 @@ class OutputValidator:
         
         # 出口发票验证
         if export_invoice_files:
-            export_invoice_path = export_invoice_files[0]  # 取第一个文件
+            export_invoice_path = export_invoice_files[-1]  # 取最后一个文件，通常是最新的
             
             results["export_invoice_field_mapping"] = self.validate_field_mapping(
                 export_invoice_path, 

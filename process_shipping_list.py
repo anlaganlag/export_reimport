@@ -1217,11 +1217,11 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
                 print("\nPacking List columns before saving:")
                 print(packing_df.columns.tolist())
                 
-                packing_df.to_excel(writer, sheet_name='Packing List', index=False)
+                packing_df.to_excel(writer, sheet_name='PL', index=False)
             else:
                 # 如果没有pl_df数据，创建一个空的packing list with correct columns (不包含 project)
                 empty_pl_df = pd.DataFrame(columns=[col for col in pl_output_columns if col != 'project'])
-                empty_pl_df.to_excel(writer, sheet_name='Packing List', index=False)
+                empty_pl_df.to_excel(writer, sheet_name='PL', index=False)
 
             # Commercial Invoice 工作表处理
             commercial_df = export_grouped.copy()
@@ -1481,7 +1481,7 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
         # Remove internal columns before saving
         save_columns = [col for col in pl_output_columns if col != 'project']  # Remove project from output
         complete_pl_df = complete_pl_df[save_columns]
-        complete_pl_df.to_excel(writer, sheet_name='Packing List', index=False)
+        complete_pl_df.to_excel(writer, sheet_name='PL', index=False)
         
         # Process each split for Commercial Invoice sheets only
         for (project, factory), df in split_dfs.items():
@@ -1494,7 +1494,7 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
                 factory_safe = str(factory).strip().replace(' ', '_')
                 
                 # 创建独立的进口发票文件
-                reimport_file_name = f'reimport_{project_safe}_{factory_safe}.xlsx'
+                reimport_file_name = f'xreimport_{project_safe}_{factory_safe}.xlsx'
                 reimport_file_path = os.path.join(output_dir, reimport_file_name)
                 
                 # Create a copy for the invoice
