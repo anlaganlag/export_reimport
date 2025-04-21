@@ -870,7 +870,6 @@ class OutputValidator:
             # 获取所有输出文件
             output_files = glob.glob(os.path.join(output_dir, "*.xlsx"))
             
-            
             # 检查是否有输出文件
             if not output_files:
                 print(f"WARNING: 在目录 {output_dir} 中未找到输出文件")
