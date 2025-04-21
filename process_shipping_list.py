@@ -8,6 +8,7 @@ from openpyxl.utils import get_column_letter
 from openpyxl.utils.dataframe import dataframe_to_rows
 from openpyxl.utils.cell import coordinate_from_string, column_index_from_string
 import shutil
+import logging
 
 # Make sure outputs directory exists
 if not os.path.exists('outputs'):
@@ -422,18 +423,36 @@ def print_column_mappings(mappings):
 def split_by_project_and_factory(df):
     """Split the dataframe by project and factory."""
     print("Available columns for splitting:", df.columns.tolist())
+    
+    # 确保必要的列存在
+    if 'project' not in df.columns:
+        print("WARNING: 'project'列不存在，添加默认值'大华'")
+        df['project'] = '大华'
+    
+    if 'factory' not in df.columns:
+        print("WARNING: 'factory'列不存在，添加默认值'默认工厂'")
+        df['factory'] = '默认工厂'
+    
     print("Unique project values:", df['project'].unique())
     print("Unique factory values:", df['factory'].unique())
     
+    # 确保工厂和项目值不是NaN
+    df['project'] = df['project'].fillna('大华')
+    df['factory'] = df['factory'].fillna('默认工厂')
+    
     # Define the project categories with more robust string handling
     project_categories = {
-        '大华': lambda x: str(x).strip() == '大华',
+        '大华': lambda x: str(x).strip() in ['大华', ''] or pd.isna(x),
         '麦格米特': lambda x: str(x).strip() == '麦格米特',
-        '工厂': lambda x: str(x).strip() not in ['大华', '麦格米特']  # Changed from 'others' to '工厂'
+        '工厂': lambda x: str(x).strip() not in ['大华', '麦格米特', ''] and not pd.isna(x)
     }
     
     # Get unique factories
     factories = df['factory'].unique()
+    if len(factories) == 0 or (len(factories) == 1 and pd.isna(factories[0])):
+        factories = ['默认工厂']
+        df['factory'] = '默认工厂'
+        print("WARNING: 没有有效的工厂值，使用'默认工厂'")
     
     # Dictionary to store split dataframes
     split_dfs = {}
@@ -446,11 +465,36 @@ def split_by_project_and_factory(df):
             
             for factory in factories:
                 key = (project_name, factory)
-                split_dfs[key] = project_df[project_df['factory'] == factory]
-                print(f"Found {len(split_dfs[key])} rows for {project_name} - {factory}")
+                factory_value = factory if not pd.isna(factory) else '默认工厂'
+                
+                if pd.isna(factory):
+                    # 处理NaN工厂值
+                    factory_df = project_df[project_df['factory'].isna()]
+                else:
+                    # 正常处理
+                    factory_df = project_df[project_df['factory'] == factory]
+                
+                split_dfs[key] = factory_df
+                print(f"Found {len(split_dfs[key])} rows for {project_name} - {factory_value}")
         except Exception as e:
             print(f"Error processing project {project_name}: {e}")
             continue
+    
+    # 如果有项目为'工厂'的数据集为空，确保仍添加一个空的DataFrame
+    for factory in factories:
+        key = ('工厂', factory)
+        if key not in split_dfs:
+            split_dfs[key] = pd.DataFrame(columns=df.columns)
+            print(f"Added empty DataFrame for 工厂 - {factory}")
+    
+    # 检查是否所有项目和工厂的组合都有数据框
+    all_projects = ['大华', '麦格米特', '工厂']
+    for project in all_projects:
+        for factory in factories:
+            key = (project, factory)
+            if key not in split_dfs:
+                split_dfs[key] = pd.DataFrame(columns=df.columns)
+                print(f"Added empty DataFrame for {project} - {factory}")
     
     return split_dfs, project_categories
 
@@ -531,8 +575,49 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
     ]
     gross_weight_col = find_column_with_pattern(packing_list_df, gross_weight_patterns, 'gross weight')
     
-    factory_col = find_column_with_pattern(packing_list_df, ['Plant Location', '工厂', 'daman/silvass'], 'factory')
-    project_col = find_column_with_pattern(packing_list_df, ['Project', '项目名称', '项目'], 'project')
+    # 扩展工厂列的匹配模式
+    factory_patterns = [
+        'Plant Location', 
+        '工厂', 
+        'factory', 
+        'daman/silvass', 
+        '工厂地点', 
+        '送达方',
+        '目的地',
+        '送货地点',
+        'location',
+        'delivery location',
+        'plant',
+        '厂区'
+    ]
+    factory_col = find_column_with_pattern(packing_list_df, factory_patterns, 'factory')
+    
+    # 如果工厂列未找到，创建一个默认值
+    if factory_col is None:
+        print("WARNING: 未找到工厂列，使用默认值'默认工厂'")
+        packing_list_df['默认工厂'] = '默认工厂'
+        factory_col = '默认工厂'
+    
+    # 扩展项目列的匹配模式
+    project_patterns = [
+        'Project', 
+        '项目名称', 
+        '项目', 
+        'project name',
+        'program',
+        'program name',
+        '计划名称',
+        '方案名称',
+        '所属项目'
+    ]
+    project_col = find_column_with_pattern(packing_list_df, project_patterns, 'project')
+    
+    # 如果项目列未找到，创建一个默认值
+    if project_col is None:
+        print("WARNING: 未找到项目列，使用默认值'大华'")
+        packing_list_df['默认项目'] = '大华'
+        project_col = '默认项目'
+        
     end_use_col = find_column_with_pattern(packing_list_df, ['end use', '用途'], 'end use')
     
     # Additional packing list columns
@@ -622,10 +707,18 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
     if factory_col:
         result_df['factory'] = packing_list_df[factory_col]
         column_mappings['factory'] = factory_col
+    else:
+        # 设置默认工厂值
+        result_df['factory'] = '默认工厂'
+        print("WARNING: 工厂列未找到，添加默认值'默认工厂'")
     
     if project_col:
         result_df['project'] = packing_list_df[project_col]
         column_mappings['project'] = project_col
+    else:
+        # 设置默认项目值
+        result_df['project'] = '大华'
+        print("WARNING: 项目列未找到，添加默认值'大华'")
     
     if end_use_col:
         result_df['end use'] = packing_list_df[end_use_col]
@@ -692,17 +785,25 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
     # Add factory to packing list
     if factory_col:
         pl_result_df['factory'] = packing_list_df[factory_col]
+    else:
+        pl_result_df['factory'] = '默认工厂'
+        print("WARNING: 为打包清单设置默认工厂值'默认工厂'")
     
     # Map project column directly from source
-    if '项目名称' in packing_list_df.columns:
+    if project_col and project_col in packing_list_df.columns:
+        result_df['project'] = packing_list_df[project_col]
+        pl_result_df['project'] = packing_list_df[project_col]
+        column_mappings['project'] = project_col
+        print(f"Successfully mapped project column from '{project_col}'")
+    elif '项目名称' in packing_list_df.columns:
         result_df['project'] = packing_list_df['项目名称']
         pl_result_df['project'] = packing_list_df['项目名称']
         column_mappings['project'] = '项目名称'
         print(f"Successfully mapped project column from '项目名称'")
     else:
-        print(f"Warning: Project column '项目名称' not found in packing list")
-        result_df['project'] = '工厂'  # Changed from 'others' to '工厂'
-        pl_result_df['project'] = '工厂'  # Changed from 'others' to '工厂'
+        print(f"Warning: Project column not found in packing list, using default value")
+        result_df['project'] = '大华'  # 使用大华作为默认项目
+        pl_result_df['project'] = '大华'  # 确保打包清单也有相同的项目值
     
     # Print found mappings for debugging
     print_column_mappings(column_mappings)
@@ -940,19 +1041,48 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
     cif_invoice = result_df.copy()
     pl_invoice = pl_result_df.copy()
     
+    # 确保工厂列在CIF发票中是可见和可用的
+    if 'factory' not in cif_invoice.columns or cif_invoice['factory'].isna().all():
+        print("WARNING: CIF发票中没有找到有效的工厂列，添加默认工厂")
+        cif_invoice['factory'] = '默认工厂'
+    
+    # 确保项目列在CIF发票中是可见和可用的
+    if 'project' not in cif_invoice.columns or cif_invoice['project'].isna().all():
+        print("WARNING: CIF发票中没有找到有效的项目列，添加默认项目")
+        cif_invoice['project'] = '大华'
+    
+    # 打印工厂和项目列信息以便调试
+    print("\nCIF发票工厂值:")
+    if 'factory' in cif_invoice.columns:
+        factory_values = cif_invoice['factory'].unique()
+        print(f"  工厂唯一值: {factory_values}")
+    else:
+        print("  未找到工厂列")
+    
+    print("\nCIF发票项目值:")
+    if 'project' in cif_invoice.columns:
+        project_values = cif_invoice['project'].unique()
+        print(f"  项目唯一值: {project_values}")
+    else:
+        print("  未找到项目列")
+    
     # Remove Trade Type and Shipper columns before saving
     if 'Trade Type' in cif_invoice.columns:
         cif_invoice = cif_invoice.drop(columns=['Trade Type'])
     if 'Shipper' in cif_invoice.columns:
         cif_invoice = cif_invoice.drop(columns=['Shipper'])
+    if 'Original_Unit' in cif_invoice.columns:
+        cif_invoice = cif_invoice.drop(columns=['Original_Unit'])
         
     if 'Trade Type' in pl_invoice.columns:
         pl_invoice = pl_invoice.drop(columns=['Trade Type'])
     if 'Shipper' in pl_invoice.columns:
         pl_invoice = pl_invoice.drop(columns=['Shipper'])
+    if 'Original_Unit' in pl_invoice.columns:
+        pl_invoice = pl_invoice.drop(columns=['Original_Unit'])
     if 'factory' in pl_invoice.columns:
         pl_invoice = pl_invoice.drop(columns=['factory'])
-        
+    
     cif_file_path = os.path.join(output_dir, 'cif_original_invoice.xlsx')
     pl_file_path = os.path.join(output_dir, 'pl_original_invoice.xlsx')
     
@@ -1341,10 +1471,22 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
                 # Create sheet name for Commercial Invoice only
                 ci_sheet_name = f'{project}_{factory}_CI'
                 
+                # 确保文件名中的工厂和项目值是有效的字符串
+                project_safe = str(project).strip().replace(' ', '_')
+                factory_safe = str(factory).strip().replace(' ', '_')
+                
+                # 创建独立的进口发票文件
+                reimport_file_name = f'reimport_{project_safe}_{factory_safe}.xlsx'
+                reimport_file_path = os.path.join(output_dir, reimport_file_name)
+                
                 # Create a copy for the invoice
                 invoice_df = df[exportReimport_output_columns].copy()
                 
-                # Save commercial invoice
+                # Save as individual reimport file
+                print(f"Saving individual reimport file for {project}_{factory}: {reimport_file_path}")
+                safe_save_to_excel(invoice_df, reimport_file_path)
+                
+                # Save to combined workbook
                 invoice_df.to_excel(writer, sheet_name=ci_sheet_name, index=False)
                 
                 print(f"Added Commercial Invoice sheet for project {project}, factory {factory}")

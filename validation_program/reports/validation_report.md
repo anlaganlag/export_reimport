@@ -40,6 +40,11 @@
 - `ph.xlsx`
 - `pl_original_invoice.xlsx`
 - `reimport_invoice.xlsx`
+- `reimport_工厂_SMT工厂月度辅耗材.xlsx`
+- `reimport_工厂_SMT工厂设备配件.xlsx`
+- `reimport_工厂_TP-LINK.xlsx`
+- `reimport_工厂_组装厂月度辅耗材.xlsx`
+- `reimport_麦格米特_麦格米特.xlsx`
 - `~$export_invoice.xlsx`
 - `~$reimport_invoice.xlsx`
 
@@ -67,23 +72,15 @@
 
 ## 验证结果统计
 
-### 输入文件验证: 7/9 通过
+### 输入文件验证: 9/9 通过
 
 ### 处理逻辑验证: 5/7 通过
 
-### 输出文件验证: 3/12 通过
+### 输出文件验证: 3/22 通过
 
 ## 详细测试结果
 
 ### 输入文件验证
-
-#### ❌ 失败的测试
-
-##### factory_split: ❌ 失败
-- 结果: 未找到工厂列，无法验证工厂拆分
-
-##### project_split: ❌ 失败
-- 结果: 以下项目未找到对应的进口发票: 工厂
 
 #### ✅ 通过的测试
 
@@ -92,6 +89,9 @@
 
 ##### exchange_rate_decimal: ✅ 通过
 - 结果: 汇率小数位验证通过
+
+##### factory_split: ✅ 通过
+- 结果: 工厂拆分验证通过
 
 ##### packing_list_field_headers: ✅ 通过
 - 结果: 表头字段名验证通过。中文字段: 27个, 英文字段: 27个
@@ -102,13 +102,16 @@
 ##### policy_file_id: ✅ 通过
 - 结果: 政策文件编号验证通过
 
+##### project_split: ✅ 通过
+- 结果: 项目拆分验证通过
+
 ##### summary_data: ✅ 通过
 - 结果: 汇总数据验证通过
 
 ##### weights: ✅ 通过
 - 结果: 净重毛重验证通过
 
-**统计**: 7/9 测试通过
+**统计**: 9/9 测试通过
 
 ### 处理逻辑验证
 
@@ -158,6 +161,21 @@
 ##### export_packing_list_totals: ❌ 失败
 - 结果: 验证出口装箱单汇总数据时出错: Worksheet named 'PL' not found
 
+##### import_invoice_field_mapping_reimport_工厂_SMT工厂月度辅耗材.xlsx: ❌ 失败
+- 结果: 验证字段映射时出错: Worksheet index 1 is invalid, 1 worksheets found
+
+##### import_invoice_field_mapping_reimport_工厂_SMT工厂设备配件.xlsx: ❌ 失败
+- 结果: 验证字段映射时出错: Worksheet index 1 is invalid, 1 worksheets found
+
+##### import_invoice_field_mapping_reimport_工厂_TP-LINK.xlsx: ❌ 失败
+- 结果: 验证字段映射时出错: Worksheet index 1 is invalid, 1 worksheets found
+
+##### import_invoice_field_mapping_reimport_工厂_组装厂月度辅耗材.xlsx: ❌ 失败
+- 结果: 验证字段映射时出错: Worksheet index 1 is invalid, 1 worksheets found
+
+##### import_invoice_field_mapping_reimport_麦格米特_麦格米特.xlsx: ❌ 失败
+- 结果: 验证字段映射时出错: Worksheet index 1 is invalid, 1 worksheets found
+
 ##### import_invoice_quantity: ❌ 失败
 - 结果: 未找到原始文件的数量列
 
@@ -165,6 +183,21 @@
 - 结果: 未找到项目列或工厂列
 
 ##### import_packing_list_field_mapping_reimport_invoice.xlsx: ❌ 失败
+- 结果: 验证字段映射时出错: Worksheet named 'PL' not found
+
+##### import_packing_list_field_mapping_reimport_工厂_SMT工厂月度辅耗材.xlsx: ❌ 失败
+- 结果: 验证字段映射时出错: Worksheet named 'PL' not found
+
+##### import_packing_list_field_mapping_reimport_工厂_SMT工厂设备配件.xlsx: ❌ 失败
+- 结果: 验证字段映射时出错: Worksheet named 'PL' not found
+
+##### import_packing_list_field_mapping_reimport_工厂_TP-LINK.xlsx: ❌ 失败
+- 结果: 验证字段映射时出错: Worksheet named 'PL' not found
+
+##### import_packing_list_field_mapping_reimport_工厂_组装厂月度辅耗材.xlsx: ❌ 失败
+- 结果: 验证字段映射时出错: Worksheet named 'PL' not found
+
+##### import_packing_list_field_mapping_reimport_麦格米特_麦格米特.xlsx: ❌ 失败
 - 结果: 验证字段映射时出错: Worksheet named 'PL' not found
 
 ##### import_packing_list_totals: ❌ 失败
@@ -181,17 +214,9 @@
 ##### import_invoice_field_mapping_reimport_invoice.xlsx: ✅ 通过
 - 结果: 字段映射验证通过
 
-**统计**: 3/12 测试通过
+**统计**: 3/22 测试通过
 
 ## 解决方案建议
-
-### 输入文件验证问题修复建议
-
-#### project_split:
-- **建议**: 根据错误信息修复问题: 以下项目未找到对应的进口发票: 工厂
-
-#### factory_split:
-- **建议**: 根据错误信息修复问题: 未找到工厂列，无法验证工厂拆分
 
 ### 处理逻辑验证问题修复建议
 
@@ -224,6 +249,36 @@
 #### import_packing_list_field_mapping_reimport_invoice.xlsx:
 - **建议**: 根据错误信息修复问题: 验证字段映射时出错: Worksheet named 'PL' not found
 
+#### import_invoice_field_mapping_reimport_工厂_SMT工厂月度辅耗材.xlsx:
+- **建议**: 根据错误信息修复问题: 验证字段映射时出错: Worksheet index 1 is invalid, 1 worksheets found
+
+#### import_packing_list_field_mapping_reimport_工厂_SMT工厂月度辅耗材.xlsx:
+- **建议**: 根据错误信息修复问题: 验证字段映射时出错: Worksheet named 'PL' not found
+
+#### import_invoice_field_mapping_reimport_工厂_SMT工厂设备配件.xlsx:
+- **建议**: 根据错误信息修复问题: 验证字段映射时出错: Worksheet index 1 is invalid, 1 worksheets found
+
+#### import_packing_list_field_mapping_reimport_工厂_SMT工厂设备配件.xlsx:
+- **建议**: 根据错误信息修复问题: 验证字段映射时出错: Worksheet named 'PL' not found
+
+#### import_invoice_field_mapping_reimport_工厂_TP-LINK.xlsx:
+- **建议**: 根据错误信息修复问题: 验证字段映射时出错: Worksheet index 1 is invalid, 1 worksheets found
+
+#### import_packing_list_field_mapping_reimport_工厂_TP-LINK.xlsx:
+- **建议**: 根据错误信息修复问题: 验证字段映射时出错: Worksheet named 'PL' not found
+
+#### import_invoice_field_mapping_reimport_工厂_组装厂月度辅耗材.xlsx:
+- **建议**: 根据错误信息修复问题: 验证字段映射时出错: Worksheet index 1 is invalid, 1 worksheets found
+
+#### import_packing_list_field_mapping_reimport_工厂_组装厂月度辅耗材.xlsx:
+- **建议**: 根据错误信息修复问题: 验证字段映射时出错: Worksheet named 'PL' not found
+
+#### import_invoice_field_mapping_reimport_麦格米特_麦格米特.xlsx:
+- **建议**: 根据错误信息修复问题: 验证字段映射时出错: Worksheet index 1 is invalid, 1 worksheets found
+
+#### import_packing_list_field_mapping_reimport_麦格米特_麦格米特.xlsx:
+- **建议**: 根据错误信息修复问题: 验证字段映射时出错: Worksheet named 'PL' not found
+
 #### import_invoice_quantity:
 - **建议**: 根据错误信息修复问题: 未找到原始文件的数量列
 
@@ -233,4 +288,4 @@
 
 
 ---
-生成时间: 2025-04-21 00:03:55
+生成时间: 2025-04-21 10:13:01
