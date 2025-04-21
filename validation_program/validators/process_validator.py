@@ -430,19 +430,19 @@ class ProcessValidator:
             cif_df = pd.read_excel(cif_invoice_path)
             
             # 读取出口发票
-            export_df = pd.read_excel(export_invoice_path, sheet_name=1)  # 通常第二个sheet是发票
+            export_df = pd.read_excel(export_invoice_path, sheet_name=1, skiprows=6)  # 通常第二个sheet是发票，跳过前6行
             
             # 找到物料编号列
-            cif_part_col = find_column_with_pattern(cif_df, ["Part Number", "物料编号", "料号"])
-            export_part_col = find_column_with_pattern(export_df, ["Part Number", "物料编号", "料号"])
+            cif_part_col = find_column_with_pattern(cif_df, ["Material code", "物料编号", "料号"])
+            export_part_col = find_column_with_pattern(export_df, ["Material code", "物料编号", "料号"])
             
             # 找到单价列
-            cif_price_col = find_column_with_pattern(cif_df, ["CIF Unit Price", "CIF单价"])
+            cif_price_col = find_column_with_pattern(cif_df, ["CIF Unit Price", "Unit Price"])
             export_price_col = find_column_with_pattern(export_df, ["Unit Price", "单价"])
             
             # 找到数量列
-            cif_qty_col = find_column_with_pattern(cif_df, ["Quantity", "数量"])
-            export_qty_col = find_column_with_pattern(export_df, ["Quantity", "数量"])
+            cif_qty_col = find_column_with_pattern(cif_df, ["Qty", "数量"])
+            export_qty_col = find_column_with_pattern(export_df, ["Qty", "数量"])
             
             if None in [cif_part_col, export_part_col, cif_price_col, export_price_col, cif_qty_col, export_qty_col]:
                 return {"success": False, "message": "未找到所有需要的列，无法验证合并逻辑"}

@@ -25,9 +25,11 @@
 - 跳过文件处理: 否
 
 ### 检测到的输出文件
+- `cif_original_invoice - 副本.xlsx`
 - `cif_original_invoice.xlsx`
 - `combined_invoice.xlsx`
 - `deduped_list.xlsx`
+- `export_invoice - 副本.xlsx`
 - `export_invoice.xlsx`
 - `invoice_大华_Silvassa.xlsx`
 - `invoice_工厂_Daman.xlsx`
@@ -45,6 +47,8 @@
 - `reimport_工厂_TP-LINK.xlsx`
 - `reimport_工厂_组装厂月度辅耗材.xlsx`
 - `reimport_麦格米特_麦格米特.xlsx`
+- `~$cif_original_invoice - 副本.xlsx`
+- `~$export_invoice - 副本.xlsx`
 - `~$export_invoice.xlsx`
 - `~$reimport_invoice.xlsx`
 
@@ -74,7 +78,7 @@
 
 ### 输入文件验证: 9/9 通过
 
-### 处理逻辑验证: 6/7 通过
+### 处理逻辑验证: 7/7 通过
 
 ### 输出文件验证: 3/22 通过
 
@@ -115,11 +119,6 @@
 
 ### 处理逻辑验证
 
-#### ❌ 失败的测试
-
-##### merge_logic: ❌ 失败
-- 结果: 未找到所有需要的列，无法验证合并逻辑
-
 #### ✅ 通过的测试
 
 ##### cif_price_calculation: ✅ 通过
@@ -134,13 +133,16 @@
 ##### insurance_calculation: ✅ 通过
 - 结果: 保险费计算验证通过
 
+##### merge_logic: ✅ 通过
+- 结果: 物料合并逻辑验证通过
+
 ##### trade_type_identification: ✅ 通过
 - 结果: 贸易类型识别逻辑验证通过
 
 ##### trade_type_split: ✅ 通过
 - 结果: 贸易类型拆分验证通过
 
-**统计**: 6/7 测试通过
+**统计**: 7/7 测试通过
 
 ### 输出文件验证
 
@@ -218,11 +220,6 @@
 
 ## 解决方案建议
 
-### 处理逻辑验证问题修复建议
-
-#### merge_logic:
-- **建议**: 根据错误信息修复问题: 未找到所有需要的列，无法验证合并逻辑
-
 ### 输出文件验证问题修复建议
 
 #### export_invoice_field_mapping:
@@ -285,4 +282,4 @@
 
 
 ---
-生成时间: 2025-04-21 10:42:27
+生成时间: 2025-04-21 11:23:27
