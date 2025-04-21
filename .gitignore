@@ -8,6 +8,7 @@ __pycache__/
 
 # output
 output/
+outputs/
 
 # dependency
 node_modules/
