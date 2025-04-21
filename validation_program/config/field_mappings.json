@@ -1,0 +1,42 @@
+{
+    "export_invoice_mapping": {
+        "NO.": "NO.",
+        "Material code": "Material code",
+        "DESCRIPTION": "DESCRIPTION",
+        "Model NO.": "Model NO.",
+        "Unit Price": "Unit Price",
+        "Qty": "Qty",
+        "Unit": "Unit",
+        "Amount": "Amount"
+    },
+    "export_packing_list_mapping": {
+        "NO.": "NO.",
+        "Material code": "Material code",
+        "DESCRIPTION": "DESCRIPTION", 
+        "Model NO.": "Model NO.",
+        "Quantity": "Quantity",
+        "Unit": "Unit",
+        "Net Weight(KG)": "Net Weight",
+        "Gross Weight(KG)": "Gross Weight"
+    },
+    "import_invoice_mapping": {
+        "NO.": "NO.",
+        "Material code": "Material code",
+        "DESCRIPTION": "DESCRIPTION",
+        "Model NO.": "Model NO.",
+        "Unit Price": "Unit Price",
+        "Qty": "Qty",
+        "Unit": "Unit", 
+        "Amount": "Amount"
+    },
+    "import_packing_list_mapping": {
+        "NO.": "NO.",
+        "Material code": "Material code",
+        "DESCRIPTION": "DESCRIPTION",
+        "Model NO.": "Model NO.", 
+        "Quantity": "Quantity",
+        "Unit": "Unit",
+        "Net Weight(KG)": "Net Weight",
+        "Gross Weight(KG)": "Gross Weight"
+    }
+} 

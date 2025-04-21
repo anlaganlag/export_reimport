@@ -22,14 +22,14 @@ if not os.path.exists('outputs'):
 # Function to read Excel files
 def read_excel_file(file_path, skip=0):
     """
-    Read Excel file with proper header handling.
+    读取Excel文件，处理多层表头
     
     Args:
-        file_path: Path to the Excel file
-        skip: Number of rows to skip before reading (default: 0)
-        
+        file_path: Excel文件路径
+        skip: 要跳过的行数(用于跳过表头)
+    
     Returns:
-        DataFrame with properly processed headers
+        pd.DataFrame: 加载的数据
     """
     try:
         # Try reading with multi-level headers (English + Chinese)
@@ -37,8 +37,16 @@ def read_excel_file(file_path, skip=0):
         # third row (2) is Chinese headers, data starts at row 4
         print(f"Reading Excel file: {file_path}")
         
+        # 修正：原装箱单结构 - 第一行是标题，第二行是英文表头，第三行是中文表头
+        # 如果要读取数据行，应从第四行开始(索引为3)，所以skip应为2(跳过前两行)而不是3
+        
         # If skip is provided, use it (used to skip specific number of rows)
         if skip > 0:
+            # 修正skip=3的情况 - 应该改为skip=2以确保从正确的数据行开始
+            if skip == 3:
+                print(f"Converting skip=3 to skip=2 to prevent skipping first data row")
+                skip = 2
+                
             print(f"Skipping {skip} rows as specified")
             return pd.read_excel(file_path, skiprows=skip)
             
@@ -501,13 +509,23 @@ def split_by_project_and_factory(df):
 # Main function to process the shipping list
 def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
     # Read the input files
-    packing_list_df = read_excel_file(packing_list_file)
+    # 修正：将skip从3改为2，确保不会丢失第一个数据行
+    # 第一行是标题，第二行是英文表头，第三行是中文表头，数据从第四行开始(索引为3)
+    # 使用skip=2，读取从第三行开始(索引为2)，即会将第一个数据行正确读入
+    packing_list_df = read_excel_file(packing_list_file, skip=2)
     policy_df = read_excel_file(policy_file)
     
     # Print original column names for debugging
     print("Original packing list columns:")
     for col in packing_list_df.columns:
         print(f"  {col}")
+    
+    # 打印前10行数据，验证是否正确读取了所有行
+    print("\nVerifying first 10 rows of data:")
+    preview_rows = min(10, len(packing_list_df))
+    for i in range(preview_rows):
+        first_col_value = packing_list_df.iloc[i, 0] if not packing_list_df.empty and len(packing_list_df.columns) > 0 else "N/A"
+        print(f"  Row {i+1}: {first_col_value}")
     
     # Define packing list output columns - define this at the beginning so it's available everywhere
     pl_output_columns = [
