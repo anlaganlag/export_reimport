@@ -10,15 +10,18 @@
         "Amount": "Amount"
     },
     "export_packing_list_mapping": {
-        "NO.": "NO.",
-        "Material code": "Material code",
-        "DESCRIPTION": "DESCRIPTION", 
-        "Model NO.": "Model NO.",
-        "Quantity": "Quantity",
-        "Unit": "Unit",
-        "Net Weight(KG)": "Net Weight",
-        "Gross Weight(KG)": "Gross Weight"
+        "P/N.":"料号",
+        "DESCRIPTION":"供应商开票名称", 
+        "Model NO.":"型号",
+        "QUANTITY":"数量",
+        "CTNS":"总件数",
+        "Carton MEASUREMENT":"总体积",
+        "G.W (KG)":"总毛中",
+        "N.W(KG)":"总净重",
+        "Carton NO.":"箱号"
     },
+
+
     "import_invoice_mapping": {
         "NO.": "NO.",
         "Material code": "Material code",
@@ -30,13 +33,14 @@
         "Amount": "Amount"
     },
     "import_packing_list_mapping": {
-        "NO.": "NO.",
-        "Material code": "Material code",
-        "DESCRIPTION": "DESCRIPTION",
-        "Model NO.": "Model NO.", 
-        "Quantity": "Quantity",
-        "Unit": "Unit",
-        "Net Weight(KG)": "Net Weight",
-        "Gross Weight(KG)": "Gross Weight"
+        "P/N.":"料号",
+        "DESCRIPTION":"供应商开票名称", 
+        "Model NO.":"型号",
+        "QUANTITY":"数量",
+        "CTNS":"总件数",
+        "Carton MEASUREMENT":"总体积",
+        "G.W (KG)":"总毛中",
+        "N.W(KG)":"总净重",
+        "Carton NO.":"箱号"
     }
 } 

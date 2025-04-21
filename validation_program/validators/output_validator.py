@@ -62,6 +62,11 @@ class OutputValidator:
         try:
             # 读取输出文件
             try:
+                if mapping_type == 'export_packing_list_mapping':
+                    skiprows = 15
+                if mapping_type == 'import_invoice_mapping':
+                    skiprows = 0
+
                 output_df = pd.read_excel(output_file, sheet_name=sheet_name, skiprows=skiprows)
                 print(f"DEBUG: 成功读取{output_file}的{sheet_name}工作表，跳过前{skiprows}行")
                 print(f"DEBUG: 读取到的列名: {output_df.columns.tolist()}")

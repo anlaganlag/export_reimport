@@ -38,7 +38,6 @@
 - `xreimport_工厂_Daman.xlsx`
 - `xreimport_工厂_Silvass.xlsx`
 - `xreimport_麦格米特_Silvass.xlsx`
-- `~$export_invoice - 副本 (3).xlsx`
 
 ## 验收标准
 
@@ -68,7 +67,7 @@
 
 ### 处理逻辑验证: 7/7 通过
 
-### 输出文件验证: 5/12 通过
+### 输出文件验证: 8/12 通过
 
 ## 详细测试结果
 
@@ -77,7 +76,7 @@
 #### ❌ 失败的测试
 
 ##### project_split: ❌ 失败
-- 结果: 以下项目未找到对应的进口发票: 组装厂月度辅耗材, SMT工厂设备配件, SMT工厂月度辅耗材, TP-LINK
+- 结果: 以下项目未找到对应的进口发票: TP-LINK, SMT工厂月度辅耗材, 组装厂月度辅耗材, SMT工厂设备配件
 
 ##### sheet_naming: ❌ 失败
 - 结果: 出口文件export_invoice.xlsx中的工作表'Commercial Invoice'不符合发票号码命名格式
@@ -144,24 +143,15 @@
 
 #### ❌ 失败的测试
 
-##### export_packing_list_field_mapping: ❌ 失败
-- 结果: 输出文件缺少字段: Material code, DESCRIPTION, Model NO., Unit Price, Qty, Unit
-
 ##### format_compliance: ❌ 失败
 - 结果: 未找到模板文件
-
-##### import_invoice_field_mapping_reimport_invoice.xlsx: ❌ 失败
-- 结果: 输出文件缺少字段: NO., Material code, DESCRIPTION, Model NO., Unit Price, Qty, Unit, Amount
 
 ##### import_invoice_quantity: ❌ 失败
 - 结果: 进口发票总数量(0)与采购装箱单总数量(9506.0)不一致
 进口发票数量明细: 
 
 ##### import_invoice_split: ❌ 失败
-- 结果: 以下项目和工厂组合未找到对应的进口发票: 项目:TP-LINK 工厂:Silvass, 项目:SMT工厂月度辅耗材 工厂:Silvass, 项目:组装厂月度辅耗材 工厂:Daman, 项目:SMT工厂设备配件 工厂:Silvass, 项目:TP-LINK 工厂:Daman, 项目:麦格米特 工厂:Silvass
-
-##### import_packing_list_field_mapping_reimport_invoice.xlsx: ❌ 失败
-- 结果: 输出文件缺少字段: NO., Material code, Quantity, Unit, Net Weight(KG), Gross Weight(KG)
+- 结果: 以下项目和工厂组合未找到对应的进口发票: 项目:TP-LINK 工厂:Daman, 项目:SMT工厂设备配件 工厂:Silvass, 项目:SMT工厂月度辅耗材 工厂:Silvass, 项目:TP-LINK 工厂:Silvass, 项目:麦格米特 工厂:Silvass, 项目:组装厂月度辅耗材 工厂:Daman
 
 ##### import_packing_list_totals: ❌ 失败
 - 结果: 进口装箱单汇总数据不一致: Quantity不一致: 进口总计(9506) vs 原始(19012.0); Total Carton Quantity不一致: 进口总计(0) vs 原始(336.0); Total Volume不一致: 进口总计(0) vs 原始(36.64); Total Gross Weight不一致: 进口总计(288.15999999999997) vs 原始(9630.92); Total Net Weight不一致: 进口总计(2953.5599999999995) vs 原始(6313.32)
@@ -177,17 +167,29 @@
 ##### export_invoice_quantity: ✅ 通过
 - 结果: 出口发票数量验证通过
 
+##### export_packing_list_field_mapping: ✅ 通过
+- 结果: 字段映射验证通过
+
 ##### export_packing_list_totals: ✅ 通过
 - 结果: 出口装箱单汇总数据验证通过
 
 ##### file_naming: ✅ 通过
 - 结果: 文件命名格式验证通过
 
-**统计**: 5/12 测试通过
+##### import_invoice_field_mapping_reimport_invoice.xlsx: ✅ 通过
+- 结果: 字段映射验证通过
+
+##### import_packing_list_field_mapping_reimport_invoice.xlsx: ✅ 通过
+- 结果: 字段映射验证通过
+
+**统计**: 8/12 测试通过
 
 ## 解决方案建议
 
 ### 输入文件验证问题修复建议
+
+#### project_split:
+- **建议**: 根据错误信息修复问题: 以下项目未找到对应的进口发票: TP-LINK, SMT工厂月度辅耗材, 组装厂月度辅耗材, SMT工厂设备配件
 
 #### sheet_naming:
 - **建议**: 根据错误信息修复问题: 出口文件export_invoice.xlsx中的工作表'Commercial Invoice'不符合发票号码命名格式
@@ -195,22 +197,10 @@
 进口文件reimport_invoice.xlsx中的工作表'工厂_Silvass_CI'不符合发票号码命名格式
 进口文件reimport_invoice.xlsx中的工作表'工厂_Daman_CI'不符合发票号码命名格式
 
-#### project_split:
-- **建议**: 根据错误信息修复问题: 以下项目未找到对应的进口发票: 组装厂月度辅耗材, SMT工厂设备配件, SMT工厂月度辅耗材, TP-LINK
-
 ### 输出文件验证问题修复建议
 
-#### export_packing_list_field_mapping:
-- **建议**: 根据错误信息修复问题: 输出文件缺少字段: Material code, DESCRIPTION, Model NO., Unit Price, Qty, Unit
-
 #### import_invoice_split:
-- **建议**: 根据错误信息修复问题: 以下项目和工厂组合未找到对应的进口发票: 项目:TP-LINK 工厂:Silvass, 项目:SMT工厂月度辅耗材 工厂:Silvass, 项目:组装厂月度辅耗材 工厂:Daman, 项目:SMT工厂设备配件 工厂:Silvass, 项目:TP-LINK 工厂:Daman, 项目:麦格米特 工厂:Silvass
-
-#### import_invoice_field_mapping_reimport_invoice.xlsx:
-- **建议**: 根据错误信息修复问题: 输出文件缺少字段: NO., Material code, DESCRIPTION, Model NO., Unit Price, Qty, Unit, Amount
-
-#### import_packing_list_field_mapping_reimport_invoice.xlsx:
-- **建议**: 根据错误信息修复问题: 输出文件缺少字段: NO., Material code, Quantity, Unit, Net Weight(KG), Gross Weight(KG)
+- **建议**: 根据错误信息修复问题: 以下项目和工厂组合未找到对应的进口发票: 项目:TP-LINK 工厂:Daman, 项目:SMT工厂设备配件 工厂:Silvass, 项目:SMT工厂月度辅耗材 工厂:Silvass, 项目:TP-LINK 工厂:Silvass, 项目:麦格米特 工厂:Silvass, 项目:组装厂月度辅耗材 工厂:Daman
 
 #### import_invoice_quantity:
 - **建议**: 根据错误信息修复问题: 进口发票总数量(0)与采购装箱单总数量(9506.0)不一致
@@ -225,4 +215,4 @@
 
 
 ---
-生成时间: 2025-04-21 17:36:28
+生成时间: 2025-04-21 18:22:41
