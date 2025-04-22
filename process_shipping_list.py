@@ -596,7 +596,8 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
         'n/w',
         '净重',
         'Net Weight',
-        'net wt'
+        'net wt',
+        'Total Net Weight'
     ]
     net_weight_col = find_column_with_pattern(packing_list_df, net_weight_patterns, 'net weight')
     
@@ -739,7 +740,10 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
     
     if net_weight_col:
         result_df['net weight'] = packing_list_df[net_weight_col]
+        result_df['Total Net Weight (kg)'] = packing_list_df[net_weight_col]
         column_mappings['net weight'] = net_weight_col
+        column_mappings['Total Net Weight (kg)'] = net_weight_col
+        print(f"Using '{net_weight_col}' for net weight and Total Net Weight (kg)")
     
     if gross_weight_col:
         result_df['gross weight'] = packing_list_df[gross_weight_col]
@@ -905,11 +909,13 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
     try:
         if net_weight_col:
             result_df['net weight'] = pd.to_numeric(result_df['net weight'], errors='coerce')
+            result_df['Total Net Weight (kg)'] = pd.to_numeric(result_df['Total Net Weight (kg)'], errors='coerce')
             print(f"Converted net weight to numeric. Example values: {result_df['net weight'].head()}")
         else:
             # If net weight column not found, set to default value
             print("WARNING: Setting default values for missing net weight column")
             result_df['net weight'] = 0
+            result_df['Total Net Weight (kg)'] = 0
             
         result_df['Qty'] = pd.to_numeric(result_df['Qty'], errors='coerce')
         result_df['Unit Price'] = pd.to_numeric(result_df['Unit Price'], errors='coerce')
@@ -923,6 +929,7 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
         
         # Fill NaN values with 0 for numerical calculations
         result_df['net weight'] = result_df['net weight'].fillna(0)
+        result_df['Total Net Weight (kg)'] = result_df['Total Net Weight (kg)'].fillna(0)
         result_df['Qty'] = result_df['Qty'].fillna(0)
         result_df['Unit Price'] = result_df['Unit Price'].fillna(0)
         
@@ -1042,11 +1049,11 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
 
     # Define output column sets for export invoice
     exportReimport_output_columns = [
-        'NO.', 'Material code', 'DESCRIPTION', 'Model NO.', 'Unit Price', 'Qty', 'Unit', 'Amount'
+        'NO.', 'Material code', 'DESCRIPTION', 'Model NO.', 'Unit Price', 'Qty', 'Unit', 'Amount', 'Total Net Weight (kg)'
     ]
 
     # Internal columns needed for calculations (including Trade Type and Shipper)
-    internal_columns = cif_output_columns + ['Trade Type', 'Shipper', 'Original_Unit']
+    internal_columns = cif_output_columns + ['Trade Type', 'Shipper', 'Original_Unit', 'Total Net Weight (kg)']
 
     # Packing list internal columns
     pl_output_columns.append('project')  # Add project to the output columns but it will be removed before final export
@@ -1175,6 +1182,7 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
             'Unit': 'first',  # This will keep the original Chinese unit
             'Model NO.': 'first',
             'DESCRIPTION': 'first',
+            'Total Net Weight (kg)': 'sum',  # Sum the total net weight for grouped items
         })
         
         # Calculate Amount after grouping
@@ -1254,7 +1262,7 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
             commercial_df = export_grouped.copy()
             # 添加汇总行
             summary_commercial = {'DESCRIPTION': 'Total', 'Material code': ''}
-            for col in ['Qty', 'Amount']:
+            for col in ['Qty', 'Amount', 'Total Net Weight (kg)']:
                 if col in commercial_df.columns:
                     summary_commercial[col] = pd.to_numeric(commercial_df[col], errors='coerce').fillna(0).sum()
             

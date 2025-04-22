@@ -82,7 +82,7 @@
 #### ❌ 失败的测试
 
 ##### project_split: ❌ 失败
-- 结果: 以下项目未找到对应的进口发票: 组装厂月度辅耗材, SMT工厂设备配件, TP-LINK, SMT工厂月度辅耗材
+- 结果: 以下项目未找到对应的进口发票: SMT工厂设备配件, SMT工厂月度辅耗材, TP-LINK, 组装厂月度辅耗材
 
 ##### sheet_naming: ❌ 失败
 - 结果: 进口文件reimport_工厂_Daman.xlsx中缺少'PL'工作表
@@ -161,11 +161,11 @@
 - 结果: 验证字段映射时出错: Worksheet index 1 is invalid, 1 worksheets found
 
 ##### import_invoice_quantity: ❌ 失败
-- 结果: 进口发票总数量(0)与采购装箱单总数量(9504.0)不一致
+- 结果: 进口发票总数量(0)与采购装箱单总数量(9503.0)不一致
 进口发票数量明细: 
 
 ##### import_invoice_split: ❌ 失败
-- 结果: 以下项目和工厂组合未找到对应的进口发票: 项目:组装厂月度辅耗材 工厂:Daman, 项目:SMT工厂设备配件 工厂:Silvass, 项目:TP-LINK 工厂:Daman, 项目:SMT工厂月度辅耗材 工厂:Silvass, 项目:TP-LINK 工厂:Silvass
+- 结果: 以下项目和工厂组合未找到对应的进口发票: 项目:TP-LINK 工厂:Silvass, 项目:组装厂月度辅耗材 工厂:Daman, 项目:SMT工厂设备配件 工厂:Silvass, 项目:TP-LINK 工厂:Daman, 项目:SMT工厂月度辅耗材 工厂:Silvass
 
 ##### import_packing_list_field_mapping_reimport_工厂_Daman.xlsx: ❌ 失败
 - 结果: 无法读取输出文件: Worksheet named 'PL' not found
@@ -177,7 +177,7 @@
 - 结果: 无法读取输出文件: Worksheet named 'PL' not found
 
 ##### import_packing_list_totals: ❌ 失败
-- 结果: 进口装箱单汇总数据不一致: Quantity不一致: 进口总计(38020) vs 原始(19008.0); Total Carton Quantity不一致: 进口总计(0) vs 原始(335.99199999999996); Total Volume不一致: 进口总计(0) vs 原始(36.63992); Total Gross Weight不一致: 进口总计(1152.6399999999999) vs 原始(6749.6576000000005); Total Net Weight不一致: 进口总计(12228.999999999998) vs 原始(6313.32)
+- 结果: 进口装箱单汇总数据不一致: Quantity不一致: 进口总计(38018) vs 原始(19006.0); Total Carton Quantity不一致: 进口总计(0) vs 原始(335.988); Total Volume不一致: 进口总计(0) vs 原始(36.63988); Total Gross Weight不一致: 进口总计(1152.6399999999999) vs 原始(6749.6464); Total Net Weight不一致: 进口总计(12228.999999999998) vs 原始(6313.32)
 
 #### ✅ 通过的测试
 
@@ -221,7 +221,7 @@
 ### 输入文件验证问题修复建议
 
 #### project_split:
-- **建议**: 根据错误信息修复问题: 以下项目未找到对应的进口发票: 组装厂月度辅耗材, SMT工厂设备配件, TP-LINK, SMT工厂月度辅耗材
+- **建议**: 根据错误信息修复问题: 以下项目未找到对应的进口发票: SMT工厂设备配件, SMT工厂月度辅耗材, TP-LINK, 组装厂月度辅耗材
 
 #### sheet_naming:
 - **建议**: 根据错误信息修复问题: 进口文件reimport_工厂_Daman.xlsx中缺少'PL'工作表
@@ -234,7 +234,7 @@
 ### 输出文件验证问题修复建议
 
 #### import_invoice_split:
-- **建议**: 根据错误信息修复问题: 以下项目和工厂组合未找到对应的进口发票: 项目:组装厂月度辅耗材 工厂:Daman, 项目:SMT工厂设备配件 工厂:Silvass, 项目:TP-LINK 工厂:Daman, 项目:SMT工厂月度辅耗材 工厂:Silvass, 项目:TP-LINK 工厂:Silvass
+- **建议**: 根据错误信息修复问题: 以下项目和工厂组合未找到对应的进口发票: 项目:TP-LINK 工厂:Silvass, 项目:组装厂月度辅耗材 工厂:Daman, 项目:SMT工厂设备配件 工厂:Silvass, 项目:TP-LINK 工厂:Daman, 项目:SMT工厂月度辅耗材 工厂:Silvass
 
 #### import_invoice_field_mapping_reimport_工厂_Daman.xlsx:
 - **建议**: 根据错误信息修复问题: 验证字段映射时出错: Worksheet index 1 is invalid, 1 worksheets found
@@ -255,13 +255,13 @@
 - **建议**: 根据错误信息修复问题: 无法读取输出文件: Worksheet named 'PL' not found
 
 #### import_invoice_quantity:
-- **建议**: 根据错误信息修复问题: 进口发票总数量(0)与采购装箱单总数量(9504.0)不一致
+- **建议**: 根据错误信息修复问题: 进口发票总数量(0)与采购装箱单总数量(9503.0)不一致
 进口发票数量明细: 
 
 #### import_packing_list_totals:
-- **建议**: 根据错误信息修复问题: 进口装箱单汇总数据不一致: Quantity不一致: 进口总计(38020) vs 原始(19008.0); Total Carton Quantity不一致: 进口总计(0) vs 原始(335.99199999999996); Total Volume不一致: 进口总计(0) vs 原始(36.63992); Total Gross Weight不一致: 进口总计(1152.6399999999999) vs 原始(6749.6576000000005); Total Net Weight不一致: 进口总计(12228.999999999998) vs 原始(6313.32)
+- **建议**: 根据错误信息修复问题: 进口装箱单汇总数据不一致: Quantity不一致: 进口总计(38018) vs 原始(19006.0); Total Carton Quantity不一致: 进口总计(0) vs 原始(335.988); Total Volume不一致: 进口总计(0) vs 原始(36.63988); Total Gross Weight不一致: 进口总计(1152.6399999999999) vs 原始(6749.6464); Total Net Weight不一致: 进口总计(12228.999999999998) vs 原始(6313.32)
 
 
 
 ---
-生成时间: 2025-04-22 14:18:55
+生成时间: 2025-04-22 14:28:32
