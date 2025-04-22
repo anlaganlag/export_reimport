@@ -1049,7 +1049,7 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
 
     # Define output column sets for export invoice
     exportReimport_output_columns = [
-        'NO.', 'Material code', 'DESCRIPTION', 'Model NO.', 'Unit Price', 'Qty', 'Unit', 'Amount', 'Total Net Weight (kg)'
+        'S/N', 'Part Number', '名称', 'Model Number', 'Unit Price (CIF, USD)', 'Quantity', 'Unit', 'Total Amount (CIF, USD)', 'Total Net Weight (kg)'
     ]
 
     # Internal columns needed for calculations (including Trade Type and Shipper)
@@ -1170,23 +1170,35 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
             packing_list = packing_list.drop(columns=['project'])
         
         # Use original Chinese units for export invoice
-        export_invoice = general_trade_df[exportReimport_output_columns].copy()
+        export_invoice = general_trade_df[['NO.', 'Material code', 'DESCRIPTION', 'Model NO.', 'Unit Price', 'Qty', 'Unit', 'Amount', 'Total Net Weight (kg)']].copy()
+        
+        # Rename columns to match the format in the second image
+        export_invoice.rename(columns={
+            'NO.': 'S/N',
+            'Material code': 'Part Number',
+            'DESCRIPTION': '名称',
+            'Model NO.': 'Model Number',
+            'Unit Price': 'Unit Price (CIF, USD)',
+            'Qty': 'Quantity',
+            'Amount': 'Total Amount (CIF, USD)'
+        }, inplace=True)
+        
         # Keep original Chinese units from the source
         if 'Original_Unit' in general_trade_df.columns:
             export_invoice['Unit'] = general_trade_df['Original_Unit']
         
         # Group by Material code and other fields, keeping original units
-        export_grouped = export_invoice.groupby(['Material code', 'Unit Price'], as_index=False).agg({
-            'Qty': 'sum',
-            'NO.': 'first',
+        export_grouped = export_invoice.groupby(['Part Number', 'Unit Price (CIF, USD)'], as_index=False).agg({
+            'Quantity': 'sum',
+            'S/N': 'first',
             'Unit': 'first',  # This will keep the original Chinese unit
-            'Model NO.': 'first',
-            'DESCRIPTION': 'first',
+            'Model Number': 'first',
+            '名称': 'first',
             'Total Net Weight (kg)': 'sum',  # Sum the total net weight for grouped items
         })
         
         # Calculate Amount after grouping
-        export_grouped['Amount'] = (export_grouped['Unit Price'] * export_grouped['Qty']).round(2)
+        export_grouped['Total Amount (CIF, USD)'] = (export_grouped['Unit Price (CIF, USD)'] * export_grouped['Quantity']).round(2)
         
         # Ensure all required columns exist and in correct order
         for col in exportReimport_output_columns:
@@ -1196,12 +1208,12 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
         # Reindex to match the required column order
         export_grouped = export_grouped.reindex(columns=exportReimport_output_columns)
         
-        # Sort by NO. to maintain original ordering
-        export_grouped = export_grouped.sort_values('NO.')
+        # Sort by S/N to maintain original ordering
+        export_grouped = export_grouped.sort_values('S/N')
         
         # Reset the index to generate sequential numbers
         export_grouped = export_grouped.reset_index(drop=True)
-        export_grouped['NO.'] = export_grouped.index + 1
+        export_grouped['S/N'] = export_grouped.index + 1
 
         # Save both sheets to the same Excel file
         export_file_path = os.path.join(output_dir, 'export_invoice.xlsx')
@@ -1261,8 +1273,8 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
             # Commercial Invoice 工作表处理
             commercial_df = export_grouped.copy()
             # 添加汇总行
-            summary_commercial = {'DESCRIPTION': 'Total', 'Material code': ''}
-            for col in ['Qty', 'Amount', 'Total Net Weight (kg)']:
+            summary_commercial = {'名称': 'Total', 'Part Number': ''}
+            for col in ['Quantity', 'Total Amount (CIF, USD)', 'Total Net Weight (kg)']:
                 if col in commercial_df.columns:
                     summary_commercial[col] = pd.to_numeric(commercial_df[col], errors='coerce').fillna(0).sum()
             
@@ -1313,14 +1325,18 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
                     
                     # Set column width - customize widths for specific columns
                     col_name = ws.cell(row=1, column=col_idx).value
-                    if col_name == 'Material code':
-                        ws.column_dimensions[get_column_letter(col_idx)].width = 35  # Wider for Material code
-                    elif col_name == 'Unit Price':
-                        ws.column_dimensions[get_column_letter(col_idx)].width = 20  # Wider for Unit Price
-                    elif col_name == 'DESCRIPTION':
+                    if col_name == 'Part Number':
+                        ws.column_dimensions[get_column_letter(col_idx)].width = 35  # Wider for Part Number
+                    elif col_name == 'Unit Price (CIF, USD)':
+                        ws.column_dimensions[get_column_letter(col_idx)].width = 25  # Wider for Unit Price
+                    elif col_name == 'Total Amount (CIF, USD)':
+                        ws.column_dimensions[get_column_letter(col_idx)].width = 25  # Wider for Amount
+                    elif col_name == '名称':
                         ws.column_dimensions[get_column_letter(col_idx)].width = 30  # Wider for Description
-                    elif col_name == 'Model NO.':
-                        ws.column_dimensions[get_column_letter(col_idx)].width = 20  # Wider for Model NO.
+                    elif col_name == 'Model Number':
+                        ws.column_dimensions[get_column_letter(col_idx)].width = 20  # Wider for Model Number
+                    elif col_name == 'Total Net Weight (kg)':
+                        ws.column_dimensions[get_column_letter(col_idx)].width = 20  # Wider for Net Weight
                     else:
                         ws.column_dimensions[get_column_letter(col_idx)].width = 15  # Default width
                 
@@ -1345,9 +1361,9 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
             
             # Find the Unit Price and Amount column indices
             for col_idx, cell in enumerate(ws[1], 1):
-                if cell.value == 'Unit Price':
+                if cell.value == 'Unit Price (CIF, USD)':
                     unit_price_col = col_idx
-                elif cell.value == 'Amount':
+                elif cell.value == 'Total Amount (CIF, USD)':
                     amount_col = col_idx
             
             # Apply formatting to the entire column
@@ -1612,11 +1628,22 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
                 reimport_file_path = os.path.join(output_dir, reimport_file_name)
                 
                 # Create a copy for the invoice
-                invoice_df = df[exportReimport_output_columns].copy()
+                invoice_df = df[['NO.', 'Material code', 'DESCRIPTION', 'Model NO.', 'Unit Price', 'Qty', 'Unit', 'Amount', 'Total Net Weight (kg)']].copy()
+                
+                # Rename columns to match the export invoice format
+                invoice_df.rename(columns={
+                    'NO.': 'S/N',
+                    'Material code': 'Part Number',
+                    'DESCRIPTION': '名称',
+                    'Model NO.': 'Model Number',
+                    'Unit Price': 'Unit Price (CIF, USD)',
+                    'Qty': 'Quantity',
+                    'Amount': 'Total Amount (CIF, USD)'
+                }, inplace=True)
                 
                 # Add summary row to invoice
-                summary_invoice = {'DESCRIPTION': 'Total', 'Material code': ''}
-                for col in ['Qty', 'Amount']:
+                summary_invoice = {'名称': 'Total', 'Part Number': ''}
+                for col in ['Quantity', 'Total Amount (CIF, USD)', 'Total Net Weight (kg)']:
                     if col in invoice_df.columns:
                         summary_invoice[col] = pd.to_numeric(invoice_df[col], errors='coerce').fillna(0).sum()
                 
@@ -1671,14 +1698,18 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
                 
                 # Set column width - customize widths for specific columns
                 col_name = ws.cell(row=1, column=col_idx).value
-                if col_name == 'Material code':
-                    ws.column_dimensions[get_column_letter(col_idx)].width = 35  # Wider for Material code
-                elif col_name == 'Unit Price':
-                    ws.column_dimensions[get_column_letter(col_idx)].width = 20  # Wider for Unit Price
-                elif col_name == 'DESCRIPTION':
+                if col_name == 'Part Number':
+                    ws.column_dimensions[get_column_letter(col_idx)].width = 35  # Wider for Part Number
+                elif col_name == 'Unit Price (CIF, USD)':
+                    ws.column_dimensions[get_column_letter(col_idx)].width = 25  # Wider for Unit Price
+                elif col_name == 'Total Amount (CIF, USD)':
+                    ws.column_dimensions[get_column_letter(col_idx)].width = 25  # Wider for Amount
+                elif col_name == '名称':
                     ws.column_dimensions[get_column_letter(col_idx)].width = 30  # Wider for Description
-                elif col_name == 'Model NO.':
-                    ws.column_dimensions[get_column_letter(col_idx)].width = 20  # Wider for Model NO.
+                elif col_name == 'Model Number':
+                    ws.column_dimensions[get_column_letter(col_idx)].width = 20  # Wider for Model Number
+                elif col_name == 'Total Net Weight (kg)':
+                    ws.column_dimensions[get_column_letter(col_idx)].width = 20  # Wider for Net Weight
                 else:
                     ws.column_dimensions[get_column_letter(col_idx)].width = 15  # Default width
             
@@ -1700,11 +1731,11 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
             # Apply number formatting to specific columns if this is a Commercial Invoice sheet
             if sheet_name != 'PL':
                 for col_idx, cell in enumerate(ws[1], 1):
-                    if cell.value == 'Unit Price':
+                    if cell.value == 'Unit Price (CIF, USD)':
                         for row in range(2, ws.max_row + 1):
                             cell = ws.cell(row=row, column=col_idx)
                             cell.number_format = '#,##0.000000'
-                    elif cell.value == 'Amount':
+                    elif cell.value == 'Total Amount (CIF, USD)':
                         for row in range(2, ws.max_row + 1):
                             cell = ws.cell(row=row, column=col_idx)
                             cell.number_format = '#,##0.00'
