@@ -525,6 +525,58 @@ def generate_invoice_sheet_name(prefix="CXCI"):
     # Use a serial number starting with 0001
     return f"{prefix}{date_part}{serial}"
 
+# Function to convert numbers to English words
+def num_to_words(num):
+    """Convert a number to its English word representation."""
+    ones = ['', 'ONE', 'TWO', 'THREE', 'FOUR', 'FIVE', 'SIX', 'SEVEN', 'EIGHT', 'NINE', 'TEN', 
+            'ELEVEN', 'TWELVE', 'THIRTEEN', 'FOURTEEN', 'FIFTEEN', 'SIXTEEN', 'SEVENTEEN', 'EIGHTEEN', 'NINETEEN']
+    tens = ['', '', 'TWENTY', 'THIRTY', 'FORTY', 'FIFTY', 'SIXTY', 'SEVENTY', 'EIGHTY', 'NINETY']
+    
+    def _convert_less_than_thousand(num):
+        if num < 20:
+            return ones[num]
+        elif num < 100:
+            return tens[num // 10] + ('-' + ones[num % 10] if num % 10 > 0 else '')
+        else:
+            return ones[num // 100] + ' HUNDRED' + (' AND ' + _convert_less_than_thousand(num % 100) if num % 100 > 0 else '')
+    
+    if num == 0:
+        return 'ZERO'
+    
+    integer_part = int(num)
+    decimal_part = int(round((num - integer_part) * 100))
+    
+    result = ''
+    
+    if integer_part >= 1000000000:
+        result += _convert_less_than_thousand(integer_part // 1000000000) + ' BILLION'
+        integer_part %= 1000000000
+        if integer_part > 0:
+            result += ' '
+    
+    if integer_part >= 1000000:
+        result += _convert_less_than_thousand(integer_part // 1000000) + ' MILLION'
+        integer_part %= 1000000
+        if integer_part > 0:
+            result += ' '
+    
+    if integer_part >= 1000:
+        result += _convert_less_than_thousand(integer_part // 1000) + ' THOUSAND'
+        integer_part %= 1000
+        if integer_part > 0:
+            result += ' '
+            if integer_part < 100:  # Add 'AND' for values less than 100
+                result += 'AND '
+    
+    if integer_part > 0:
+        result += _convert_less_than_thousand(integer_part)
+    
+    # Handle decimal part if present
+    if decimal_part > 0:
+        result += ' AND CENTS ' + (tens[decimal_part // 10] + (('-' + ones[decimal_part % 10]) if decimal_part % 10 > 0 else '') if decimal_part >= 20 else ones[decimal_part])
+    
+    return result.strip()
+
 # Main function to process the shipping list
 def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
     # Read the input files
@@ -1287,7 +1339,23 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
                     summary_row[col] = None
             
             summary_row = summary_row[exportReimport_output_columns]
-            commercial_df = pd.concat([commercial_df, summary_row], ignore_index=True)
+            
+            # Get the total amount from the summary row
+            total_amount = summary_commercial.get('Total Amount (CIF, USD)', 0)
+            total_amount_words = num_to_words(total_amount)
+            
+            # Format following the screenshot: "SAY USD [AMOUNT IN WORDS] ONLY."
+            # Create an empty row with all fields blank, but spanning all columns
+            empty_row_data = {col: "" for col in exportReimport_output_columns}
+            empty_row = pd.DataFrame([empty_row_data])
+            
+            # Create the words row with the exact format from screenshot
+            words_row_data = {col: "" for col in exportReimport_output_columns}
+            words_row_data['S/N'] = f"Amount in Words: SAY USD {total_amount_words} ONLY."
+            words_row = pd.DataFrame([words_row_data])
+            
+            # Add both rows to the DataFrame (summary row, empty row, words row)
+            commercial_df = pd.concat([commercial_df, summary_row, empty_row, words_row], ignore_index=True)
             
             # 使用正确的发票号码格式作为工作表名
             invoice_sheet_name = generate_invoice_sheet_name()
@@ -1376,6 +1444,38 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
                 for row in range(2, ws.max_row + 1):  # Start from row 2 (skip header)
                     cell = ws.cell(row=row, column=amount_col)
                     cell.number_format = '#,##0.00'
+            
+            # Find the "SAY USD" row and merge cells to span across all columns
+            if sheet_name != 'PL':  # Only for invoice sheets, not packing list
+                for row_idx in range(1, ws.max_row + 1):
+                    if ws.cell(row=row_idx, column=1).value == "SAY USD":
+                        # Get the total amount words from the Part Number column
+                        amount_words = ws.cell(row=row_idx, column=2).value
+                        only_text = ws.cell(row=row_idx, column=3).value if ws.cell(row=row_idx, column=3).value else "ONLY."
+                        # Create the full text in the proper format
+                        full_text = f"SAY USD {amount_words} {only_text}"
+                        # Set this text in the first cell
+                        ws.cell(row=row_idx, column=1).value = full_text
+                        # Merge cells across all columns
+                        last_col = len(exportReimport_output_columns)
+                        ws.merge_cells(start_row=row_idx, start_column=1, end_row=row_idx, end_column=last_col)
+                        # Align the text left
+                        ws.cell(row=row_idx, column=1).alignment = Alignment(horizontal='left', vertical='center')
+                        break
+            
+            # Find the "Amount in Words:" row and merge cells to span across all columns
+            if sheet_name != 'PL':  # Only for invoice sheets, not packing list
+                for row_idx in range(1, ws.max_row + 1):
+                    cell_value = ws.cell(row=row_idx, column=1).value
+                    if cell_value and "Amount in Words:" in str(cell_value):
+                        # Merge all columns in this row
+                        last_col = len(exportReimport_output_columns)
+                        ws.merge_cells(start_row=row_idx, start_column=1, end_row=row_idx, end_column=last_col)
+                        # Align the text left and make it bold
+                        cell = ws.cell(row=row_idx, column=1)
+                        cell.alignment = Alignment(horizontal='left', vertical='center')
+                        cell.font = Font(bold=True)
+                        break
             
             # Save the styled workbook
             wb.save(export_file_path)
@@ -1656,7 +1756,22 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
                         summary_row[col] = None
                 
                 summary_row = summary_row[exportReimport_output_columns]
-                invoice_df = pd.concat([invoice_df, summary_row], ignore_index=True)
+                
+                # Get the total amount for English words conversion
+                total_amount = summary_invoice.get('Total Amount (CIF, USD)', 0)
+                total_amount_words = num_to_words(total_amount)
+                
+                # Create an empty row and a row for the amount in words
+                empty_row_data = {col: "" for col in exportReimport_output_columns}
+                empty_row = pd.DataFrame([empty_row_data])
+                
+                words_row_data = {col: "" for col in exportReimport_output_columns}
+                words_row_data['S/N'] = "Amount in Words:"
+                words_row_data['Part Number'] = f"SAY USD {total_amount_words} ONLY."
+                words_row = pd.DataFrame([words_row_data])
+                
+                # Add all rows to the DataFrame
+                invoice_df = pd.concat([invoice_df, summary_row, empty_row, words_row], ignore_index=True)
                 
                 # Save as individual reimport file
                 print(f"Saving individual reimport file for {project}_{factory}: {reimport_file_path}")
@@ -1739,7 +1854,23 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
                         for row in range(2, ws.max_row + 1):
                             cell = ws.cell(row=row, column=col_idx)
                             cell.number_format = '#,##0.00'
-
+                
+                # Find the "SAY USD" row and merge cells to span all columns
+                for row_idx in range(1, ws.max_row + 1):
+                    if ws.cell(row=row_idx, column=1).value == "SAY USD":
+                        # Get the total amount words from the Part Number column
+                        amount_words = ws.cell(row=row_idx, column=2).value
+                        only_text = ws.cell(row=row_idx, column=3).value if ws.cell(row=row_idx, column=3).value else "ONLY."
+                        # Create the full text in the proper format
+                        full_text = f"SAY USD {amount_words} {only_text}"
+                        # Set this text in the first cell
+                        ws.cell(row=row_idx, column=1).value = full_text
+                        # Merge cells across all columns
+                        last_col = len(exportReimport_output_columns)
+                        ws.merge_cells(start_row=row_idx, start_column=1, end_row=row_idx, end_column=last_col)
+                        # Align the text left
+                        ws.cell(row=row_idx, column=1).alignment = Alignment(horizontal='left', vertical='center')
+                        break
         
         # Save the styled workbook
         wb.save(reimport_invoice_path)
