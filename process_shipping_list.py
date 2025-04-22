@@ -1539,39 +1539,81 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
 
                         # Add company information rows after Amount in Words
                         company_info = [
-                            "Country Of Origin: ",
-                            "Payment Term: ",
-                            "Delivery Term: ",
-                            "Company Name:  test Shibo Chuangxiang Digital Technology (Shenzhen) Co., LTD",
-                            "Account number:  test 811030101280058437",
-                            "Bank Name: test China citic bank shenzhen branch",
-                            "Bank Address: test 8F,Citic security tower, zhongxin 4road, futian dist. futian shenzhen  china",
-                            "SWIFT No.: test CIBKCNBJ518"
+                            "Country Of Origin: China",
+                            "Payment Term: 100% TT within 5 working days when Unicair(Holdings) Limited receive Goods.",
+                            "Delivery Term: CIF",
+                            "Company Name:  Shibo Chuangxiang Digital Technology (Shenzhen) Co., LTD",
+                            "Account number:  811030101280058376",
+                            "Bank Name: China citic bank shenzhen branch",
+                            "Bank Address:8F,Citic security tower, zhongxin 4road, futian dist. futian shenzhen  china",
+                            "SWIFT No.: CIBKCNBJ518"
                         ]
 
-                        # Insert empty row after Amount in Words
-                        ws.insert_rows(row_idx + 1)
-                        
-                        # Add company information
-                        for i, info in enumerate(company_info, 1):
-                            # Insert new row
-                            current_row = row_idx + i
-                            
-                            # Set the value in the first column
+                        # Start row for info block
+                        info_start_row = row_idx + 1
+
+                        # Add each line of info
+                        for i, info in enumerate(company_info):
+                            current_row = info_start_row + i
                             cell = ws.cell(row=current_row, column=1)
                             cell.value = info
                             
-                            # Merge cells across all columns
+                            # Merge all columns for each row
                             ws.merge_cells(start_row=current_row, start_column=1, end_row=current_row, end_column=last_col)
                             
                             # Apply styling
                             cell.alignment = Alignment(horizontal='left', vertical='center')
                             cell.font = Font(bold=True)
                             
-                            # Apply borders
-                            for col in range(1, last_col + 1):
-                                cell = ws.cell(row=current_row, column=col)
-                                cell.border = thin_border
+                            # Remove all borders initially
+                            cell.border = Border()
+
+                        # Create outer border style
+                        outer_border = Border(
+                            left=Side(style='thin'),
+                            right=Side(style='thin'),
+                            top=Side(style='thin'),
+                            bottom=Side(style='thin')
+                        )
+
+                        # Apply outer borders only
+                        for col in range(1, last_col + 1):
+                            # Top border for first row
+                            top_cell = ws.cell(row=info_start_row, column=col)
+                            top_cell.border = Border(
+                                top=Side(style='thin'),
+                                left=Side(style='thin') if col == 1 else None,
+                                right=Side(style='thin') if col == last_col else None
+                            )
+                            
+                            # Bottom border for last row
+                            bottom_cell = ws.cell(row=info_start_row + len(company_info) - 1, column=col)
+                            bottom_cell.border = Border(
+                                bottom=Side(style='thin'),
+                                left=Side(style='thin') if col == 1 else None,
+                                right=Side(style='thin') if col == last_col else None
+                            )
+
+                        # Apply left and right borders
+                        for row in range(info_start_row, info_start_row + len(company_info)):
+                            # Left border
+                            left_cell = ws.cell(row=row, column=1)
+                            current_border = left_cell.border
+                            left_cell.border = Border(
+                                left=Side(style='thin'),
+                                top=current_border.top,
+                                bottom=current_border.bottom
+                            )
+                            
+                            # Right border
+                            right_cell = ws.cell(row=row, column=last_col)
+                            current_border = right_cell.border
+                            right_cell.border = Border(
+                                right=Side(style='thin'),
+                                top=current_border.top,
+                                bottom=current_border.bottom
+                            )
+
                         break
 
                     # Make all text in the sheet bold
