@@ -577,7 +577,8 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
     # Main invoice columns
     sr_no_col = find_column_with_pattern(packing_list_df, ['S/N', '序号', '序列号'], 'NO.')
     material_code_col = find_column_with_pattern(packing_list_df, ['p/n', 'Part Number', 'material code', '系统料号', '料号'], 'Material code')
-    description_col = find_column_with_pattern(packing_list_df, ['Commercial Invoice Description', '清关英文货描(关务提供)', '描述', 'description'], 'DESCRIPTION')
+    # 修改: 将 '供应商开票名称' 放在匹配模式的最前面，优先使用该字段作为DESCRIPTION
+    description_col = find_column_with_pattern(packing_list_df, ['供应商开票名称', 'Commercial Invoice Description', '清关英文货描(关务提供)', '描述', 'description'], 'DESCRIPTION')
     model_col = find_column_with_pattern(packing_list_df, ['Model Number', '型号', '物料型号', '货物型号', 'model'], 'Model NO.')
     unit_price_col = find_column_with_pattern(packing_list_df, ['Unit Price (Excl. Tax, CNY)()', 'unit price', '采购单价不含税', '不含税单价', '单价'], 'Unit Price')
     qty_col = find_column_with_pattern(packing_list_df, ['Quantity', 'quantity', '数量', 'qty'], 'Qty')
@@ -691,7 +692,11 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
     if description_col:
         result_df['DESCRIPTION'] = packing_list_df[description_col]
         column_mappings['DESCRIPTION'] = description_col
-        print(f"Using '{description_col}' as the source for DESCRIPTION")
+        # 添加更明确的日志消息，区分不同的列来源
+        if '供应商开票名称' in str(description_col):
+            print(f"Using '供应商开票名称' column '{description_col}' for DESCRIPTION as recommended")
+        else:
+            print(f"Using '{description_col}' as the source for DESCRIPTION")
     else:
         # Description is essential - default to Material code if not found
         if material_code_col:
@@ -770,6 +775,9 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
     
     if description_col:
         pl_result_df['DESCRIPTION'] = packing_list_df[description_col]
+        # 添加日志，显示使用的是相同的描述源
+        if '供应商开票名称' in str(description_col):
+            print(f"Using '供应商开票名称' column '{description_col}' for packing list DESCRIPTION as well")
     
     if model_col:
         pl_result_df['Model NO.'] = packing_list_df[model_col]
