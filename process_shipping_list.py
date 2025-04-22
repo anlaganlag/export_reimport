@@ -1475,7 +1475,56 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
                         cell = ws.cell(row=row_idx, column=1)
                         cell.alignment = Alignment(horizontal='left', vertical='center')
                         cell.font = Font(bold=True)
+
+                        # Add company information rows after Amount in Words
+                        company_info = [
+                            "Country Of Origin: ",
+                            "Payment Term: ",
+                            "Delivery Term: ",
+                            "Company Name:  test Shibo Chuangxiang Digital Technology (Shenzhen) Co., LTD",
+                            "Account number:  test 811030101280058437",
+                            "Bank Name: test China citic bank shenzhen branch",
+                            "Bank Address: test 8F,Citic security tower, zhongxin 4road, futian dist. futian shenzhen  china",
+                            "SWIFT No.: test CIBKCNBJ518"
+                        ]
+
+                        # Insert empty row after Amount in Words
+                        ws.insert_rows(row_idx + 1)
+                        
+                        # Add company information
+                        for i, info in enumerate(company_info, 1):
+                            # Insert new row
+                            current_row = row_idx + i
+                            
+                            # Set the value in the first column
+                            cell = ws.cell(row=current_row, column=1)
+                            cell.value = info
+                            
+                            # Merge cells across all columns
+                            ws.merge_cells(start_row=current_row, start_column=1, end_row=current_row, end_column=last_col)
+                            
+                            # Apply styling
+                            cell.alignment = Alignment(horizontal='left', vertical='center')
+                            cell.font = Font(bold=True)
+                            
+                            # Apply borders
+                            for col in range(1, last_col + 1):
+                                cell = ws.cell(row=current_row, column=col)
+                                cell.border = thin_border
                         break
+
+                    # Make all text in the sheet bold
+                    for row in ws.iter_rows():
+                        for cell in row:
+                            if cell.value:  # Only apply bold to cells with content
+                                current_font = cell.font
+                                cell.font = Font(
+                                    name=current_font.name,
+                                    size=current_font.size,
+                                    bold=True,
+                                    italic=current_font.italic,
+                                    color=current_font.color
+                                )
             
             # Save the styled workbook
             wb.save(export_file_path)
