@@ -1010,74 +1010,103 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
         net_weight = pd.Series([0] * len(result_df))
         print(f"Using default values due to error")
 
-    # Calculate total cost (采购总价) for each row and sum
-    result_df['采购总价']  = result_df['Unit Price'] * result_df['Qty'] 
-    total_amount =  result_df['采购总价'].sum()
-    #总价加价就是总价FOB
+    # Calculate total cost (采购总价) for each row and sum - 保持完整精度
+    result_df['采购总价'] = result_df['Unit Price'] * result_df['Qty']
+    total_amount = result_df['采购总价'].sum()
+    
+    # 总价加价就是总价FOB - 保持完整精度
     totalFOB = total_amount * (1 + markup_percentage)
-    print(f"  总价FOB: ¥{totalFOB:.4f}")
 
-
+    # 计算总保费 - 保持完整精度
     total_insurance = totalFOB * insurance_coefficient * insurance_rate
     result_df['总保费'] = total_insurance
-    print(f"  总保费: ¥{total_insurance:.4f}")
 
     result_df['总运费'] = total_freight_amount
-    print(f"  总运费: ¥{total_freight_amount:.4f}")
 
+    # 修改计算总净重的部分
+    try:
+        if net_weight_col:
+            # 将净重列转换为数值型，保持完整精度
+            result_df['net weight'] = pd.to_numeric(result_df['net weight'], errors='coerce')
+            result_df['Total Net Weight (kg)'] = pd.to_numeric(result_df['Total Net Weight (kg)'], errors='coerce')
+            
+            # 修改识别汇总行的逻辑
+            total_mask = ~(
+                (result_df['NO.'].isna() | (result_df['NO.'] == '')) &
+                (result_df['net weight'].notna())
+            )
+            
+            # 计算总净重时只使用非汇总行 - 保持完整精度
+            net_weight = result_df[total_mask]['net weight']
+            total_net_weight = net_weight.sum()
+            
+        else:
+            print("WARNING: 未找到净重列，使用默认值")
+            total_net_weight = 1
+            net_weight = pd.Series([0] * len(result_df))
+            
+        if total_net_weight <= 0:
+            print("WARNING: 计算得到的总净重为0或负数！")
+            total_net_weight = 1
+            print(f"使用默认净重值: {total_net_weight} kg")
+            
+    except Exception as e:
+        print(f"计算总净重时出错: {e}")
+        total_net_weight = 1
+        net_weight = pd.Series([0] * len(result_df))
+        print(f"使用默认值进行计算")
 
-    result_df['每公斤摊的运保费'] = (result_df['总保费'] + result_df['总运费']) / total_net_weight
-
+    # 使用正确的总净重继续后续计算 - 保持完整精度
+    result_df['每公斤摊的运保费'] = (total_insurance + total_freight_amount) / total_net_weight
     result_df['该项对应的运保费'] = result_df['每公斤摊的运保费'] * result_df['net weight']
 
-    # 总CIF = 总价FOB+总保费+总运费(policy表上传)
-    total_CIF = totalFOB*(1+insurance_coefficient*insurance_rate)+total_freight_amount
-    print(f"  总CIF: ¥{total_CIF:.4f}")
+    # 总CIF = 总价FOB+总保费+总运费 - 保持完整精度
+    total_CIF = totalFOB * (1 + insurance_coefficient * insurance_rate) + total_freight_amount
 
-
-            # 每公斤净重CIF
+    # 每公斤净重CIF - 保持完整精度
     cif_per_kg = total_CIF / total_net_weight
-    print(f"  每公斤净重CIF: ¥{cif_per_kg:.8f}")
 
-    # 每行数据净重*每公斤净重CIF = 该行数据CIF价格
+    # 每行数据净重*每公斤净重CIF = 该行数据CIF价格 - 保持完整精度
     unit_kg_cif = cif_per_kg * net_weight
 
-        # Calculate FOB price for each item
+    # Calculate FOB price for each item - 保持完整精度
     result_df['采购单价'] = result_df['Unit Price']
     result_df['采购总价'] = result_df['Unit Price'] * result_df['Qty']
     result_df['FOB单价'] = result_df['Unit Price'] * (1 + markup_percentage)
     result_df['FOB总价'] = result_df['FOB单价'] * result_df['Qty']
 
+    # 计算CIF总价和单价 - 保持完整精度
+    result_df['CIF总价(FOB总价+运保费)'] = result_df['FOB总价'] + result_df['该项对应的运保费']
+    result_df['CIF单价'] = result_df['CIF总价(FOB总价+运保费)'] / result_df['Qty']
 
-    result_df['CIF总价(FOB总价+运保费)'] =  result_df['FOB总价']  + result_df['该项对应的运保费']
+    # 计算USD单价 - 保持完整精度
+    result_df['单价USD数值'] = result_df['CIF单价'] / exchange_rate
 
-    result_df['CIF单价'] = result_df['CIF总价(FOB总价+运保费)'] / result_df['Qty'].replace(0, 1)
+    # 只在最终显示时格式化数值，不影响计算精度
+    display_columns = ['采购单价', '采购总价', 'FOB单价', 'FOB总价', '总保费', '总运费', 
+                      '每公斤摊的运保费', '该项对应的运保费', 'CIF总价(FOB总价+运保费)', 
+                      'CIF单价']
+    
+    # 这些列在显示时才四舍五入，不影响计算
+    for col in display_columns:
+        if col in result_df.columns:
+            result_df[col] = result_df[col]
 
-
-
+    # 确保Unit Price (CIF, USD)保持完整精度
+    result_df['单价USD数值'] = result_df['CIF单价'] / exchange_rate
 
     # Summary statistics
     print(f"\nSummary statistics:")
     print(f"  Total items: {len(result_df)}")
-    print(f"  Total net weight: {total_net_weight:.2f} kg")
+    print(f"  Total net weight: {total_net_weight} kg")  # 不再四舍五入显示
     
     # Calculate unit freight rate (per kg)
     unit_freight_rate = total_freight_amount / total_net_weight if total_net_weight > 0 else 0
-    print(f"  Unit freight rate: ¥{unit_freight_rate:.2f} per kg")
-    print(f"  Markup percentage: {markup_percentage*100:.1f}%")
-    print(f"  Exchange rate: ¥{exchange_rate:.4f} per USD")
+    print(f"  Unit freight rate: ¥{unit_freight_rate} per kg")  # 不再四舍五入显示
+    print(f"  Markup percentage: {markup_percentage*100}%")  # 不再四舍五入显示
+    print(f"  Exchange rate: ¥{exchange_rate} per USD")  # 不再四舍五入显示
     
-
-    
-
-
-
-    
-    # Calculate CIF price for each item
-    # result_df['CIF总价(FOB总价+运保费)'] = result_df['FOB总价'] + result_df['该项对应的运保费']
-    # result_df['CIF单价'] = result_df['CIF总价(FOB总价+运保费)'] / result_df['Qty'].replace(0, 1)  # Prevent division by zero
-    
-    # Calculate USD value
+    # Calculate USD value - 保持原始精度直到最终显示
     result_df['单价USD数值'] = result_df['CIF单价'] * exchange_rate
     
     # Fill in the unit column if it exists
@@ -1139,7 +1168,7 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
     
     for col in numeric_columns:
         if col in result_df.columns:
-            result_df[col] = result_df[col].round(2)
+            result_df[col] = result_df[col]
     
     # Generate the intermediate CIF invoice file (CIF原始发票)
     cif_invoice = result_df.copy()
@@ -1187,11 +1216,38 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
     if 'factory' in pl_invoice.columns:
         pl_invoice = pl_invoice.drop(columns=['factory'])
     
+    # 在保存CIF原始发票之前，确保所有数值列保持完整精度
+    numeric_columns = ['采购单价', '采购总价', 'FOB单价', 'FOB总价', '总保费', '总运费', 
+                      '每公斤摊的运保费', '该项对应的运保费', 'CIF总价(FOB总价+运保费)', 
+                      'CIF单价', '单价USD数值', 'Unit Price', 'Amount']
+    
+    # 移除所有数值列的格式化，保持原始精度
+    for col in numeric_columns:
+        if col in cif_invoice.columns:
+            # 确保数值类型，但不进行任何四舍五入
+            cif_invoice[col] = pd.to_numeric(cif_invoice[col], errors='coerce')
+    
     cif_file_path = os.path.join(output_dir, 'cif_original_invoice.xlsx')
     pl_file_path = os.path.join(output_dir, 'pl_original_invoice.xlsx')
     
-    # Save CIF invoice
-    safe_save_to_excel(cif_invoice, cif_file_path)
+    # 保存CIF发票时不进行任何格式化或四舍五入
+    with pd.ExcelWriter(cif_file_path, engine='openpyxl') as writer:
+        cif_invoice.to_excel(writer, index=False)
+        
+        # 获取工作表
+        workbook = writer.book
+        worksheet = writer.sheets['Sheet1']
+        
+        # 设置数值列的格式以显示完整精度
+        for col_idx, col_name in enumerate(cif_invoice.columns, 1):
+            if col_name in numeric_columns:
+                # 使用自定义数字格式来显示所有有效数字
+                col_letter = get_column_letter(col_idx)
+                for row in range(2, len(cif_invoice) + 2):  # 从第2行开始（跳过表头）
+                    cell = worksheet[f"{col_letter}{row}"]
+                    cell.number_format = '0.############'  # 使用足够多的#来显示所有有效数字
+    
+    # 保存打包清单
     safe_save_to_excel(pl_invoice, pl_file_path)
     
     # 提取一般贸易的物料
@@ -1222,18 +1278,23 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
             packing_list = packing_list.drop(columns=['project'])
         
         # Use original Chinese units for export invoice
-        export_invoice = general_trade_df[['NO.', 'Material code', 'DESCRIPTION', 'Model NO.', 'Unit Price', 'Qty', 'Unit', 'Amount', 'Total Net Weight (kg)']].copy()
+        export_invoice = general_trade_df[['NO.', 'Material code', 'DESCRIPTION', 'Model NO.', '单价USD数值', 'Qty', 'Unit', 'Amount', 'Total Net Weight (kg)']].copy()
         
-        # Rename columns to match the format in the second image
+        # 将人民币单价转换为美元单价（除以汇率）
+        export_invoice['Unit Price (CIF, USD)'] = export_invoice['单价USD数值'] 
+        
+        # 重命名列（但保持 Unit Price (CIF, USD) 不变，因为我们已经直接设置了这个列）
         export_invoice.rename(columns={
             'NO.': 'S/N',
             'Material code': 'Part Number',
             'DESCRIPTION': '名称',
             'Model NO.': 'Model Number',
-            'Unit Price': 'Unit Price (CIF, USD)',
             'Qty': 'Quantity',
             'Amount': 'Total Amount (CIF, USD)'
         }, inplace=True)
+        
+        # 重新计算美元总金额
+        export_invoice['Total Amount (CIF, USD)'] = export_invoice['Unit Price (CIF, USD)'] * export_invoice['Quantity']
         
         # Keep original Chinese units from the source
         if 'Original_Unit' in general_trade_df.columns:
@@ -1250,7 +1311,7 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
         })
         
         # Calculate Amount after grouping
-        export_grouped['Total Amount (CIF, USD)'] = (export_grouped['Unit Price (CIF, USD)'] * export_grouped['Quantity']).round(2)
+        export_grouped['Total Amount (CIF, USD)'] = (export_grouped['Unit Price (CIF, USD)'] * export_grouped['Quantity'])
         
         # Ensure all required columns exist and in correct order
         for col in exportReimport_output_columns:
@@ -1777,7 +1838,7 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
                 reimport_file_path = os.path.join(output_dir, reimport_file_name)
                 
                 # Create a copy for the invoice
-                invoice_df = df[['NO.', 'Material code', 'DESCRIPTION', 'Model NO.', 'Unit Price', 'Qty', 'Unit', 'Amount', 'Total Net Weight (kg)']].copy()
+                invoice_df = df[['NO.', 'Material code', 'DESCRIPTION', 'Model NO.', 'CIF单价', 'Qty', 'Unit', 'CIF总价(FOB总价+运保费)', 'Total Net Weight (kg)']].copy()
                 
                 # Rename columns to match the export invoice format
                 invoice_df.rename(columns={
@@ -1785,9 +1846,10 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
                     'Material code': 'Part Number',
                     'DESCRIPTION': '名称',
                     'Model NO.': 'Model Number',
-                    'Unit Price': 'Unit Price (CIF, USD)',
+                    'CIF单价': 'Unit Price (CIF, USD)',  # 使用计算得到的 CIF单价
                     'Qty': 'Quantity',
-                    'Amount': 'Total Amount (CIF, USD)'
+                    'CIF总价(FOB总价+运保费)': 'Total Amount (CIF, USD)',  # 使用 CIF总价
+                    'Unit': 'Unit'  # 保留原始单位
                 }, inplace=True)
                 
                 # Add summary row to invoice
@@ -1931,15 +1993,6 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
         print(f"Warning: Could not apply styling to reimport invoice file: {e}")
 
     return result_df
-
-
-    add_columns = [
-        '件数',  # 件数
-        '总体积',  # 总体积
-        'G.W（KG)\n总毛重',  # 总毛重
-        'N.W  (KG)\n总净重',  # 总净重
-        'CTN NO.\n(箱号)'  # 箱号
-    ]
 
 # Run the process
 if __name__ == "__main__":
