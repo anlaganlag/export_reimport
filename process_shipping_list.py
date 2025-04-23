@@ -657,20 +657,82 @@ def modify_header_file(h_file_path, company_name, company_address):
         print(f"Error modifying header file: {e}")
         return False
 
+def read_policy_file(policy_file):
+    """
+    读取新格式的政策文件并提取所需参数
+    
+    Args:
+        policy_file: 政策文件路径
+    
+    Returns:
+        dict: 包含所有政策参数的字典
+    """
+    try:
+        # 读取政策文件，使用第一列作为索引
+        policy_df = pd.read_excel(policy_file, index_col=0)
+        
+        # 提取所需参数
+        # 使用字段名称作为索引来获取对应的值
+        policy_params = {
+            'packing_list_no': policy_df.loc['采购装箱单编号', '值'],  # 装箱单编号
+            'total_net_weight': float(policy_df.loc['总净重(KG)', '值']),  # 总净重
+            'total_freight': float(policy_df.loc['总运费(RMB)', '值']),  # 总运费
+            'freight_unit_price': float(policy_df.loc['运费单价(RMB/KG)', '值']),  # 运费单价
+            'markup_percentage': float(policy_df.loc['加价率', '值']),  # 加价率
+            'insurance_coefficient': float(policy_df.loc['保险系数', '值']),  # 保险系数
+            'insurance_rate': float(policy_df.loc['保险费率', '值']),  # 保险费率
+            'exchange_rate': float(policy_df.loc['汇率(RMB/美元)', '值']),  # 汇率
+            'company_name': policy_df.loc['公司名称', '值'],  # 公司名称
+            'company_address': policy_df.loc['公司地址', '值'],  # 公司地址
+            'bank_account': policy_df.loc['Account number', '值'],  # 银行账号
+            'bank_name': policy_df.loc['Bank Name', '值'],  # 银行名称
+            'bank_address': policy_df.loc['Bank Address', '值'],  # 银行地址
+            'swift_no': policy_df.loc['SWIFT No.', '值']  # SWIFT号码
+        }
+        
+        # 打印提取的参数用于调试
+        print("\n提取的政策参数:")
+        for key, value in policy_params.items():
+            print(f"{key}: {value}")
+        
+        return policy_params
+    except Exception as e:
+        print(f"读取政策文件时出错: {e}")
+        print("政策文件的实际内容:")
+        try:
+            temp_df = pd.read_excel(policy_file)
+            print(temp_df.head())
+            print("\n列名:", temp_df.columns.tolist())
+        except Exception as e2:
+            print(f"无法读取政策文件内容: {e2}")
+        raise
+
 # Main function to process the shipping list
 def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
     # Read the input files
     packing_list_df = read_excel_file(packing_list_file, skip=2)
-    policy_df = read_excel_file(policy_file)
     
-    # Extract company information from policy file
-    pc = policy_df['采购公司'].iloc[0]  # Company name
-    pca = policy_df['采购公司地址'].iloc[0]  # Company address
-    ba = policy_df['银行账号'].iloc[0]  # Bank account
-    bn = policy_df['银行名称'].iloc[0]  # Bank name
-    badd = policy_df['银行地址'].iloc[0]  # Bank address
-    swn = policy_df['SWIFT No'].iloc[0]  # SWIFT number
-    
+    # 使用新的政策文件读取函数
+    try:
+        policy_params = read_policy_file(policy_file)
+        
+        # 从政策参数中提取值
+        markup_percentage = policy_params['markup_percentage']  # 加价率
+        insurance_coefficient = policy_params['insurance_coefficient']  # 保险系数
+        insurance_rate = policy_params['insurance_rate']  # 保险费率
+        total_freight_amount = policy_params['total_freight']  # 总运费
+        exchange_rate = policy_params['exchange_rate']  # 汇率
+        pc = policy_params['company_name']  # 公司名称
+        pca = policy_params['company_address']  # 公司地址
+        ba = policy_params['bank_account']  # 银行账号
+        bn = policy_params['bank_name']  # 银行名称
+        badd = policy_params['bank_address']  # 银行地址
+        swn = policy_params['swift_no']  # SWIFT号码
+        
+    except Exception as e:
+        print(f"处理政策文件时出错: {e}")
+        raise
+
     # Modify h.xlsx with company information
     h_file = 'h.xlsx'
     h_file_paths = [
@@ -710,22 +772,6 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
     
     print("\nPacking List output columns defined:")
     print(pl_output_columns)
-    
-    # Extract policy parameters using correct column names
-    markup_percentage = policy_df['加价率'].iloc[0]  # Markup percentage
-    insurance_coefficient = policy_df['保险系数'].iloc[0]  # Insurance coefficient
-    insurance_rate = policy_df['保险费率'].iloc[0]  # Insurance rate
-    total_freight_amount = policy_df['总运费(RMB)'].iloc[0]  # Total freight amount
-    exchange_rate = policy_df['汇率(RMB/美元)'].iloc[0] 
-    
-    
-    pc = policy_df['采购公司'].iloc[0]  # Insurance coefficient
-    pca = policy_df['采购公司地址'].iloc[0]  # Insurance rate
-    ba = policy_df['银行账号'].iloc[0]  # Total freight amount
-    bn = policy_df['银行名称'].iloc[0]  # Exchange rate
-    badd = policy_df['银行地址'].iloc[0] 
-    swn = policy_df['SWIFT No'].iloc[0]  # Exchange rate
- # Exchange rate
     
     # Clean up the column names for better handling
     packing_list_df.columns = [str(col).strip() for col in packing_list_df.columns]
@@ -1394,7 +1440,7 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
         export_invoice = general_trade_df[['NO.', 'Material code', 'DESCRIPTION', 'Model NO.', '单价USD数值', 'Qty', 'Unit', 'Amount', 'Total Net Weight (kg)']].copy()
         
         # 将人民币单价转换为美元单价（除以汇率）
-        export_invoice['Unit Price (CIF, USD)'] = export_invoice['单价USD数值'] 
+        export_invoice['Unit Price (CIF, USD)'] = export_invoice['单价USD数值'].round(4)
         
         # 重命名列（但保持 Unit Price (CIF, USD) 不变，因为我们已经直接设置了这个列）
         export_invoice.rename(columns={
@@ -1407,7 +1453,7 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
         }, inplace=True)
         
         # 重新计算美元总金额
-        export_invoice['Total Amount (CIF, USD)'] = export_invoice['Unit Price (CIF, USD)'] * export_invoice['Quantity']
+        export_invoice['Total Amount (CIF, USD)'] = (export_invoice['Unit Price (CIF, USD)'] * export_invoice['Quantity']).round(4)
         
         # Keep original Chinese units from the source
         if 'Original_Unit' in general_trade_df.columns:
