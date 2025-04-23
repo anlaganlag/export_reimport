@@ -1665,98 +1665,28 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
                         # Start row for info block
                         info_start_row = row_idx + 1
 
-                        # Add each line of info
-                        for i, info in enumerate(company_info):
-                            current_row = info_start_row + i
-                            cell = ws.cell(row=current_row, column=1)
-                            cell.value = info
-                            
-                            # Merge all columns for each row
-                            ws.merge_cells(start_row=current_row, start_column=1, end_row=current_row, end_column=last_col)
-                            
-                            # Apply styling
-                            cell.alignment = Alignment(horizontal='left', vertical='center')
-                            cell.font = Font(bold=True)
-                            
-                            # Remove all borders initially
-                            cell.border = Border()
-
-                        # Create outer border style
-                        outer_border = Border(
-                            left=Side(style='thin'),
-                            right=Side(style='thin'),
-                            top=Side(style='thin'),
-                            bottom=Side(style='thin')
-                        )
-
-                        # Apply outer borders only
-                        for col in range(1, last_col + 1):
-                            # Top border for first row
-                            top_cell = ws.cell(row=info_start_row, column=col)
-                            top_cell.border = Border(
-                                top=Side(style='thin'),
-                                left=Side(style='thin') if col == 1 else None,
-                                right=Side(style='thin') if col == last_col else None
-                            )
-                            
-                            # Bottom border for last row
-                            bottom_cell = ws.cell(row=info_start_row + len(company_info) - 1, column=col)
-                            bottom_cell.border = Border(
-                                bottom=Side(style='thin'),
-                                left=Side(style='thin') if col == 1 else None,
-                                right=Side(style='thin') if col == last_col else None
-                            )
-
-                        # Apply left and right borders
-                        for row in range(info_start_row, info_start_row + len(company_info)):
-                            # Left border
-                            left_cell = ws.cell(row=row, column=1)
-                            current_border = left_cell.border
-                            left_cell.border = Border(
-                                left=Side(style='thin'),
-                                top=current_border.top,
-                                bottom=current_border.bottom
-                            )
-                            
-                            # Right border
-                            right_cell = ws.cell(row=row, column=last_col)
-                            current_border = right_cell.border
-                            right_cell.border = Border(
-                                right=Side(style='thin'),
-                                top=current_border.top,
-                                bottom=current_border.bottom
-                            )
-
                         # Add company info rows
-                        for info_text in company_info:
-                            # Insert a new row
-                            ws.insert_rows(info_start_row)
-                            # Write the info text
-                            cell = ws.cell(row=info_start_row, column=1)
-                            cell.value = info_text
-                            # Merge cells across all columns
-                            ws.merge_cells(start_row=info_start_row, start_column=1, end_row=info_start_row, end_column=last_col)
-                            # Align text left
+                        for i, info in enumerate(company_info):
+                            # Merge cells for each info row
+                            ws.merge_cells(start_row=info_start_row + i, start_column=1, end_row=info_start_row + i, end_column=last_col)
+                            # Add the info text
+                            cell = ws.cell(row=info_start_row + i, column=1)
+                            cell.value = info
                             cell.alignment = Alignment(horizontal='left', vertical='center')
-                            # Make text bold
-                            cell.font = Font(bold=True)
-                            info_start_row += 1
 
-                        # Add signature block after company info
-                        signature_start_row = info_start_row + 1
-                        signature_info = [
-                            "Authorized Signature: _________________",
-                            "Date: _________________"
-                        ]
+                        # Add signature and date fields
+                        signature_row = info_start_row + len(company_info)
+                        ws.merge_cells(start_row=signature_row, start_column=1, end_row=signature_row, end_column=last_col)
+                        signature_cell = ws.cell(row=signature_row, column=1)
+                        signature_cell.value = ""
+                        signature_cell.alignment = Alignment(horizontal='right', vertical='center')
 
-                        for sig_text in signature_info:
-                            ws.insert_rows(signature_start_row)
-                            cell = ws.cell(row=signature_start_row, column=1)
-                            cell.value = sig_text
-                            ws.merge_cells(start_row=signature_start_row, start_column=1, end_row=signature_start_row, end_column=last_col)
-                            cell.alignment = Alignment(horizontal='right', vertical='center')
-                            cell.font = Font(bold=True)
-                            signature_start_row += 1
+                        # Add empty row after signature
+                        empty_row = signature_row + 1
+                        ws.merge_cells(start_row=empty_row, start_column=1, end_row=empty_row, end_column=last_col)
+                        ws.cell(row=empty_row, column=1).value = ""
+
+                        # Do not repeat the company info block again
 
                     # Make all text in the sheet bold
                     for row in ws.iter_rows():
