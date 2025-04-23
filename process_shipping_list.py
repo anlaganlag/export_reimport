@@ -812,18 +812,21 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
     ]
     net_weight_col = find_column_with_pattern(packing_list_df, net_weight_patterns, 'net weight')
     
+    # 修改总毛重匹配模式
     gross_weight_patterns = [
-        'Total Gross Weight (kg)',
-        'gross weight', 
+        'Total Gross Weight (kg)',  # 优先匹配总毛重
+        'Total Gross Weight',
+        '总毛重',
         'G.W  (KG)总毛重', 
+        'Total G.W',
+        'gross weight', 
         'g.w', 
-        '总毛重', 
         'G.W (KG)', 
-        'G.W  (KG)',
-        'gross wt',
-        '毛重'
+        'G.W  (KG)'
     ]
-    gross_weight_col = find_column_with_pattern(packing_list_df, gross_weight_patterns, 'gross weight')
+    
+    # 在find_column_with_pattern函数调用时使用新的匹配模式
+    gross_weight_col = find_column_with_pattern(packing_list_df, gross_weight_patterns, 'G.W (KG)')
     
     # 扩展工厂列的匹配模式
     factory_patterns = [
@@ -957,9 +960,17 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
         print(f"Using '{net_weight_col}' for net weight and Total Net Weight (kg)")
     
     if gross_weight_col:
-        result_df['gross weight'] = packing_list_df[gross_weight_col]
-        result_df['G.W (KG)'] = packing_list_df[gross_weight_col]  # Also add as G.W (KG)
-        column_mappings['gross weight'] = gross_weight_col
+        print(f"Using total gross weight column: {gross_weight_col} for G.W (KG)")
+        pl_result_df['G.W (KG)'] = packing_list_df[gross_weight_col]
+    else:
+        # 如果找不到总毛重列，尝试计算
+        unit_gw_col = find_column_with_pattern(packing_list_df, ['Gross Weight per Unit', '单件毛重'], 'Unit Gross Weight')
+        if unit_gw_col and 'QUANTITY' in pl_result_df.columns:
+            print(f"Calculating total gross weight from unit weight and quantity")
+            pl_result_df['G.W (KG)'] = pd.to_numeric(packing_list_df[unit_gw_col], errors='coerce') * pd.to_numeric(pl_result_df['QUANTITY'], errors='coerce')
+        else:
+            print("WARNING: Could not find or calculate total gross weight")
+            pl_result_df['G.W (KG)'] = None
     
     if factory_col:
         result_df['factory'] = packing_list_df[factory_col]
@@ -1754,7 +1765,7 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
             wb.save(export_file_path)
             
             # Apply cell merging for packing list
-            merge_packing_list_cells(export_file_path)
+            # merge_packing_list_cells(export_file_path)
             
             print(f"Successfully saved and styled export file with multiple sheets: {export_file_path}")
             
@@ -2157,6 +2168,14 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
         
     except Exception as e:
         print(f"Warning: Could not apply styling to reimport invoice file: {e}")
+
+    # 添加验证步骤
+    if 'G.W (KG)' in pl_result_df.columns:
+        # 检查是否有异常的重量值
+        gw_values = pd.to_numeric(pl_result_df['G.W (KG)'], errors='coerce')
+        if not gw_values.empty and gw_values.max() < gw_values.sum() * 0.5:  # 如果最大值远小于总和，可能使用了单件重量
+            print("WARNING: G.W (KG) values seem too small, might be using unit weights instead of total weights")
+            print(f"Max weight: {gw_values.max()}, Total weight: {gw_values.sum()}")
 
     return result_df
 
