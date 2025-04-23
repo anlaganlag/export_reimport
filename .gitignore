@@ -9,6 +9,14 @@ __pycache__/
 # output
 output/
 outputs/
+# Specific output files
+outputs/*.xlsx
+outputs/**/*.xlsx
+/outputs/cif_original_invoice.xlsx
+/outputs/export_invoice.xlsx
+/outputs/pl_original_invoice.xlsx
+/outputs/reimport_invoice.xlsx
+/outputs/reimport_invoice_*.xlsx
 
 # dependency
 node_modules/
