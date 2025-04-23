@@ -299,7 +299,7 @@ def apply_excel_styling(file_path):
                 cell.number_format = '#,##0'
                 cell.alignment = Alignment(horizontal='right')
             elif col_name in ['Unit Price' ]:
-                cell.number_format = '#,##0.000000'
+                cell.number_format = '#,##0.0000'
                 cell.alignment = Alignment(horizontal='right')
             elif col_name in ['NO.']:
                 cell.alignment = Alignment(horizontal='center')
@@ -615,15 +615,81 @@ def num_to_words(num):
     
     return result.strip()
 
+def modify_header_file(h_file_path, company_name, company_address):
+    """
+    Modify the header file (h.xlsx) with company information while preserving styles and merges.
+    
+    Args:
+        h_file_path: Path to the h.xlsx file
+        company_name: Company name to replace A1
+        company_address: Company address to replace A2
+    """
+    try:
+        # Load the workbook
+        wb = load_workbook(h_file_path)
+        ws = wb.active
+        
+        # Store the original merged cell ranges
+        merged_ranges = list(ws.merged_cells.ranges)
+        
+        # Unmerge all cells temporarily
+        for merged_range in merged_ranges:
+            ws.unmerge_cells(str(merged_range))
+        
+        # Update the values
+        ws['A1'] = company_name
+        ws['A2'] = company_address
+        
+        # Reapply the merges
+        for merged_range in merged_ranges:
+            ws.merge_cells(str(merged_range))
+        
+        # Ensure text alignment is preserved
+        for row in [1, 2]:
+            cell = ws.cell(row=row, column=1)
+            cell.alignment = Alignment(horizontal='center', vertical='center')
+        
+        # Save the modified file
+        wb.save(h_file_path)
+        print(f"Successfully updated header file with company information")
+        return True
+    except Exception as e:
+        print(f"Error modifying header file: {e}")
+        return False
+
 # Main function to process the shipping list
 def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
     # Read the input files
-    # 修正：将skip从3改为2，确保不会丢失第一个数据行
-    # 第一行是标题，第二行是英文表头，第三行是中文表头，数据从第四行开始(索引为3)
-    # 使用skip=2，读取从第三行开始(索引为2)，即会将第一个数据行正确读入
     packing_list_df = read_excel_file(packing_list_file, skip=2)
     policy_df = read_excel_file(policy_file)
     
+    # Extract company information from policy file
+    pc = policy_df['采购公司'].iloc[0]  # Company name
+    pca = policy_df['采购公司地址'].iloc[0]  # Company address
+    ba = policy_df['银行账号'].iloc[0]  # Bank account
+    bn = policy_df['银行名称'].iloc[0]  # Bank name
+    badd = policy_df['银行地址'].iloc[0]  # Bank address
+    swn = policy_df['SWIFT No'].iloc[0]  # SWIFT number
+    
+    # Modify h.xlsx with company information
+    h_file = 'h.xlsx'
+    h_file_paths = [
+        h_file,  # Current directory
+        os.path.join(output_dir, h_file),  # Output directory
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), h_file)  # Script directory
+    ]
+    
+    h_file_found = False
+    for h_path in h_file_paths:
+        if os.path.exists(h_path):
+            print(f"Found h.xlsx at: {h_path}")
+            if modify_header_file(h_path, pc, pca):
+                h_file_found = True
+                break
+    
+    if not h_file_found:
+        print("Warning: Could not find or modify h.xlsx")
+
     # Print original column names for debugging
     print("Original packing list columns:")
     for col in packing_list_df.columns:
@@ -1546,7 +1612,7 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
             if unit_price_col:
                 for row in range(2, ws.max_row + 1):  # Start from row 2 (skip header)
                     cell = ws.cell(row=row, column=unit_price_col)
-                    cell.number_format = '#,##0.000000'
+                    cell.number_format = '#,##0.0000'
             
             if amount_col:
                 for row in range(2, ws.max_row + 1):  # Start from row 2 (skip header)
@@ -1591,8 +1657,8 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
                             f"Delivery Term: ",
                             f"Company Name: {pc}",
                             f"Account number: {ba}",
-                            f"Bank Name:{bn}",
-                            f"Bank Address:{badd}",
+                            f"Bank Name: {bn}",
+                            f"Bank Address: {badd}",
                             f"SWIFT No.: {swn}"
                         ]
 
@@ -1661,7 +1727,36 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
                                 bottom=current_border.bottom
                             )
 
-                        break
+                        # Add company info rows
+                        for info_text in company_info:
+                            # Insert a new row
+                            ws.insert_rows(info_start_row)
+                            # Write the info text
+                            cell = ws.cell(row=info_start_row, column=1)
+                            cell.value = info_text
+                            # Merge cells across all columns
+                            ws.merge_cells(start_row=info_start_row, start_column=1, end_row=info_start_row, end_column=last_col)
+                            # Align text left
+                            cell.alignment = Alignment(horizontal='left', vertical='center')
+                            # Make text bold
+                            cell.font = Font(bold=True)
+                            info_start_row += 1
+
+                        # Add signature block after company info
+                        signature_start_row = info_start_row + 1
+                        signature_info = [
+                            "Authorized Signature: _________________",
+                            "Date: _________________"
+                        ]
+
+                        for sig_text in signature_info:
+                            ws.insert_rows(signature_start_row)
+                            cell = ws.cell(row=signature_start_row, column=1)
+                            cell.value = sig_text
+                            ws.merge_cells(start_row=signature_start_row, start_column=1, end_row=signature_start_row, end_column=last_col)
+                            cell.alignment = Alignment(horizontal='right', vertical='center')
+                            cell.font = Font(bold=True)
+                            signature_start_row += 1
 
                     # Make all text in the sheet bold
                     for row in ws.iter_rows():
@@ -2055,7 +2150,7 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
                     if cell.value == 'Unit Price (CIF, USD)':
                         for row in range(2, ws.max_row + 1):
                             cell = ws.cell(row=row, column=col_idx)
-                            cell.number_format = '#,##0.000000'
+                            cell.number_format = '#,##0.0000'
                     elif cell.value == 'Total Amount (CIF, USD)':
                         for row in range(2, ws.max_row + 1):
                             cell = ws.cell(row=row, column=col_idx)
