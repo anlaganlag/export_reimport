@@ -20,6 +20,44 @@ if not os.path.exists('outputs'):
         print(f"Error creating outputs directory: {e}")
         raise
 
+def apply_font_style(cell, is_bold=False):
+    """Helper function to apply font style to a cell."""
+    current_font = cell.font
+    return Font(
+        name=current_font.name if current_font.name else 'Arial',
+        size=current_font.size if current_font.size else 11,
+        bold=is_bold,
+        italic=current_font.italic if current_font.italic else False,
+        color=current_font.color if current_font.color else None
+    )
+
+def apply_selective_bold(ws):
+    """Apply selective bold formatting to the worksheet."""
+    # Make header row bold
+    for cell in ws[1]:
+        if cell.value:
+            cell.font = apply_font_style(cell, is_bold=True)
+    
+    # Make all data rows not bold by default
+    for row_idx in range(2, ws.max_row + 1):
+        for cell in ws[row_idx]:
+            if cell.value:
+                cell.font = apply_font_style(cell, is_bold=False)
+    
+    # Find the Total row
+    total_row = None
+    for row_idx in range(1, ws.max_row + 1):
+        if ws.cell(row=row_idx, column=2).value == "Total":
+            total_row = row_idx
+            break
+    
+    if total_row:
+        # Make Total row and subsequent rows bold
+        for row_idx in range(total_row, ws.max_row + 1):
+            for cell in ws[row_idx]:
+                if cell.value:
+                    cell.font = apply_font_style(cell, is_bold=True)
+
 # Function to read Excel files
 def read_excel_file(file_path, skip=0):
     """
@@ -612,7 +650,16 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
     insurance_coefficient = policy_df['保险系数'].iloc[0]  # Insurance coefficient
     insurance_rate = policy_df['保险费率'].iloc[0]  # Insurance rate
     total_freight_amount = policy_df['总运费(RMB)'].iloc[0]  # Total freight amount
-    exchange_rate = policy_df['汇率(RMB/美元)'].iloc[0]  # Exchange rate
+    exchange_rate = policy_df['汇率(RMB/美元)'].iloc[0] 
+    
+    
+    pc = policy_df['采购公司'].iloc[0]  # Insurance coefficient
+    pca = policy_df['采购公司地址'].iloc[0]  # Insurance rate
+    ba = policy_df['银行账号'].iloc[0]  # Total freight amount
+    bn = policy_df['银行名称'].iloc[0]  # Exchange rate
+    badd = policy_df['银行地址'].iloc[0] 
+    swn = policy_df['SWIFT No'].iloc[0]  # Exchange rate
+ # Exchange rate
     
     # Clean up the column names for better handling
     packing_list_df.columns = [str(col).strip() for col in packing_list_df.columns]
@@ -1539,14 +1586,14 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
 
                         # Add company information rows after Amount in Words
                         company_info = [
-                            "Country Of Origin: China",
-                            "Payment Term: 100% TT within 5 working days when Unicair(Holdings) Limited receive Goods.",
-                            "Delivery Term: CIF",
-                            "Company Name:  Shibo Chuangxiang Digital Technology (Shenzhen) Co., LTD",
-                            "Account number:  811030101280058376",
-                            "Bank Name: China citic bank shenzhen branch",
-                            "Bank Address:8F,Citic security tower, zhongxin 4road, futian dist. futian shenzhen  china",
-                            "SWIFT No.: CIBKCNBJ518"
+                            f"Country Of Origin: ",
+                            f"Payment Term: ",
+                            f"Delivery Term: ",
+                            f"Company Name: {pc}",
+                            f"Account number: {ba}",
+                            f"Bank Name:{bn}",
+                            f"Bank Address:{badd}",
+                            f"SWIFT No.: {swn}"
                         ]
 
                         # Start row for info block
@@ -1628,6 +1675,9 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
                                     italic=current_font.italic,
                                     color=current_font.color
                                 )
+
+                    # Apply selective bold formatting
+                    apply_selective_bold(ws)
             
             # Save the styled workbook
             wb.save(export_file_path)
@@ -1995,6 +2045,9 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
             
             # Freeze the header row
             ws.freeze_panes = 'A2'
+            
+            # Apply selective bold formatting
+            apply_selective_bold(ws)
             
             # Apply number formatting to specific columns if this is a Commercial Invoice sheet
             if sheet_name != 'PL':
