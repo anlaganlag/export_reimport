@@ -796,21 +796,91 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
     unit_col = find_column_with_pattern(packing_list_df, ['Unit', '单位', '单位中文'], 'Unit')
     
     # Enhanced patterns for net weight and gross weight
-    net_weight_patterns = [
-        'Total Net Weight (kg)', 
-        'N.W  (KG)总净重', 
-        'n.w', 
-        '总净重', 
-        'N.W(KG)', 
-        'N.W  (KG)', 
+    # 优先级顺序很重要 - 总净重相关的模式必须放在最前面
+    total_net_weight_patterns = [
+        'Total Net Weight (kg)',  # 最优先匹配
+        'Total Net Weight',
+        'N.W  (KG)总净重',
+        '总净重(KG)',
+        '总净重',
+        'Total N.W'
+    ]
+    
+    # 单件净重的排除模式
+    unit_net_weight_patterns = [
+        'Net Weight per Unit',
+        'Unit Net Weight',
+        'per unit',
+        'per piece',
+        'unit net',
+        '单件净重',
+        '每件净重',
+        '单个净重'
+    ]
+    
+    # 其他净重相关的模式（仅在找不到总净重时使用）
+    general_net_weight_patterns = [
+        'N.W(KG)',
+        'N.W  (KG)',
         'net weight',
         'n/w',
         '净重',
         'Net Weight',
-        'net wt',
-        'Total Net Weight'
+        'net wt'
     ]
-    net_weight_col = find_column_with_pattern(packing_list_df, net_weight_patterns, 'net weight')
+    
+    def find_total_net_weight_column(df, total_patterns, unit_patterns, general_patterns):
+        """专门用于查找总净重列的函数"""
+        # 1. 首先尝试精确匹配总净重模式
+        for pattern in total_patterns:
+            for col in df.columns:
+                col_str = str(col).lower()
+                pattern_lower = pattern.lower()
+                if pattern_lower in col_str:
+                    # 确保这不是单件净重列
+                    if not any(unit_p.lower() in col_str for unit_p in unit_patterns):
+                        print(f"Found exact total net weight match: {col}")
+                        return col
+        
+        # 2. 如果没找到精确匹配，检查其他净重列，但要排除单件净重
+        for pattern in general_patterns:
+            for col in df.columns:
+                col_str = str(col).lower()
+                pattern_lower = pattern.lower()
+                if pattern_lower in col_str:
+                    # 再次确认不是单件净重列
+                    if not any(unit_p.lower() in col_str for unit_p in unit_patterns):
+                        print(f"Found general net weight match: {col}")
+                        return col
+        
+        print("WARNING: Could not find appropriate total net weight column")
+        return None
+    
+    # 使用新的查找函数找到总净重列
+    net_weight_col = find_total_net_weight_column(
+        packing_list_df,
+        total_net_weight_patterns,
+        unit_net_weight_patterns,
+        general_net_weight_patterns
+    )
+    
+    if net_weight_col:
+        print(f"Selected net weight column for both invoice and packing list: {net_weight_col}")
+        # 为主发票设置净重列
+        result_df['net weight'] = packing_list_df[net_weight_col]
+        result_df['Total Net Weight (kg)'] = packing_list_df[net_weight_col]
+        # 为装箱单设置净重列
+        pl_result_df['N.W(KG)'] = packing_list_df[net_weight_col]
+        
+        column_mappings['net weight'] = net_weight_col
+        column_mappings['Total Net Weight (kg)'] = net_weight_col
+        print(f"Using '{net_weight_col}' for all net weight values")
+    else:
+        print("ERROR: Could not find total net weight column, using fallback values")
+        # 设置默认值
+        result_df['net weight'] = 0
+        result_df['Total Net Weight (kg)'] = 0
+        pl_result_df['N.W(KG)'] = 0
     
     # 修改总毛重匹配模式
     gross_weight_patterns = [
@@ -951,13 +1021,6 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
         result_df['Original_Unit'] = packing_list_df[unit_col]  # Keep original units for reference
         pl_result_df['Original_Unit'] = packing_list_df[unit_col]  # Also keep in pl_result_df
         column_mappings['Unit'] = unit_col
-    
-    if net_weight_col:
-        result_df['net weight'] = packing_list_df[net_weight_col]
-        result_df['Total Net Weight (kg)'] = packing_list_df[net_weight_col]
-        column_mappings['net weight'] = net_weight_col
-        column_mappings['Total Net Weight (kg)'] = net_weight_col
-        print(f"Using '{net_weight_col}' for net weight and Total Net Weight (kg)")
     
     if gross_weight_col:
         print(f"Using total gross weight column: {gross_weight_col} for G.W (KG)")

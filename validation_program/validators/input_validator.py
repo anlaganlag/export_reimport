@@ -149,9 +149,9 @@ class InputValidator:
             chinese_row = header_df.iloc[1]  # 跳过行后的第二行
             
             # 必须字段列表
-            required_chinese =  ["序号", "料号", "供应商", "项目名称", "工厂地点", "进口清关货描", "供应商开票名称", "物料名称", "型号", "数量", "单位", "纸箱尺寸", "单件体积", "总体积", "单件毛重", "总毛重", "单件净重", "总净重", "每箱数量", "总件数", "箱号", "栈板尺寸", "栈板编号", "出口报关方式", "采购公司", "采购单价不含税", "开票税率"]
+            required_chinese =  ["序号", "料号", "供应商", "项目名称", "工厂地点", "进口清关货描", "供应商开票名称", "物料名称", "型号", "数量", "单位", "纸箱尺寸", "单件体积", "总体积", "单件毛重", "总毛重", "总净重", "每箱数量", "总件数", "箱号", "栈板尺寸", "栈板编号", "出口报关方式", "采购公司", "采购单价不含税", "开票税率"]
 
-            required_english =  ["S/N", "Part Number", "Supplier", "Project", "Plant Location", "Commodity Description (Customs)", "Commercial Invoice Description", "EPR Part NameEPR", "Model Number", "Quantity", "Unit", "Carton Size (L×W×H in mm)", "Unit Volume (CBM)", "Total Volume (CBM)", "Gross Weight per Unit (kg)", "Total Gross Weight (kg)", "Net Weight per Unit (kg)", "Total Net Weight (kg)", "Quantity per Carton", "Total Carton Quantity", "Carton Number", "Pallet Size (L×W×H in mm)", "Pallet ID", "Export Declaration Method", "Purchasing Company", "Unit Price (Excl. Tax, CNY)()", "Tax Rate (%)"]
+            required_english =  ["S/N", "Part Number", "Supplier", "Project", "Plant Location", "Commodity Description (Customs)", "Commercial Invoice Description", "EPR Part NameEPR", "Model Number", "Quantity", "Unit", "Carton Size (L×W×H in mm)", "Unit Volume (CBM)", "Total Volume (CBM)", "Gross Weight per Unit (kg)", "Total Gross Weight (kg)", "Total Net Weight (kg)", "Quantity per Carton", "Total Carton Quantity", "Carton Number", "Pallet Size (L×W×H in mm)", "Pallet ID", "Export Declaration Method", "Purchasing Company", "Unit Price (Excl. Tax, CNY)()", "Tax Rate (%)"]
             
             # 如果发现表头结构不同，尝试其他组合
             if not any(req.lower() in str(x).lower() for x in english_row if pd.notna(x) for req in required_english):
