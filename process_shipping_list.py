@@ -128,11 +128,13 @@ def merge_packing_list_cells(workbook_path):
     """
     try:
         wb = load_workbook(workbook_path)
-        if 'Packing List' not in wb.sheetnames:
-            print("No 'Packing List' sheet found in workbook")
+        if 'Packing List' not in wb.sheetnames and 'PL' not in wb.sheetnames:
+            print("No 'Packing List' or 'PL' sheet found in workbook")
             return False
             
-        ws = wb['Packing List']
+        # 使用'PL'或'Packing List'作为工作表名称
+        sheet_name = 'PL' if 'PL' in wb.sheetnames else 'Packing List'
+        ws = wb[sheet_name]
         
         # Find column indices
         carton_no_idx = None
@@ -141,20 +143,39 @@ def merge_packing_list_cells(workbook_path):
         gw_idx = None
         desc_idx = None
         
+        # 新旧列名映射关系
+        column_name_mapping = {
+            'Carton Number': ['Carton NO.', 'Carton Number', '箱号'],
+            'Total Carton Quantity': ['CTNS', 'Total Carton Quantity', '件数'],
+            'Total Volume (CBM)': ['Carton MEASUREMENT', 'Total Volume (CBM)', '体积'],
+            'Total Gross Weight (kg)': ['G.W (KG)', 'Total Gross Weight (kg)', '毛重'],
+            '名称': ['DESCRIPTION', '名称', '描述']
+        }
+        
         for col_idx, cell in enumerate(ws[1], 1):
-            if cell.value == 'Carton NO.':
-                carton_no_idx = col_idx
-            elif cell.value == 'CTNS':
-                ctns_idx = col_idx
-            elif cell.value == 'Carton MEASUREMENT':
-                measurement_idx = col_idx
-            elif cell.value == 'G.W (KG)':
-                gw_idx = col_idx
-            elif cell.value == 'DESCRIPTION':
-                desc_idx = col_idx
+            cell_value = cell.value
+            if not cell_value:
+                continue
+                
+            cell_value_str = str(cell_value).strip()
+            
+            # 使用映射关系查找对应的列
+            for target_col, possible_names in column_name_mapping.items():
+                if cell_value_str in possible_names or any(name.lower() in cell_value_str.lower() for name in possible_names):
+                    if target_col == 'Carton Number':
+                        carton_no_idx = col_idx
+                    elif target_col == 'Total Carton Quantity':
+                        ctns_idx = col_idx
+                    elif target_col == 'Total Volume (CBM)':
+                        measurement_idx = col_idx
+                    elif target_col == 'Total Gross Weight (kg)':
+                        gw_idx = col_idx
+                    elif target_col == '名称':
+                        desc_idx = col_idx
         
         if not all([carton_no_idx, ctns_idx, measurement_idx, gw_idx]):
             print("Could not find all required columns for merging")
+            print(f"Found: Carton NO: {carton_no_idx}, CTNS: {ctns_idx}, Measurement: {measurement_idx}, G.W: {gw_idx}")
             return False
             
         # Track rows with the same carton number
@@ -165,7 +186,7 @@ def merge_packing_list_cells(workbook_path):
         # Check if the last row is a "Total" row
         total_row_idx = None
         for row_idx in range(last_row, 1, -1):
-            if desc_idx and ws.cell(row=row_idx, column=desc_idx).value == 'Total':
+            if desc_idx and ws.cell(row=row_idx, column=desc_idx).value in ['Total', 'total', '合计', '总计']:
                 total_row_idx = row_idx
                 break
         
@@ -766,8 +787,9 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
     
     # Define packing list output columns - define this at the beginning so it's available everywhere
     pl_output_columns = [
-        'Sr No.', 'P/N.', 'DESCRIPTION', 'Model NO.', 'QUANTITY', 'CTNS', 
-        'Carton MEASUREMENT', 'G.W (KG)', 'N.W(KG)', 'Carton NO.'
+        'S/N', 'Part Number', '名称', 'Model Number', 'Quantity', 
+        'Total Carton Quantity', 'Total Volume (CBM)', 'Total Gross Weight (kg)', 
+        'Total Net Weight (kg)', 'Carton Number'
     ]
     
     print("\nPacking List output columns defined:")
@@ -1057,47 +1079,47 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
     
     # Map packing list columns
     if sr_no_col:
-        pl_result_df['Sr No.'] = packing_list_df[sr_no_col]
+        pl_result_df['S/N'] = packing_list_df[sr_no_col]
     
     if material_code_col:
-        pl_result_df['P/N.'] = packing_list_df[material_code_col]
+        pl_result_df['Part Number'] = packing_list_df[material_code_col]
     
     if description_col:
-        pl_result_df['DESCRIPTION'] = packing_list_df[description_col]
+        pl_result_df['名称'] = packing_list_df[description_col]
         # 添加日志，显示使用的是相同的描述源
         if '供应商开票名称' in str(description_col):
-            print(f"Using '供应商开票名称' column '{description_col}' for packing list DESCRIPTION as well")
+            print(f"Using '供应商开票名称' column '{description_col}' for packing list 名称 as well")
     
     if model_col:
-        pl_result_df['Model NO.'] = packing_list_df[model_col]
+        pl_result_df['Model Number'] = packing_list_df[model_col]
     
     if qty_col:
-        pl_result_df['QUANTITY'] = packing_list_df[qty_col]
+        pl_result_df['Quantity'] = packing_list_df[qty_col]
     
     if ctns_col:
-        pl_result_df['CTNS'] = packing_list_df[ctns_col]
+        pl_result_df['Total Carton Quantity'] = packing_list_df[ctns_col]
     else:
-        pl_result_df['CTNS'] = 1  # Default value if not found
+        pl_result_df['Total Carton Quantity'] = 1  # Default value if not found
     
     if carton_measurement_col:
-        pl_result_df['Carton MEASUREMENT'] = packing_list_df[carton_measurement_col]
+        pl_result_df['Total Volume (CBM)'] = packing_list_df[carton_measurement_col]
     else:
-        pl_result_df['Carton MEASUREMENT'] = ""  # Default empty value if not found
+        pl_result_df['Total Volume (CBM)'] = ""  # Default empty value if not found
     
     if gross_weight_col:
-        pl_result_df['G.W (KG)'] = packing_list_df[gross_weight_col]
+        pl_result_df['Total Gross Weight (kg)'] = packing_list_df[gross_weight_col]
     else:
-        pl_result_df['G.W (KG)'] = ""  # Default empty value if not found
+        pl_result_df['Total Gross Weight (kg)'] = ""  # Default empty value if not found
     
     if net_weight_col:
-        pl_result_df['N.W(KG)'] = packing_list_df[net_weight_col]
+        pl_result_df['Total Net Weight (kg)'] = packing_list_df[net_weight_col]
     else:
-        pl_result_df['N.W(KG)'] = 0  # Default value if not found
+        pl_result_df['Total Net Weight (kg)'] = 0  # Default value if not found
     
     if carton_no_col:
-        pl_result_df['Carton NO.'] = packing_list_df[carton_no_col]
+        pl_result_df['Carton Number'] = packing_list_df[carton_no_col]
     else:
-        pl_result_df['Carton NO.'] = ""  # Default empty value if not found
+        pl_result_df['Carton Number'] = ""  # Default empty value if not found
     
     # Add Trade Type column
     if trade_type_col:
@@ -1206,11 +1228,11 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
         result_df['Unit Price'] = pd.to_numeric(result_df['Unit Price'], errors='coerce')
         
         # Also convert packing list numeric columns
-        pl_result_df['QUANTITY'] = pd.to_numeric(pl_result_df['QUANTITY'], errors='coerce')
-        if 'G.W (KG)' in pl_result_df.columns:
-            pl_result_df['G.W (KG)'] = pd.to_numeric(pl_result_df['G.W (KG)'], errors='coerce')
-        if 'N.W(KG)' in pl_result_df.columns:
-            pl_result_df['N.W(KG)'] = pd.to_numeric(pl_result_df['N.W(KG)'], errors='coerce')
+        pl_result_df['Quantity'] = pd.to_numeric(pl_result_df['Quantity'], errors='coerce')
+        if 'Total Gross Weight (kg)' in pl_result_df.columns:
+            pl_result_df['Total Gross Weight (kg)'] = pd.to_numeric(pl_result_df['Total Gross Weight (kg)'], errors='coerce')
+        if 'Total Net Weight (kg)' in pl_result_df.columns:
+            pl_result_df['Total Net Weight (kg)'] = pd.to_numeric(pl_result_df['Total Net Weight (kg)'], errors='coerce')
         
         # Fill NaN values with 0 for numerical calculations
         result_df['net weight'] = result_df['net weight'].fillna(0)
@@ -1218,11 +1240,11 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
         result_df['Qty'] = result_df['Qty'].fillna(0)
         result_df['Unit Price'] = result_df['Unit Price'].fillna(0)
         
-        pl_result_df['QUANTITY'] = pl_result_df['QUANTITY'].fillna(0)
-        if 'G.W (KG)' in pl_result_df.columns:
-            pl_result_df['G.W (KG)'] = pl_result_df['G.W (KG)'].fillna(0)
-        if 'N.W(KG)' in pl_result_df.columns:
-            pl_result_df['N.W(KG)'] = pl_result_df['N.W(KG)'].fillna(0)
+        pl_result_df['Quantity'] = pl_result_df['Quantity'].fillna(0)
+        if 'Total Gross Weight (kg)' in pl_result_df.columns:
+            pl_result_df['Total Gross Weight (kg)'] = pl_result_df['Total Gross Weight (kg)'].fillna(0)
+        if 'Total Net Weight (kg)' in pl_result_df.columns:
+            pl_result_df['Total Net Weight (kg)'] = pl_result_df['Total Net Weight (kg)'].fillna(0)
         
         # Calculate total net weight
         net_weight = result_df['net weight']
@@ -1391,7 +1413,7 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
     result_df = result_df.dropna(subset=['Material code'], how='all')
     result_df = result_df.dropna(how='all')
     
-    pl_result_df = pl_result_df.dropna(subset=['P/N.'], how='all')
+    pl_result_df = pl_result_df.dropna(subset=['Part Number'], how='all')
     pl_result_df = pl_result_df.dropna(how='all')
     
     # Apply formatting to numeric columns
@@ -1594,8 +1616,8 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
                 packing_df = packing_df[output_columns]
                 
                 # 添加汇总行（只对数字列计算总和）
-                summary_cols = ['QUANTITY', 'G.W (KG)', 'N.W(KG)', 'CTNS', 'Carton MEASUREMENT']
-                summary_packing = {'DESCRIPTION': 'Total'}
+                summary_cols = ['Quantity', 'Total Gross Weight (kg)', 'Total Net Weight (kg)', 'Total Carton Quantity', 'Total Volume (CBM)']
+                summary_packing = {'名称': 'Total'}
                 for col in summary_cols:
                     if col in packing_df.columns:
                         # Calculate sum without modifying the original column in place
@@ -1603,7 +1625,7 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
                         summary_packing[col] = pd.to_numeric(packing_df[col], errors='coerce').fillna(0).sum()
 
                 summary_row = pd.DataFrame([{col: (summary_packing.get(col, None) if col in summary_cols else None) for col in packing_df.columns}])
-                summary_row['DESCRIPTION'] = 'Total'
+                summary_row['名称'] = 'Total'
                 packing_df = pd.concat([packing_df, summary_row], ignore_index=True)
                 
                 # Debug print columns
@@ -2023,8 +2045,8 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
         complete_pl_df = complete_pl_df[save_columns]
         
         # Add summary row to packing list
-        summary_cols = ['QUANTITY', 'G.W (KG)', 'N.W(KG)', 'CTNS', 'Carton MEASUREMENT']
-        summary_packing = {'DESCRIPTION': 'Total'}
+        summary_cols = ['Quantity', 'Total Gross Weight (kg)', 'Total Net Weight (kg)', 'Total Carton Quantity', 'Total Volume (CBM)']
+        summary_packing = {'名称': 'Total'}
         for col in summary_cols:
             if col in complete_pl_df.columns:
                 # Calculate sum without modifying the original column in place
