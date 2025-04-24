@@ -1850,7 +1850,7 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
             wb.save(export_file_path)
             
             # Apply cell merging for packing list
-            # merge_packing_list_cells(export_file_path)
+            merge_packing_list_cells(export_file_path)
             
             print(f"Successfully saved and styled export file with multiple sheets: {export_file_path}")
             
