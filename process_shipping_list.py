@@ -1594,8 +1594,8 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
                 packing_df = packing_df[output_columns]
                 
                 # 添加汇总行（只对数字列计算总和）
-                summary_cols = ['QUANTITY', 'G.W (KG)', 'N.W(KG)']
-                summary_packing = {}
+                summary_cols = ['QUANTITY', 'G.W (KG)', 'N.W(KG)', 'CTNS', 'Carton MEASUREMENT']
+                summary_packing = {'DESCRIPTION': 'Total'}
                 for col in summary_cols:
                     if col in packing_df.columns:
                         # Calculate sum without modifying the original column in place
@@ -2023,7 +2023,7 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
         complete_pl_df = complete_pl_df[save_columns]
         
         # Add summary row to packing list
-        summary_cols = ['QUANTITY', 'G.W (KG)', 'N.W(KG)']
+        summary_cols = ['QUANTITY', 'G.W (KG)', 'N.W(KG)', 'CTNS', 'Carton MEASUREMENT']
         summary_packing = {'DESCRIPTION': 'Total'}
         for col in summary_cols:
             if col in complete_pl_df.columns:
