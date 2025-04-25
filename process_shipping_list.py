@@ -842,6 +842,37 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
     if not h_file_found:
         print("Warning: Could not find or modify h.xlsx")
 
+    # Update pl_h.xlsx with company information
+    pl_h_file = 'pl_h.xlsx'
+    try:
+        # Load the workbook
+        wb = load_workbook(pl_h_file)
+        ws = wb.active
+        
+        # Store the original merged cell ranges
+        merged_ranges = list(ws.merged_cells.ranges)
+        
+        # Unmerge cells temporarily
+        for merged_range in merged_ranges:
+            ws.unmerge_cells(str(merged_range))
+        
+        # Update the values in B4 and B5 (shipper information)
+        ws['B4'] = pc  # Company name
+        ws['B5'] = pca  # Company address
+
+        ws['A1'] = pc  # Company name
+        ws['A2'] = pca  # Company address
+        
+        # Reapply the merges
+        for merged_range in merged_ranges:
+            ws.merge_cells(str(merged_range))
+        
+        # Save the modified file
+        wb.save(pl_h_file)
+        print(f"Successfully updated pl_h.xlsx with company information")
+    except Exception as e:
+        print(f"Error modifying pl_h.xlsx: {e}")
+
     # Print original column names for debugging
     print("Original packing list columns:")
     for col in packing_list_df.columns:
