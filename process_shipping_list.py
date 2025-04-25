@@ -199,32 +199,21 @@ def merge_packing_list_cells(workbook_path):
             # Skip empty or None values
             if not carton_no:
                 continue
-                
-            # If this is the first carton number encountered
-            if current_carton is None:
-                current_carton = carton_no
-                start_row = row_idx
-                continue
-                
-            # If we encounter a new carton number
-            if current_carton != carton_no:
-                # Check if the previous group has more than one row
-                if start_row < row_idx - 1:  # More than one row in the group
+            
+            if carton_no != current_carton:
+                # 处理上一组（如果有）
+                if start_row and start_row < row_idx - 1:  # 如果上一组有多行
                     end_row = row_idx - 1
-                    # Merge CTNS cells
                     ws.merge_cells(start_row=start_row, start_column=ctns_idx, 
                                   end_row=end_row, end_column=ctns_idx)
-                    # Merge Carton MEASUREMENT cells
                     ws.merge_cells(start_row=start_row, start_column=measurement_idx,
                                   end_row=end_row, end_column=measurement_idx)
-                    # Merge G.W (KG) cells
                     ws.merge_cells(start_row=start_row, start_column=gw_idx,
                                   end_row=end_row, end_column=gw_idx)
-                    # Merge Carton NO. cells
                     ws.merge_cells(start_row=start_row, start_column=carton_no_idx,
                                   end_row=end_row, end_column=carton_no_idx)
                 
-                # Start tracking the new carton
+                # 开始新组
                 current_carton = carton_no
                 start_row = row_idx
         
@@ -251,6 +240,86 @@ def merge_packing_list_cells(workbook_path):
         return True
     except Exception as e:
         print(f"Error merging cells in Packing List: {e}")
+        return False
+
+def apply_pl_footer_styling(workbook_path):
+    """为PL页脚应用样式，包括合并单元格和加粗文本。"""
+    try:
+        wb = load_workbook(workbook_path)
+        sheet_name = 'PL' if 'PL' in wb.sheetnames else 'Packing List'
+        
+        if sheet_name not in wb.sheetnames:
+            print(f"No '{sheet_name}' sheet found in workbook")
+            return False
+            
+        ws = wb[sheet_name]
+        
+        # 查找总计行和页脚行
+        total_row = None
+        footer_start_row = None
+        
+        for row_idx in range(1, ws.max_row + 1):
+            if ws.cell(row=row_idx, column=3).value == 'Total':  # 假设第三列是'名称'/'DESCRIPTION'列
+                total_row = row_idx
+            elif ws.cell(row=row_idx, column=1).value and 'PACKED IN' in str(ws.cell(row=row_idx, column=1).value):
+                footer_start_row = row_idx
+                break
+        
+        if not footer_start_row:
+            # 尝试完整文本匹配
+            for row_idx in range(1, ws.max_row + 1):
+                cell_value = ws.cell(row=row_idx, column=1).value
+                if cell_value and 'PACKED IN' in str(cell_value):
+                    footer_start_row = row_idx
+                    break
+        
+        if not footer_start_row:
+            print("Footer rows not found in the sheet")
+            return False
+        
+        # 获取列数
+        max_column = ws.max_column
+        
+        # 绿色背景填充
+        light_green_fill = PatternFill(start_color="E2EFDA", end_color="E2EFDA", fill_type="solid")
+        
+        # 对每个页脚行应用样式
+        for row_idx in range(footer_start_row, footer_start_row + 5):  # 假设有5行页脚
+            if row_idx <= ws.max_row:
+                # 合并整行所有单元格
+                try:
+                    ws.merge_cells(start_row=row_idx, start_column=1, end_row=row_idx, end_column=max_column)
+                except Exception as e:
+                    print(f"Warning: Could not merge cells for row {row_idx}: {e}")
+                
+                # 为每个单元格应用样式
+                cell = ws.cell(row=row_idx, column=1)
+                
+                # 设置加粗字体
+                cell.font = Font(bold=True)
+                
+                # 设置绿色背景
+                cell.fill = light_green_fill
+                
+                # 设置左对齐
+                cell.alignment = Alignment(horizontal='left', vertical='center')
+                
+                # 设置边框
+                thin_border = Side(style='thin')
+                cell.border = Border(
+                    left=thin_border,
+                    right=thin_border,
+                    top=thin_border,
+                    bottom=thin_border
+                )
+        
+        # 保存样式更改
+        wb.save(workbook_path)
+        print(f"Successfully applied footer styling to {sheet_name} sheet")
+        return True
+        
+    except Exception as e:
+        print(f"Error applying footer styling: {e}")
         return False
 
 # Function to apply styling to Excel workbook
@@ -1632,7 +1701,43 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
                 print("\nPacking List columns before saving:")
                 print(packing_df.columns.tolist())
                 
+                # 添加PL页脚信息
+                # 获取包裹数量
+                total_packages = int(summary_packing.get('Total Carton Quantity', 0))
+                # 获取总净重
+                total_net_weight = summary_packing.get('Total Net Weight (kg)', 0)
+                # 获取总毛重
+                total_gross_weight = summary_packing.get('Total Gross Weight (kg)', 0)
+                # 获取总体积
+                total_volume = summary_packing.get('Total Volume (CBM)', 0)
+                
+                # 创建页脚行
+                footer_rows = [
+                    {'S/N': f'PACKED IN {total_packages} PACKAGES ONLY.'},
+                    {'S/N': f'NET WEIGHT: {total_net_weight:.2f} KGS'},
+                    {'S/N': f'GROSS WEIGHT: {total_gross_weight:.2f} KGS'},
+                    {'S/N': f'TOTAL MEASUREMENT:{total_volume:.2f} CBM'},
+                    {'S/N': 'COUNTRY OF ORIGIN: CHINA'}
+                ]
+                
+                # 为每行添加空白列，确保列数匹配
+                for row in footer_rows:
+                    for col in packing_df.columns:
+                        if col not in row:
+                            row[col] = None
+                
+                # 将页脚行添加到数据框
+                footer_df = pd.DataFrame(footer_rows)
+                packing_df = pd.concat([packing_df, footer_df], ignore_index=True)
+                
+                # 保存到Excel
                 packing_df.to_excel(writer, sheet_name='PL', index=False)
+                
+                # Apply cell merging for packing list
+                merge_packing_list_cells(export_file_path)
+                
+                # Apply footer styling for packing list
+                apply_pl_footer_styling(export_file_path)
             else:
                 # 如果没有pl_df数据，创建一个空的packing list with correct columns (不包含 project)
                 empty_pl_df = pd.DataFrame(columns=[col for col in pl_output_columns if col != 'project'])
@@ -1852,6 +1957,9 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
             # Apply cell merging for packing list
             merge_packing_list_cells(export_file_path)
             
+            # Apply footer styling for packing list
+            apply_pl_footer_styling(export_file_path)
+            
             print(f"Successfully saved and styled export file with multiple sheets: {export_file_path}")
             
             # After saving the export_invoice.xlsx, now merge it with h.xlsx and f.xlsx
@@ -2056,6 +2164,35 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
         summary_row = pd.DataFrame([summary_packing])
         complete_pl_df = pd.concat([complete_pl_df, summary_row], ignore_index=True)
         
+        # 添加PL页脚信息
+        # 获取包裹数量
+        total_packages = int(summary_packing.get('Total Carton Quantity', 0))
+        # 获取总净重
+        total_net_weight = summary_packing.get('Total Net Weight (kg)', 0)
+        # 获取总毛重
+        total_gross_weight = summary_packing.get('Total Gross Weight (kg)', 0)
+        # 获取总体积
+        total_volume = summary_packing.get('Total Volume (CBM)', 0)
+        
+        # 创建页脚行
+        footer_rows = [
+            {'S/N': f'PACKED IN {total_packages} PACKAGES ONLY.'},
+            {'S/N': f'NET WEIGHT: {total_net_weight:.2f} KGS'},
+            {'S/N': f'GROSS WEIGHT: {total_gross_weight:.2f} KGS'},
+            {'S/N': f'TOTAL MEASUREMENT:{total_volume:.2f} CBM'},
+            {'S/N': 'COUNTRY OF ORIGIN: CHINA'}
+        ]
+        
+        # 为每行添加空白列，确保列数匹配
+        for row in footer_rows:
+            for col in complete_pl_df.columns:
+                if col not in row:
+                    row[col] = None
+        
+        # 将页脚行添加到数据框
+        footer_df = pd.DataFrame(footer_rows)
+        complete_pl_df = pd.concat([complete_pl_df, footer_df], ignore_index=True)
+        
         # Save packing list sheet
         complete_pl_df.to_excel(writer, sheet_name='PL', index=False)
         
@@ -2248,8 +2385,13 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
         # Save the styled workbook
         wb.save(reimport_invoice_path)
         merge_packing_list_cells(reimport_invoice_path)
-
-        print(f"Successfully saved and styled reimport invoice file: {reimport_invoice_path}")
+        
+        # Apply footer styling for packing list
+        apply_pl_footer_styling(reimport_invoice_path)
+        
+        # Save the final results
+        print(f"Successfully generated all files in {output_dir}:")
+        print(f"1. {os.path.basename(export_file_path)}")
         
     except Exception as e:
         print(f"Warning: Could not apply styling to reimport invoice file: {e}")
