@@ -212,3 +212,105 @@ python validation_program/main.py --packing-list path/to/packing_list.xlsx --pol
   - `process_validator.py` - 处理逻辑验证器
   - `utils.py` - 工具函数
 - `validation_program/config/` - 配置文件目录
+
+# Export Invoice Generator 出口发票生成器
+
+This application helps you generate export invoices from packing lists and policy files.
+此应用程序帮助您从装箱单和政策文件生成出口发票。
+
+## Prerequisites 前置要求
+
+- Python 3.8 or later / Python 3.8 或更高版本
+- For Windows: PowerShell / Windows系统需要：PowerShell
+- For Mac/Linux: Terminal with Bash / Mac/Linux系统需要：支持Bash的终端
+
+## Quick Start 快速开始
+
+### Windows:
+
+1. Right-click `run_app.ps1` and select "Run with PowerShell"
+   右键点击 `run_app.ps1` 并选择"使用 PowerShell 运行"
+
+   OR 或者
+
+2. Open PowerShell and run:
+   打开 PowerShell 并运行：
+   ```powershell
+   .\run_app.ps1
+   ```
+
+### Mac/Linux:
+
+1. Open Terminal and navigate to the project directory
+   打开终端并导航到项目目录
+
+2. Make the script executable:
+   使脚本可执行：
+   ```bash
+   chmod +x run_app.sh
+   ```
+
+3. Run the script:
+   运行脚本：
+   ```bash
+   ./run_app.sh
+   ```
+
+## Manual Setup 手动设置
+
+If you prefer to set up manually 如果您想手动设置：
+
+1. Create virtual environment 创建虚拟环境:
+   ```bash
+   python -m venv venv
+   ```
+
+2. Activate virtual environment 激活虚拟环境:
+   - Windows:
+     ```powershell
+     .\venv\Scripts\Activate.ps1
+     ```
+   - Mac/Linux:
+     ```bash
+     source venv/bin/activate
+     ```
+
+3. Install requirements 安装依赖:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+4. Run the app 运行应用:
+   ```bash
+   streamlit run app.py
+   ```
+
+## Usage 使用方法
+
+1. Upload your packing list file (Excel format)
+   上传装箱单文件（Excel格式）
+
+2. Upload your policy file (Excel format)
+   上传政策文件（Excel格式）
+
+3. Click "Generate Invoice" to process
+   点击"生成发票"进行处理
+
+4. Download the generated files
+   下载生成的文件
+
+## Troubleshooting 故障排除
+
+If you encounter any issues 如果遇到问题：
+
+1. Make sure Python 3.8+ is installed
+   确保安装了 Python 3.8 或更高版本
+
+2. Check that your Excel files are in the correct format
+   检查 Excel 文件格式是否正确
+
+3. Try deleting the `venv` folder and running the script again
+   尝试删除 `venv` 文件夹并重新运行脚本
+
+4. Check the error messages in the terminal
+   检查终端中的错误信息
