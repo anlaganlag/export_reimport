@@ -2,127 +2,47 @@
 - װ�䵥: testfiles/original_packing_list.xlsx
 - �����ļ�: testfiles/policy.xlsx
 - ���Ŀ¼: outputs
+����: ����Excel�ļ�ʧ�ܣ���ʹ��ԭʼ�ļ�: name 'clean_excel_file' is not defined
 Reading Excel file: testfiles/original_packing_list.xlsx
-Skipping 2 rows as specified
-Reading Excel file: testfiles/policy.xlsx
-First 4 rows preview:
-  Row 1: [1, 253.79, 452, 1.78100003940266, 0.05]...
-Error reading with multi-level headers: header index 2 exceeds maximum index 1 of data.
-Falling back to standard Excel reading...
-Original packing list columns:
-  ���
-  �Ϻ�
-  ��Ӧ��
-  ��Ŀ����
-  �����ص�
-  ������ػ���
-  ��Ӧ�̿�Ʊ����
-  ��������
-  �ͺ�
-  ����
-  ��λ
-  ֽ��ߴ�
-  �������
-  �����
-  ����ë��
-  ��ë��
-  ��������
-  �ܾ���
-  ÿ������
-  �ܼ���
-  ���
-  ջ��ߴ�
-  ջ����
-  ���ڱ��ط�ʽ
-  �ɹ���˾
-  �ɹ����۲���˰
-  ��Ʊ˰��
-  Unnamed: 27
+Method 1 failed due to Excel filter issue: Value must be either numerical or a string containing a wildcard
+Method 2 failed due to Excel filter issue: Value must be either numerical or a string containing a wildcard
+Method 3 failed due to Excel filter issue: Value must be either numerical or a string containing a wildcard
+Method 4 failed due to Excel filter issue: Value must be either numerical or a string containing a wildcard
+Method 5 failed due to Excel filter issue: Value must be either numerical or a string containing a wildcard
+�����ļ�ʱ����: Value must be either numerical or a string containing a wildcard
+����λ��:     raise ValueError("Value must be either numerical or a string containing a wildcard")
+ʹ�� --debug �������Բ鿴��ϸ������Ϣ
 
-Verifying first 10 rows of data:
-  Row 1: 1.0
-  Row 2: 2.0
-  Row 3: 3.0
-  Row 4: 4.0
-  Row 5: 5.0
-  Row 6: 6.0
-  Row 7: 7.0
-  Row 8: 8.0
-  Row 9: 9.0
-  Row 10: 10.0
+�������� 0 �ж�ȡ�����ļ�:
+ǰ5��: [['�ɹ�װ�䵥���', 'CXCJ202501220l'], ['�ܾ���(KG)', 3156.66], ['���˷�(RMB)', 6339.01], ['�˷ѵ���(RMB/KG)', 2.00813834876103], ['�Ӽ���', 0.05]]
+����: ['�ֶ�', 'ֵ']
 
-Packing List output columns defined:
-['Sr No.', 'P/N.', 'DESCRIPTION', 'Model NO.', 'QUANTITY', 'CTNS', 'Carton MEASUREMENT', 'G.W (KG)', 'N.W(KG)', 'Carton NO.']
+�������� 1 �ж�ȡ�����ļ�:
+ǰ5��: [['�ܾ���(KG)', 3156.66], ['���˷�(RMB)', 6339.01], ['�˷ѵ���(RMB/KG)', 2.00813834876103], ['�Ӽ���', 0.05], ['����ϵ��', 1.1]]
+����: ['�ɹ�װ�䵥���', 'CXCJ202501220l']
 
-Finding column mappings...
-Found column '���' for NO.
-Found column '�Ϻ�' for Material code
-WARNING: Could not find a column matching patterns ['Commercial Invoice Description', '���Ӣ�Ļ���(�����ṩ)', '����', 'description'] for DESCRIPTION
-Found column '�ͺ�' for Model NO.
-Found column '�ɹ����۲���˰' for Unit Price
-Found column '����' for Qty
-Found column '��λ' for Unit
-Found column '��������' for net weight
-Found column '����ë��' for gross weight
-Found column '�����ص�' for factory
-Found column '��Ŀ����' for project
-WARNING: Could not find a column matching patterns ['end use', '��;'] for end use
-Found column '�ܼ���' for CTNS
-Found column '�����' for Carton MEASUREMENT
-Found column '���' for Carton NO.
-Found column '���ڱ��ط�ʽ' for Trade Type
-WARNING: Description column not found, using Material code as Description
-Successfully mapped project column from '��Ŀ����'
+�������� 2 �ж�ȡ�����ļ�:
+ǰ5��: [['���˷�(RMB)', 6339.01], ['�˷ѵ���(RMB/KG)', 2.00813834876103], ['�Ӽ���', 0.05], ['����ϵ��', 1.1], ['���շ���', 0.0005]]
+����: ['�ܾ���(KG)', 3156.66]
 
-Column mappings summary:
+�������� 3 �ж�ȡ�����ļ�:
+ǰ5��: [['�˷ѵ���(RMB/KG)', 2.00813834876103], ['�Ӽ���', 0.05], ['����ϵ��', 1.1], ['���շ���', 0.0005], ['����(RMB/��Ԫ)', 0.139122692302341]]
+����: ['���˷�(RMB)', 6339.01]
 
-Found column mappings:
-  NO. <- ���
-  Material code <- �Ϻ�
-  Model NO. <- �ͺ�
-  Unit Price <- �ɹ����۲���˰
-  Qty <- ����
-  Unit <- ��λ
-  net weight <- ��������
-  factory <- �����ص�
-  project <- ��Ŀ����
+װ�䵥�ļ��ṹ:
+�� 1 ��: ['�ɹ�װ�䵥', nan, nan, '�ɹ�װ�䵥��ţ�', 'CXCI2025012201']...
+�� 2 ��: ['S/N', 'Part Number', 'Supplier', 'Project', 'Plant Location']...
+�� 3 ��: ['���', '�Ϻ�', '��Ӧ��', '��Ŀ����', '�����ص�']...
+�� 4 ��: [1, 'C100.C05-032-04-00', '���', 'SMT�����豸���', 'Silvassa']...
+�� 5 ��: [2, 'E100.020310008', '��÷����', 'SMT�����豸���', 'Silvassa']...
 
-Missing column mappings:
-  DESCRIPTION - No matching column found in the source file
-  end use - No matching column found in the source file
+���Բ�ͬ�ı�ͷ���ö�ȡװ�䵥:
 
-Found 11 out of 11 expected column mappings (100.0%)
+��׼��ȡ:
+��׼��ȡ����: Value must be either numerical or a string containing a wildcard
 
-Found net weight column: ��������
-Sample net weight values:
-  Row 1: 2.6
-  Row 2: 1.1
-  Row 3: 0.5
-  Row 4: 0.2
-  Row 5: 1.55
+�༶��ͷ��ȡ [��2-3��]:
+�༶��ͷ��ȡ����: Value must be either numerical or a string containing a wildcard
 
-ó������ͳ�ƣ�
-  һ��ó����������: 61
-  ��ó����������: 0
-Converted net weight to numeric. Example values: 0    2.60
-1    1.10
-2    0.50
-3    0.20
-4    1.55
-Name: net weight, dtype: float64
-Total net weight calculated: 3428.56 kg
-�����ļ�ʱ����: 'gbk' codec can't encode character '\xa5' in position 9: illegal multibyte sequence
-Traceback (most recent call last):
-  File "D:\project\export_reimport\process_shipping_list.py", line 1658, in <module>
-    result = process_shipping_list(packing_list_file, policy_file, args.output_dir)
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "D:\project\export_reimport\process_shipping_list.py", line 943, in process_shipping_list
-    print(f"  �ܼ�FOB: \xa5{totalFOB:.4f}")
-UnicodeEncodeError: 'gbk' codec can't encode character '\xa5' in position 9: illegal multibyte sequence
-
-During handling of the above exception, another exception occurred:
-
-Traceback (most recent call last):
-  File "D:\project\export_reimport\process_shipping_list.py", line 1671, in <module>
-    print(f"����λ��: {traceback.format_exc().splitlines()[-2]}")
-UnicodeEncodeError: 'gbk' codec can't encode character '\xa5' in position 27: illegal multibyte sequence
+�������У��༶��ͷ��ȡ:
+�������ж༶��ͷ��ȡ����: Value must be either numerical or a string containing a wildcard

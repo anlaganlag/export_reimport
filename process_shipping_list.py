@@ -912,6 +912,8 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
     material_code_col = find_column_with_pattern(packing_list_df, ['p/n', 'Part Number', 'material code', '系统料号', '料号'], 'Material code')
     # 修改: 将 '供应商开票名称' 放在匹配模式的最前面，优先使用该字段作为DESCRIPTION
     description_col = find_column_with_pattern(packing_list_df, ['供应商开票名称', 'Commercial Invoice Description', '清关英文货描(关务提供)', '描述', 'description'], 'DESCRIPTION')
+    # 新增：查找进口清关货描（Commodity Description (Customs)）列
+    customs_desc_col = find_column_with_pattern(packing_list_df, ['进口清关货描', 'Commodity Description (Customs)'], 'Commodity Description (Customs)')
     model_col = find_column_with_pattern(packing_list_df, ['Model Number', '型号', '物料型号', '货物型号', 'model'], 'Model NO.')
     unit_price_col = find_column_with_pattern(packing_list_df, ['Unit Price (Excl. Tax, CNY)()', 'unit price', '采购单价不含税', '不含税单价', '单价'], 'Unit Price')
     qty_col = find_column_with_pattern(packing_list_df, ['Quantity', 'quantity', '数量', 'qty'], 'Qty')
@@ -2266,50 +2268,42 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
                 
                 # Create a copy for the invoice
                 invoice_df = df[['NO.', 'Material code', 'DESCRIPTION', 'Model NO.', 'CIF单价', 'Qty', 'Unit', 'CIF总价(FOB总价+运保费)', 'Total Net Weight (kg)']].copy()
-                
-                # Rename columns to match the export invoice format
-                invoice_df.rename(columns={
+                # 替换"名称"为"Commodity Description (Customs)"，并赋值
+                if customs_desc_col is not None and customs_desc_col in packing_list_df.columns:
+                    invoice_df['Commodity Description (Customs)'] = packing_list_df.loc[df.index, customs_desc_col].values
+                else:
+                    invoice_df['Commodity Description (Customs)'] = invoice_df['DESCRIPTION']
+                # 删除"DESCRIPTION"列
+                invoice_df.drop(columns=['DESCRIPTION'], inplace=True)
+                # 调整列顺序，确保Commodity Description (Customs)在Part Number后面
+                reimport_columns = [
+                    'S/N', 'Part Number', 'Commodity Description (Customs)', 'Model Number', 'Unit Price (CIF, USD)', 'Quantity', 'Unit', 'Total Amount (CIF, USD)', 'Total Net Weight (kg)'
+                ]
+                invoice_df = invoice_df.rename(columns={
                     'NO.': 'S/N',
                     'Material code': 'Part Number',
-                    'DESCRIPTION': '名称',
                     'Model NO.': 'Model Number',
-                    'CIF单价': 'Unit Price (CIF, USD)',  # 使用计算得到的 CIF单价
+                    'CIF单价': 'Unit Price (CIF, USD)',
                     'Qty': 'Quantity',
-                    'CIF总价(FOB总价+运保费)': 'Total Amount (CIF, USD)',  # 使用 CIF总价
-                    'Unit': 'Unit'  # 保留原始单位
-                }, inplace=True)
-                
+                    'CIF总价(FOB总价+运保费)': 'Total Amount (CIF, USD)',
+                    'Unit': 'Unit'
+                })
+                invoice_df = invoice_df[reimport_columns]
                 # Add summary row to invoice
-                summary_invoice = {'名称': 'Total', 'Part Number': ''}
+                summary_invoice = {col: '' for col in reimport_columns}
+                summary_invoice['Commodity Description (Customs)'] = 'Total'
+                summary_invoice['Part Number'] = ''
                 for col in ['Quantity', 'Total Amount (CIF, USD)', 'Total Net Weight (kg)']:
                     if col in invoice_df.columns:
                         summary_invoice[col] = pd.to_numeric(invoice_df[col], errors='coerce').fillna(0).sum()
-                
-                # Create new row with just the sums for Qty and Amount
-                summary_row = pd.DataFrame([summary_invoice])
-                
-                # Proper column order for the summary row
-                for col in exportReimport_output_columns:
-                    if col not in summary_row.columns:
-                        summary_row[col] = None
-                
-                summary_row = summary_row[exportReimport_output_columns]
-                
-                # Get the total amount for English words conversion
-                total_amount = summary_invoice.get('Total Amount (CIF, USD)', 0)
-                total_amount_words = num_to_words(total_amount)
-                
-                # Create an empty row and a row for the amount in words
-                empty_row_data = {col: "" for col in exportReimport_output_columns}
-                empty_row = pd.DataFrame([empty_row_data])
-                
-                words_row_data = {col: "" for col in exportReimport_output_columns}
-                words_row_data['S/N'] = "Amount in Words:"
-                words_row_data['Part Number'] = f"SAY USD {total_amount_words} ONLY."
-                words_row = pd.DataFrame([words_row_data])
-                
+                summary_row = pd.DataFrame([summary_invoice])[reimport_columns]
+                # Create empty row and words row
+                empty_row = pd.DataFrame([{col: '' for col in reimport_columns}])
+                words_row = pd.DataFrame([{col: '' for col in reimport_columns}])
+                words_row['S/N'] = 'Amount in Words:'
+                words_row['Part Number'] = f"SAY USD {total_amount_words} ONLY."
                 # Add all rows to the DataFrame
-                invoice_df = pd.concat([invoice_df, summary_row, empty_row, words_row], ignore_index=True)
+                invoice_df = pd.concat([invoice_df, summary_row, empty_row, words_row], ignore_index=True)[reimport_columns]
                 
                 # Save as individual reimport file
                 print(f"Saving individual reimport file for {project}_{factory}: {reimport_file_path}")

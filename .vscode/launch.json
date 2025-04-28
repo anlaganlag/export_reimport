@@ -6,7 +6,7 @@
             "type": "python",
             "request": "launch",
             "program": "${workspaceFolder}/process_shipping_list.py",
-            "args": [
+            "args": [总保费
                 "--packing-list",
                 "testfiles/original_packing_list.xlsx",
                 "--policy",

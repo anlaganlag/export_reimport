@@ -23,6 +23,7 @@ Converting the process_shipping_list.py script into a Streamlit web application 
    - Success criteria: Interface is user-friendly and bilingual
 6. ✅ Create setup scripts and documentation
    - Success criteria: One-click setup works on both Windows and Mac/Linux
+7. ✅ Reimport发票字段名替换为Commodity Description (Customs)并取值自进口清关货描
 
 ## Project Status Board
 - [x] Task 1: Basic Streamlit app setup complete
@@ -35,6 +36,7 @@ Converting the process_shipping_list.py script into a Streamlit web application 
   - Created run_app.sh for Mac/Linux
   - Added comprehensive README.md with instructions
   - Added troubleshooting guide
+- [ ] Task 7: Reimport发票字段名替换为Commodity Description (Customs)并取值自进口清关货描
 
 ## Current Status / Progress Tracking
 Project is complete with all major tasks finished. The application now includes:
@@ -45,8 +47,11 @@ Project is complete with all major tasks finished. The application now includes:
 - One-click setup scripts for Windows and Mac/Linux
 - Comprehensive documentation
 
+正在执行：
+- [ ] reimport印度进口发票"名称"字段名替换为"Commodity Description (Customs)"，且取值逻辑改为"进口清关货描"列。
+
 ## Executor's Feedback or Assistance Requests
-No current assistance needed. All tasks have been completed successfully.
+无
 
 ## Lessons
 1. Always provide bilingual interface for better accessibility
@@ -55,4 +60,29 @@ No current assistance needed. All tasks have been completed successfully.
 4. Document troubleshooting steps for common issues
 5. Use virtual environments for dependency management
 6. Include clear success criteria for each task
-7. Maintain processing logic while improving user interface 
+7. Maintain processing logic while improving user interface
+
+## 2024-任务：reimport印度进口发票"名称"字段替换为"Commodity Description (Customs)"及其取值逻辑调整
+
+### 背景与动机
+用户要求将process_shipping_list.py生成的reimport印度进口发票（复进口发票）中的字段"名称"改为"Commodity Description (Customs)"，且取值逻辑改为输入表格中的"进口清关货描"列。
+
+### 关键分析与挑战
+1. 字段名替换：reimport发票相关所有环节将"名称"替换为"Commodity Description (Customs)"
+2. 字段取值逻辑调整：优先查找"进口清关货描"列赋值给新字段，找不到需容错
+3. 兼容性与健壮性：只影响reimport发票，其他不变
+4. 输出列顺序与样式：同步调整相关代码，确保新字段名贯穿始终
+
+### 高级任务拆解
+1. 定位所有涉及"名称"字段的代码段（reimport发票相关）
+2. 字段名替换为"Commodity Description (Customs)"
+3. 字段取值逻辑调整为"进口清关货描"
+4. 汇总行、空行、样式等同步适配
+5. 测试与验证：生成的reimport发票表头和内容正确，其他功能不受影响
+
+### Success Criteria
+- [ ] reimport印度进口发票的表头字段为"Commodity Description (Customs)"
+- [ ] 该字段内容为输入表"进口清关货描"列的值
+- [ ] 若无该列，程序有容错提示
+- [ ] 其他发票/packing list/出口发票不受影响
+- [ ] 汇总行、空行、样式等同步适配 
