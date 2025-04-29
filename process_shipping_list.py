@@ -2289,6 +2289,10 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
                     'Unit': 'Unit'
                 })
                 invoice_df = invoice_df[reimport_columns]
+                # 保证Unit Price (CIF, USD)为美元价
+                if 'Unit Price (CIF, USD)' in invoice_df.columns:
+                    invoice_df['Unit Price (CIF, USD)'] = round(invoice_df['Unit Price (CIF, USD)'] * exchange_rate,4)
+                    invoice_df['Total Amount (CIF, USD)'] = invoice_df['Unit Price (CIF, USD)'] * invoice_df['Quantity']
                 # Add summary row to invoice
                 summary_invoice = {col: '' for col in reimport_columns}
                 summary_invoice['Commodity Description (Customs)'] = 'Total'
