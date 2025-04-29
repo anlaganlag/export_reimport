@@ -152,12 +152,25 @@ def merge_three_excel_files(first_file, middle_file, last_file, output_file, fir
         if cell.value and col_letter in middle_ci_sheet.column_dimensions:
             ci_column_widths[cell.value] = middle_ci_sheet.column_dimensions[col_letter].width
     
+    # Determine if we're merging a reimport invoice or export invoice based on filename
+    is_reimport = 'reimport' in middle_file.lower()
+    
     # Prepare data for merging Commercial Invoice
-    files_to_merge = [
-        (first_file, lambda wb: wb.active),
-        (middle_file, lambda wb: wb[wb.sheetnames[1]]),
-        (last_file, lambda wb: wb.active)
-    ]
+    # For reimport invoices, use the second sheet of the first file (h.xlsx)
+    if is_reimport:
+        print("Detected reimport invoice - using second sheet of h.xlsx as first parameter")
+        files_to_merge = [
+            (first_file, lambda wb: wb[wb.sheetnames[1]] if len(wb.sheetnames) > 1 else wb.active),
+            (middle_file, lambda wb: wb[wb.sheetnames[1]]),
+            (last_file, lambda wb: wb.active)
+        ]
+    else:
+        # For export invoices, use the original approach
+        files_to_merge = [
+            (first_file, lambda wb: wb.active),
+            (middle_file, lambda wb: wb[wb.sheetnames[1]]),
+            (last_file, lambda wb: wb.active)
+        ]
     
     # Merge sheets vertically
     row_offset = 0

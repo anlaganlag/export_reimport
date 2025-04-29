@@ -2429,9 +2429,179 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
             company_address=pca
         )
         
+        # After styling, now merge the reimport invoice with the second sheet of h.xlsx
+        print("Merging files for reimport invoice: Second sheet of h.xlsx, reimport_invoice.xlsx, f.xlsx")
+        
+        # Temporarily save reimport_invoice.xlsx to a backup file
+        temp_reimport_file = os.path.join(output_dir, 'temp_reimport_invoice.xlsx')
+        try:
+            import shutil
+            shutil.copy(reimport_invoice_path, temp_reimport_file)
+            
+            # Prepare file paths for merging
+            h_file = 'h.xlsx'
+            f_file = 'f.xlsx'
+            
+            # For Packing List sheet, we need different files
+            pl_h_file = 'pl_h.xlsx'  # First file for Packing List sheet
+            pl_f_file = 'pl_f.xlsx'  # Last file for Packing List sheet
+            
+            # Reuse the find_file function
+            h_file_path = find_file(h_file)
+            f_file_path = find_file(f_file)
+            pl_h_file_path = find_file(pl_h_file)
+            pl_f_file_path = find_file(pl_f_file)
+            
+            if h_file_path and f_file_path:
+                print(f"Found files for merging Reimport Invoice:")
+                print(f"  {h_file}: {h_file_path}")
+                print(f"  {f_file}: {f_file_path}")
+                
+                # Get the path to merge.py (checking multiple locations)
+                merge_py_path = find_file('merge.py')
+                
+                if merge_py_path:
+                    print(f"Found merge.py at: {merge_py_path}")
+                    
+                    # Call merge.py with the second sheet of h.xlsx as first parameter
+                    import subprocess
+                    import sys
+                    
+                    # Prepare command with or without Packing List files
+                    if pl_h_file_path and pl_f_file_path:
+                        merge_cmd = [
+                            sys.executable, 
+                            merge_py_path, 
+                            h_file_path,  # h.xlsx will be used, second sheet specified in merge.py 
+                            temp_reimport_file, 
+                            f_file_path, 
+                            reimport_invoice_path,
+                            pl_h_file_path,
+                            pl_f_file_path
+                        ]
+                    else:
+                        merge_cmd = [
+                            sys.executable, 
+                            merge_py_path, 
+                            h_file_path, 
+                            temp_reimport_file, 
+                            f_file_path, 
+                            reimport_invoice_path
+                        ]
+                        
+                    print(f"Running merge command for reimport: {' '.join(merge_cmd)}")
+                    
+                    try:
+                        # Use subprocess.run with stdout and stderr captured to diagnose issues
+                        result = subprocess.run(
+                            merge_cmd, 
+                            check=True,
+                            capture_output=True,
+                            text=True
+                        )
+                        
+                        # Print stdout and stderr for debugging
+                        if result.stdout:
+                            print("Reimport Merge output:")
+                            print(result.stdout)
+                        
+                        if result.stderr:
+                            print("Reimport Merge errors:")
+                            print(result.stderr)
+                        
+                        # If successful, verify the file exists and update A1 and A2 with company info
+                        if os.path.exists(reimport_invoice_path):
+                            print(f"Successfully merged files into: {reimport_invoice_path}")
+                            
+                            # Now update cells A1 and A2 with company name and address from policy file
+                            wb = load_workbook(reimport_invoice_path)
+                            
+                            # Iterate through all sheets
+                            for sheet_name in wb.sheetnames:
+                                ws = wb[sheet_name]
+                                
+                                # Store the original merged cell ranges
+                                merged_ranges = list(ws.merged_cells.ranges)
+                                
+                                # Unmerge cells temporarily for A1 and A2 if they're merged
+                                for merged_range in merged_ranges:
+                                    if (merged_range.min_row <= 1 <= merged_range.max_row and 
+                                        merged_range.min_col <= 1 <= merged_range.max_col) or \
+                                       (merged_range.min_row <= 2 <= merged_range.max_row and 
+                                        merged_range.min_col <= 1 <= merged_range.max_col):
+                                        ws.unmerge_cells(str(merged_range))
+                                
+                                # Update A1 and A2 with company info
+                                ws['A1'] = pc  # Company name from policy file
+                                ws['A2'] = pca  # Company address from policy file
+                                
+                                # Re-apply the merges for cells other than A1 and A2
+                                for merged_range in merged_ranges:
+                                    # Skip if it's an A1 or A2 merge that we've already handled
+                                    if not ((merged_range.min_row == 1 and merged_range.min_col == 1) or 
+                                            (merged_range.min_row == 2 and merged_range.min_col == 1)):
+                                        ws.merge_cells(str(merged_range))
+                                    else:
+                                        # Determine if this is a horizontal merge for A1 or A2
+                                        if merged_range.min_row == merged_range.max_row:  # Horizontal merge
+                                            if merged_range.min_row == 1:  # A1 row
+                                                # Re-merge A1 across columns
+                                                ws.merge_cells(start_row=1, start_column=1, 
+                                                              end_row=1, end_column=merged_range.max_col)
+                                            elif merged_range.min_row == 2:  # A2 row
+                                                # Re-merge A2 across columns
+                                                ws.merge_cells(start_row=2, start_column=1, 
+                                                              end_row=2, end_column=merged_range.max_col)
+                            
+                            # Ensure text alignment is proper
+                            for sheet_name in wb.sheetnames:
+                                ws = wb[sheet_name]
+                                for row in [1, 2]:
+                                    cell = ws.cell(row=row, column=1)
+                                    cell.alignment = Alignment(horizontal='center', vertical='center')
+                                    cell.font = Font(bold=True)
+                            
+                            # Save the modified workbook
+                            wb.save(reimport_invoice_path)
+                            print(f"Updated A1 and A2 cells with company information from policy file")
+                        else:
+                            print(f"Error: Merged reimport file not created at {reimport_invoice_path}")
+                    except subprocess.CalledProcessError as e:
+                        print(f"Error running merge script for reimport: {e}")
+                        if hasattr(e, 'stderr') and e.stderr:
+                            print(f"Error details: {e.stderr}")
+                    except Exception as e:
+                        print(f"Error during reimport file merging: {e}")
+                        # Restore original reimport_invoice.xlsx if merging failed
+                        if os.path.exists(temp_reimport_file):
+                            shutil.copy(temp_reimport_file, reimport_invoice_path)
+                            print("Restored original reimport_invoice.xlsx")
+                else:
+                    print(f"Error: merge.py not found for reimport merging")
+            else:
+                missing_files = []
+                if not h_file_path:
+                    missing_files.append(h_file)
+                if not f_file_path:
+                    missing_files.append(f_file)
+                if missing_files:
+                    print(f"Warning: Could not merge reimport files. Missing files: {', '.join(missing_files)}")
+                else:
+                    print("Unexpected error: All files found but reimport merging could not proceed")
+        except Exception as e:
+            print(f"Error during reimport file merging: {e}")
+        finally:
+            # Clean up temporary file
+            if os.path.exists(temp_reimport_file):
+                try:
+                    os.remove(temp_reimport_file)
+                except:
+                    pass
+        
         # Save the final results
         print(f"Successfully generated all files in {output_dir}:")
         print(f"1. {os.path.basename(export_file_path)}")
+        print(f"2. {os.path.basename(reimport_invoice_path)}")
         
     except Exception as e:
         print(f"Warning: Could not apply styling to reimport invoice file: {e}")
