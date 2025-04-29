@@ -2418,6 +2418,17 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
         # Apply footer styling for packing list
         apply_pl_footer_styling(reimport_invoice_path)
         
+        # Apply footer styling for import invoices
+        apply_import_invoice_footer_styling(
+            reimport_invoice_path,
+            company_name=pc,
+            bank_name=bn,
+            account_no=ba,
+            swift_code=swn,
+            branch_address=badd,
+            company_address=pca
+        )
+        
         # Save the final results
         print(f"Successfully generated all files in {output_dir}:")
         print(f"1. {os.path.basename(export_file_path)}")
@@ -2434,6 +2445,281 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
             print(f"Max weight: {gw_values.max()}, Total weight: {gw_values.sum()}")
 
     return result_df
+
+def apply_import_invoice_footer_styling(workbook_path, company_name, bank_name, account_no, swift_code, branch_address, company_address):
+    """
+    Apply footer styling for import invoices with the required format:
+    - Amount in Words
+    - COUNTRY OF ORIGIN: CHINA
+    - Payment Term
+    - Delivery Term
+    - Company and bank details
+    """
+    try:
+        wb = load_workbook(workbook_path)
+        
+        # Iterate through all sheets except 'PL'
+        for sheet_name in wb.sheetnames:
+            if sheet_name == 'PL':
+                continue
+                
+            ws = wb[sheet_name]
+            
+            # Find the "Amount in Words:" row
+            words_row_idx = None
+            for row_idx in range(1, ws.max_row + 1):
+                cell_value = ws.cell(row=row_idx, column=1).value
+                if cell_value:
+                    if "Amount in Words:" in str(cell_value) or "SAY USD" in str(cell_value):
+                        words_row_idx = row_idx
+                        break
+            
+            if not words_row_idx:
+                for row_idx in range(1, ws.max_row + 1):
+                    for col_idx in range(1, ws.max_column + 1):
+                        cell_value = ws.cell(row=row_idx, column=col_idx).value
+                        if cell_value and ("Amount in Words:" in str(cell_value) or "SAY USD" in str(cell_value)):
+                            words_row_idx = row_idx
+                            break
+                    if words_row_idx:
+                        break
+            
+            if not words_row_idx:
+                print(f"Amount in Words row not found in sheet {sheet_name}")
+                continue
+            
+            # Set column count based on the sheet
+            max_column = ws.max_column
+            
+            # Get the amount value from the total row
+            amount_value = None
+            for row_idx in range(words_row_idx - 3, words_row_idx):
+                cell_value = ws.cell(row=row_idx, column=max_column).value
+                if isinstance(cell_value, (int, float)) or (isinstance(cell_value, str) and cell_value.replace('.', '', 1).isdigit()):
+                    amount_value = float(cell_value)
+                    break
+            
+            # Convert amount to words if found
+            amount_words = ""
+            if amount_value:
+                amount_words = num_to_words(amount_value)
+                print(f"Converted amount {amount_value} to words: {amount_words}")
+            
+            # Store the original "Amount in Words:" row content
+            original_amount_text = ""
+            for col_idx in range(1, max_column + 1):
+                cell_value = ws.cell(row=words_row_idx, column=col_idx).value
+                if cell_value and col_idx > 1:  # Skip the first column which has "Amount in Words:"
+                    original_amount_text = str(cell_value)
+                    break
+            
+            # Prepare the footer content with the correct format for Amount in Words
+            # Skip the "Amount in Words:" since we'll preserve the original
+            footer_rows = [
+                {"col1": "COUNTRY OF ORIGIN: ", "col2": ""},
+                {"col1": "Payment Term: ", "col2": ""},
+                {"col1": "Delivery Term:", "col2": ""},
+                {"col1": "COMPANY NAME:" + company_name, "col2": ""},
+                {"col1": "BANK NAME:" + bank_name, "col2": ""},
+                {"col1": "ACCOUNT NO.: " + account_no, "col2": ""},
+                {"col1": "SWIFT CODE: " + swift_code, "col2": ""},
+                {"col1": "BRANCH ADDRESS:" + branch_address, "col2": ""},
+                {"col1": "COMPANY ADDRESS:" + company_address, "col2": ""}
+            ]
+            
+            # Apply light green fill
+            light_green_fill = PatternFill(start_color="E2EFDA", end_color="E2EFDA", fill_type="solid")
+            
+            # Create a thin border
+            thin_border = Border(
+                left=Side(style='thin'),
+                right=Side(style='thin'),
+                top=Side(style='thin'),
+                bottom=Side(style='thin')
+            )
+            
+            # Delete existing rows that might contain the footer information
+            # Skip the "Amount in Words:" row
+            rows_to_delete = []
+            for row_idx in range(words_row_idx + 1, min(words_row_idx + 10, ws.max_row + 1)):
+                cell_value = ws.cell(row=row_idx, column=1).value
+                if cell_value and any(keyword in str(cell_value) for keyword in [
+                    "COUNTRY OF ORIGIN", "Payment Term", "Delivery Term",
+                    "COMPANY NAME", "BANK NAME", "ACCOUNT NO", "SWIFT CODE", "BRANCH ADDRESS"
+                ]):
+                    rows_to_delete.append(row_idx)
+            
+            # Delete rows in reverse order to maintain correct indices
+            for row_idx in sorted(rows_to_delete, reverse=True):
+                ws.delete_rows(row_idx)
+            
+            # Apply styling to the original "Amount in Words:" row
+            for col_idx in range(1, max_column + 1):
+                cell = ws.cell(row=words_row_idx, column=col_idx)
+                cell.fill = light_green_fill
+                cell.font = Font(bold=True)
+                
+                # Apply borders
+                is_leftmost_col = (col_idx == 1)
+                is_rightmost_col = (col_idx == max_column)
+                
+                top_border = Side(style='thin')
+                bottom_border = Side(style='thin')
+                left_border = Side(style='thin' if is_leftmost_col else 'none')
+                right_border = Side(style='thin' if is_rightmost_col else 'none')
+                
+                cell.border = Border(
+                    left=left_border,
+                    right=right_border,
+                    top=top_border,
+                    bottom=bottom_border
+                )
+                
+                if col_idx == 1:
+                    cell.alignment = Alignment(horizontal='left', vertical='center')
+                else:
+                    cell.alignment = Alignment(horizontal='left', vertical='center')
+            
+            # Set "Amount in Words:" in the first cell and merge cells if needed
+            first_cell = ws.cell(row=words_row_idx, column=1)
+            if "Amount in Words:" not in str(first_cell.value):
+                first_cell.value = "Amount in Words:"
+            
+            # Clear all cells except the first one and the content cell
+            content_cell = None
+            content_value = ""
+            
+            # Find cell with content (should be in column 2 or later)
+            for col_idx in range(2, max_column + 1):
+                cell_value = ws.cell(row=words_row_idx, column=col_idx).value
+                if cell_value:
+                    content_cell = ws.cell(row=words_row_idx, column=col_idx)
+                    content_value = str(cell_value)
+                    break
+            
+            # If no content found, use the previously stored or generated amount text
+            if not content_value:
+                content_value = original_amount_text or f"SAY USD {amount_words} ONLY."
+                
+            # First merge any existing ranges for this row to avoid merge conflicts
+            for merged_range in list(ws.merged_cells.ranges):
+                if merged_range.min_row <= words_row_idx <= merged_range.max_row:
+                    ws.unmerge_cells(
+                        start_row=merged_range.min_row,
+                        start_column=merged_range.min_col,
+                        end_row=merged_range.max_row,
+                        end_column=merged_range.max_col
+                    )
+            
+            # Set content in second cell
+            second_cell = ws.cell(row=words_row_idx, column=2)
+            second_cell.value = content_value
+            
+            # Clear other cells in the row
+            for col_idx in range(3, max_column + 1):
+                ws.cell(row=words_row_idx, column=col_idx).value = None
+            
+            # Split into two parts: "Amount in Words:" and the content
+            # Do not merge the first column
+            if max_column > 2:
+                # Merge from column 2 to the end
+                ws.merge_cells(start_row=words_row_idx, start_column=2, end_row=words_row_idx, end_column=max_column)
+            
+            # Start adding rows from the row after the words_row_idx
+            current_row = words_row_idx + 1
+
+            # Create a style for the cells
+            def apply_cell_style(cell, row_position, col_position, is_first_row, is_last_row, is_leftmost_col, is_rightmost_col):
+                """
+                Apply styling to a cell in the footer based on its position
+                
+                Args:
+                    cell: The cell to style
+                    row_position: Position in the footer (0-based index)
+                    col_position: Column position (1-based index)
+                    is_first_row: Whether this cell is in the first row of the footer
+                    is_last_row: Whether this cell is in the last row of the footer
+                    is_leftmost_col: Whether this cell is in the leftmost column
+                    is_rightmost_col: Whether this cell is in the rightmost column
+                """
+                cell.fill = light_green_fill
+                # Make all text bold
+                cell.font = Font(bold=True)
+                
+                # Only apply borders at the outer edges of the footer
+                top_border = Side(style='thin' if is_first_row else 'none')
+                bottom_border = Side(style='thin' if is_last_row else 'none')
+                left_border = Side(style='thin' if is_leftmost_col else 'none')
+                right_border = Side(style='thin' if is_rightmost_col else 'none')
+                
+                cell.border = Border(
+                    left=left_border,
+                    right=right_border,
+                    top=top_border,
+                    bottom=bottom_border
+                )
+                
+                cell.alignment = Alignment(horizontal='left', vertical='center')
+
+            # First, create all the footer rows
+            footer_start_row = current_row
+            for i, row_data in enumerate(footer_rows):
+                is_first_row = (i == 0)
+                is_last_row = (i == len(footer_rows) - 1)
+                
+                # For all rows, merge all columns
+                cell = ws.cell(row=current_row, column=1)
+                cell.value = row_data["col1"]
+                
+                # Merge all columns
+                ws.merge_cells(start_row=current_row, start_column=1, end_row=current_row, end_column=max_column)
+                
+                current_row += 1
+                # Insert a new row except for the last item
+                if row_data != footer_rows[-1]:
+                    ws.insert_rows(current_row)
+
+            # Now apply styles to all cells after creating all the rows
+            footer_end_row = footer_start_row + len(footer_rows) - 1
+            for row_idx in range(footer_start_row, footer_end_row + 1):
+                is_first_row = (row_idx == footer_start_row)
+                is_last_row = (row_idx == footer_end_row)
+                
+                # For each row, find the leftmost and rightmost visible (non-merged) cells
+                visible_cells_in_row = []
+                
+                for col_idx in range(1, max_column + 1):
+                    is_hidden_by_merge = False
+                    
+                    for merged_range in ws.merged_cells.ranges:
+                        if (row_idx >= merged_range.min_row and row_idx <= merged_range.max_row and 
+                            col_idx >= merged_range.min_col and col_idx <= merged_range.max_col):
+                            # Cell is part of a merge range
+                            if row_idx != merged_range.min_row or col_idx != merged_range.min_col:
+                                # Not the top-left cell of the merge, so it's hidden
+                                is_hidden_by_merge = True
+                                break
+                    
+                    if not is_hidden_by_merge:
+                        visible_cells_in_row.append(col_idx)
+                
+                # Now style each visible cell in this row
+                for col_idx in visible_cells_in_row:
+                    is_leftmost_col = (col_idx == 1)
+                    is_rightmost_col = (col_idx == max_column)
+                    
+                    cell = ws.cell(row=row_idx, column=col_idx)
+                    apply_cell_style(cell, row_idx - footer_start_row, col_idx, is_first_row, is_last_row, is_leftmost_col, is_rightmost_col)
+        
+        # Save the modified workbook
+        wb.save(workbook_path)
+        print(f"Successfully applied import invoice footer styling")
+        return True
+    except Exception as e:
+        print(f"Error applying import invoice footer styling: {e}")
+        import traceback
+        print(traceback.format_exc())
+        return False
 
 # Run the process
 if __name__ == "__main__":
