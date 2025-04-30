@@ -471,46 +471,95 @@ def merge_india_invoice_rows(df):
     # Make a copy to avoid modifying the original DataFrame
     result_df = df.copy()
 
+    # 打印原始数据的列名和前几行，用于调试
+    print(f"原始数据列名: {result_df.columns.tolist()}")
+    print(f"原始数据前3行: {result_df.head(3)}")
+
     # Convert numeric columns to appropriate types
     numeric_cols = ['Quantity', 'Unit Price (CIF, USD)', 'Total Amount (CIF, USD)', 'Total Net Weight (kg)']
     for col in numeric_cols:
         if col in result_df.columns:
             result_df[col] = pd.to_numeric(result_df[col], errors='coerce').fillna(0)
 
+    # 确保Part Number列存在且有值
+    if 'Part Number' not in result_df.columns or result_df['Part Number'].isna().all():
+        print("警告: Part Number列不存在或全为空值，无法进行合并")
+        # 如果没有Part Number列，则添加序号作为Part Number
+        if 'Part Number' not in result_df.columns:
+            result_df['Part Number'] = [f"ITEM-{i+1}" for i in range(len(result_df))]
+        # 如果Part Number列全为空，则填充序号
+        elif result_df['Part Number'].isna().all():
+            result_df['Part Number'] = [f"ITEM-{i+1}" for i in range(len(result_df))]
+
+    # 确保Unit Price (CIF, USD)列存在且有值
+    if 'Unit Price (CIF, USD)' not in result_df.columns:
+        print("警告: Unit Price (CIF, USD)列不存在，无法进行合并")
+        return result_df
+
+    # 打印合并前的唯一Part Number和Unit Price组合
+    unique_combinations = result_df.groupby(['Part Number', 'Unit Price (CIF, USD)']).size().reset_index(name='count')
+    print(f"合并前的唯一Part Number和Unit Price组合数量: {len(unique_combinations)}")
+    print(f"前5个组合: {unique_combinations.head(5)}")
+
     # Group by Part Number and Unit Price only, then aggregate
-    grouped = result_df.groupby(['Part Number', 'Unit Price (CIF, USD)']).agg({
-        'Quantity': 'sum',
-        'Total Amount (CIF, USD)': 'sum',
-        'Total Net Weight (kg)': 'sum',
-        # Keep the first occurrence of other fields
-        'DESCRIPTION': 'first',
-        'Unit': 'first'
-    }).reset_index()
+    try:
+        # 确保所有必要的列都存在于结果DataFrame中
+        required_columns = ['S/N', 'Part Number', 'DESCRIPTION', 'Unit Price (CIF, USD)',
+                           'Quantity', 'Unit', 'Total Amount (CIF, USD)', 'Total Net Weight (kg)']
 
-    # Recalculate Total Amount based on Unit Price and Quantity to ensure accuracy
-    grouped['Total Amount (CIF, USD)'] = grouped['Unit Price (CIF, USD)'] * grouped['Quantity']
+        for col in required_columns:
+            if col not in result_df.columns:
+                if col == 'S/N':
+                    result_df[col] = range(1, len(result_df) + 1)
+                elif col == 'Unit':
+                    result_df[col] = 'PCS'  # 默认单位
+                elif col == 'DESCRIPTION':
+                    result_df[col] = result_df['Part Number'] if 'Part Number' in result_df.columns else 'Unknown'
+                else:
+                    result_df[col] = 0
 
-    # Create new S/N column starting from 1
-    grouped['S/N'] = range(1, len(grouped) + 1)
+        # 使用groupby合并相同Part Number和Unit Price的行
+        agg_dict = {
+            'Quantity': 'sum',
+            'Total Amount (CIF, USD)': 'sum',
+            'Total Net Weight (kg)': 'sum',
+            # Keep the first occurrence of other fields
+            'DESCRIPTION': 'first',
+            'Unit': 'first'
+        }
 
-    # Print summary of the merging operation
-    print(f"India import invoice merging summary:")
-    print(f"  Original rows: {len(result_df)}")
-    print(f"  Merged rows: {len(grouped)}")
-    print(f"  Reduction: {len(result_df) - len(grouped)} rows ({(len(result_df) - len(grouped)) / len(result_df) * 100:.1f}%)")
+        # 只对agg_dict中存在于DataFrame的列进行聚合
+        valid_agg_dict = {k: v for k, v in agg_dict.items() if k in result_df.columns}
 
-    # Reorder columns to match original format
-    columns_order = [
-        'S/N', 'Part Number', 'DESCRIPTION', 'Unit Price (CIF, USD)',
-        'Quantity', 'Unit', 'Total Amount (CIF, USD)', 'Total Net Weight (kg)'
-    ]
+        grouped = result_df.groupby(['Part Number', 'Unit Price (CIF, USD)']).agg(valid_agg_dict).reset_index()
 
-    # Ensure all required columns exist
-    for col in columns_order:
-        if col not in grouped.columns:
-            grouped[col] = ''
+        # 重新计算Total Amount以确保准确性
+        if 'Quantity' in grouped.columns and 'Unit Price (CIF, USD)' in grouped.columns:
+            grouped['Total Amount (CIF, USD)'] = grouped['Unit Price (CIF, USD)'] * grouped['Quantity']
 
-    return grouped[columns_order]
+        # 创建新的S/N列，从1开始编号
+        grouped['S/N'] = range(1, len(grouped) + 1)
+
+        # 确保列的顺序与原始DataFrame相同
+        if set(required_columns).issubset(set(grouped.columns)):
+            grouped = grouped[required_columns]
+
+        # 打印合并操作的摘要
+        print(f"India import invoice merging summary:")
+        print(f"  Original rows: {len(result_df)}")
+        print(f"  Merged rows: {len(grouped)}")
+        print(f"  Reduction: {len(result_df) - len(grouped)} rows ({(len(result_df) - len(grouped)) / len(result_df) * 100:.1f}%)")
+
+        # 打印合并后的数据前几行，用于调试
+        print(f"合并后数据前3行: {grouped.head(3)}")
+
+        return grouped
+    except Exception as e:
+        print(f"合并行时出错: {e}")
+        print(f"错误详情: {str(e)}")
+        # 如果合并失败，返回原始数据框并重新编号
+        result_df['S/N'] = range(1, len(result_df) + 1)
+        return result_df
 
 def safe_save_to_excel(df, file_path, include_summary=True):
     """Safely save DataFrame to Excel with proper error handling."""
@@ -636,10 +685,9 @@ def split_by_project_and_factory(df):
     print("Unique factory values:", df['factory'].unique())
 
     # Define the project categories with more robust string handling
+    # 修改项目分类逻辑，使用包含关系而不是精确匹配
     project_categories = {
-        '大华': lambda x: str(x).strip() == '大华',
-        '麦格米特': lambda x: str(x).strip() == '麦格米特',
-        '工厂': lambda x: str(x).strip() not in ['大华', '麦格米特']
+        '工厂': lambda x: 'special' not in str(x).strip().lower(),
     }
 
     # Get unique factories
