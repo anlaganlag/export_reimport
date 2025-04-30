@@ -2837,16 +2837,55 @@ def apply_import_invoice_footer_styling(workbook_path, company_name, bank_name, 
                 amount_words = num_to_words(amount_value)
                 print(f"Converted amount {amount_value} to words: {amount_words}")
 
-            # Store the original "Amount in Words:" row content
-            original_amount_text = ""
-            for col_idx in range(1, max_column + 1):
-                cell_value = ws.cell(row=words_row_idx, column=col_idx).value
-                if cell_value and col_idx > 1:  # Skip the first column which has "Amount in Words:"
-                    original_amount_text = str(cell_value)
-                    break
+            # Get the full text for "Amount in Words" row
+            full_text = ""
+            first_cell_text = ws.cell(row=words_row_idx, column=1).value
+            if first_cell_text and "Amount in Words:" in str(first_cell_text):
+                full_text = first_cell_text
+                # Check if there's content in other cells in the same row
+                for col_idx in range(2, max_column + 1):
+                    cell_value = ws.cell(row=words_row_idx, column=col_idx).value
+                    if cell_value:
+                        full_text += " " + str(cell_value)
+            
+            # If no content found or incomplete, create a complete text
+            if not full_text or "SAY USD" not in full_text:
+                full_text = f"Amount in Words: SAY USD {amount_words} ONLY."
+
+            # Unmerge any existing merged cells in this row
+            for merged_range in list(ws.merged_cells.ranges):
+                if merged_range.min_row <= words_row_idx <= merged_range.max_row:
+                    ws.unmerge_cells(str(merged_range))
+
+            # Set the full text in the first cell
+            ws.cell(row=words_row_idx, column=1).value = full_text
+            
+            # Clear other cells in the row
+            for col_idx in range(2, max_column + 1):
+                ws.cell(row=words_row_idx, column=col_idx).value = None
+
+            # Merge all cells in the row
+            ws.merge_cells(start_row=words_row_idx, start_column=1, end_row=words_row_idx, end_column=max_column)
+            
+            # Apply styling to the merged cell
+            merged_cell = ws.cell(row=words_row_idx, column=1)
+            merged_cell.alignment = Alignment(horizontal='left', vertical='center')
+            merged_cell.font = Font(bold=True)
+            
+            # Apply light green fill
+            light_green_fill = PatternFill(start_color="E2EFDA", end_color="E2EFDA", fill_type="solid")
+            merged_cell.fill = light_green_fill
+            
+            # Apply border
+            thin_border = Border(
+                left=Side(style='thin'),
+                right=Side(style='thin'),
+                top=Side(style='thin'),
+                bottom=Side(style='thin')
+            )
+            merged_cell.border = thin_border
 
             # Prepare the footer content with the correct format for Amount in Words
-            # Skip the "Amount in Words:" since we'll preserve the original
             footer_rows = [
                 {"col1": "COUNTRY OF ORIGIN: ", "col2": ""},
                 {"col1": "Payment Term: ", "col2": ""},
@@ -2858,17 +2897,6 @@ def apply_import_invoice_footer_styling(workbook_path, company_name, bank_name, 
                 {"col1": "BRANCH ADDRESS:" + branch_address, "col2": ""},
                 {"col1": "COMPANY ADDRESS:" + company_address, "col2": ""}
             ]
-
-            # Apply light green fill
-            light_green_fill = PatternFill(start_color="E2EFDA", end_color="E2EFDA", fill_type="solid")
-
-            # Create a thin border
-            thin_border = Border(
-                left=Side(style='thin'),
-                right=Side(style='thin'),
-                top=Side(style='thin'),
-                bottom=Side(style='thin')
-            )
 
             # Delete existing rows that might contain the footer information
             # Skip the "Amount in Words:" row
@@ -2884,79 +2912,7 @@ def apply_import_invoice_footer_styling(workbook_path, company_name, bank_name, 
             # Delete rows in reverse order to maintain correct indices
             for row_idx in sorted(rows_to_delete, reverse=True):
                 ws.delete_rows(row_idx)
-
-            # Apply styling to the original "Amount in Words:" row
-            for col_idx in range(1, max_column + 1):
-                cell = ws.cell(row=words_row_idx, column=col_idx)
-                cell.fill = light_green_fill
-                cell.font = Font(bold=True)
-
-                # Apply borders
-                is_leftmost_col = (col_idx == 1)
-                is_rightmost_col = (col_idx == max_column)
-
-                top_border = Side(style='thin')
-                bottom_border = Side(style='thin')
-                left_border = Side(style='thin' if is_leftmost_col else 'none')
-                right_border = Side(style='thin' if is_rightmost_col else 'none')
-
-                cell.border = Border(
-                    left=left_border,
-                    right=right_border,
-                    top=top_border,
-                    bottom=bottom_border
-                )
-
-                if col_idx == 1:
-                    cell.alignment = Alignment(horizontal='left', vertical='center')
-                else:
-                    cell.alignment = Alignment(horizontal='left', vertical='center')
-
-            # Set "Amount in Words:" in the first cell and merge cells if needed
-            first_cell = ws.cell(row=words_row_idx, column=1)
-            if "Amount in Words:" not in str(first_cell.value):
-                first_cell.value = "Amount in Words:"
-
-            # Clear all cells except the first one and the content cell
-            content_cell = None
-            content_value = ""
-
-            # Find cell with content (should be in column 2 or later)
-            for col_idx in range(2, max_column + 1):
-                cell_value = ws.cell(row=words_row_idx, column=col_idx).value
-                if cell_value:
-                    content_cell = ws.cell(row=words_row_idx, column=col_idx)
-                    content_value = str(cell_value)
-                    break
-
-            # If no content found, use the previously stored or generated amount text
-            if not content_value:
-                content_value = original_amount_text or f"SAY USD {amount_words} ONLY."
-
-            # First merge any existing ranges for this row to avoid merge conflicts
-            for merged_range in list(ws.merged_cells.ranges):
-                if merged_range.min_row <= words_row_idx <= merged_range.max_row:
-                    ws.unmerge_cells(
-                        start_row=merged_range.min_row,
-                        start_column=merged_range.min_col,
-                        end_row=merged_range.max_row,
-                        end_column=merged_range.max_col
-                    )
-
-            # Set content in second cell
-            second_cell = ws.cell(row=words_row_idx, column=2)
-            second_cell.value = content_value
-
-            # Clear other cells in the row
-            for col_idx in range(3, max_column + 1):
-                ws.cell(row=words_row_idx, column=col_idx).value = None
-
-            # Split into two parts: "Amount in Words:" and the content
-            # Do not merge the first column
-            if max_column > 2:
-                # Merge from column 2 to the end
-                ws.merge_cells(start_row=words_row_idx, start_column=2, end_row=words_row_idx, end_column=max_column)
-
+                
             # Start adding rows from the row after the words_row_idx
             current_row = words_row_idx + 1
 
