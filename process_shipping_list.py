@@ -455,6 +455,63 @@ def add_summary_row(df, file_path):
             raise
 
 # Function to safely save DataFrame to Excel
+# Function to merge rows for India import invoice
+def merge_india_invoice_rows(df):
+    """
+    Merge rows in India import invoice based on Part Number and Unit Price (CIF, USD).
+    Sum up Quantity, Total Amount (CIF, USD), and Total Net Weight (kg) for merged rows.
+    Renumber S/N starting from 1.
+
+    Args:
+        df: DataFrame containing invoice data
+
+    Returns:
+        DataFrame with merged rows
+    """
+    # Make a copy to avoid modifying the original DataFrame
+    result_df = df.copy()
+
+    # Convert numeric columns to appropriate types
+    numeric_cols = ['Quantity', 'Unit Price (CIF, USD)', 'Total Amount (CIF, USD)', 'Total Net Weight (kg)']
+    for col in numeric_cols:
+        if col in result_df.columns:
+            result_df[col] = pd.to_numeric(result_df[col], errors='coerce').fillna(0)
+
+    # Group by Part Number and Unit Price only, then aggregate
+    grouped = result_df.groupby(['Part Number', 'Unit Price (CIF, USD)']).agg({
+        'Quantity': 'sum',
+        'Total Amount (CIF, USD)': 'sum',
+        'Total Net Weight (kg)': 'sum',
+        # Keep the first occurrence of other fields
+        'DESCRIPTION': 'first',
+        'Unit': 'first'
+    }).reset_index()
+
+    # Recalculate Total Amount based on Unit Price and Quantity to ensure accuracy
+    grouped['Total Amount (CIF, USD)'] = grouped['Unit Price (CIF, USD)'] * grouped['Quantity']
+
+    # Create new S/N column starting from 1
+    grouped['S/N'] = range(1, len(grouped) + 1)
+
+    # Print summary of the merging operation
+    print(f"India import invoice merging summary:")
+    print(f"  Original rows: {len(result_df)}")
+    print(f"  Merged rows: {len(grouped)}")
+    print(f"  Reduction: {len(result_df) - len(grouped)} rows ({(len(result_df) - len(grouped)) / len(result_df) * 100:.1f}%)")
+
+    # Reorder columns to match original format
+    columns_order = [
+        'S/N', 'Part Number', 'DESCRIPTION', 'Unit Price (CIF, USD)',
+        'Quantity', 'Unit', 'Total Amount (CIF, USD)', 'Total Net Weight (kg)'
+    ]
+
+    # Ensure all required columns exist
+    for col in columns_order:
+        if col not in grouped.columns:
+            grouped[col] = ''
+
+    return grouped[columns_order]
+
 def safe_save_to_excel(df, file_path, include_summary=True):
     """Safely save DataFrame to Excel with proper error handling."""
     try:
@@ -2285,6 +2342,10 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
                 if 'Unit Price (CIF, USD)' in invoice_df.columns:
                     invoice_df['Unit Price (CIF, USD)'] = round(invoice_df['Unit Price (CIF, USD)'] * exchange_rate,4)
                     invoice_df['Total Amount (CIF, USD)'] = invoice_df['Unit Price (CIF, USD)'] * invoice_df['Quantity']
+
+                    # 合并相同Part Number和Unit Price的行
+                invoice_df = merge_india_invoice_rows(invoice_df)
+
                 # Add summary row to invoice
                 summary_invoice = {col: '' for col in reimport_columns}
                 summary_invoice['DESCRIPTION'] = 'Total'
