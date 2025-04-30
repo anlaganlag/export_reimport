@@ -56,7 +56,7 @@ def translate_unit(unit):
     """
     if not unit or not isinstance(unit, str):
         return "PCS"  # Default to PCS if unit is empty or not a string
-    
+
     # Return the translation if found in dictionary, otherwise return the original unit
     return UNIT_TRANSLATION.get(unit, unit)
 
@@ -571,6 +571,11 @@ def merge_india_invoice_rows(df):
         # 只对agg_dict中存在于DataFrame的列进行聚合
         valid_agg_dict = {k: v for k, v in agg_dict.items() if k in result_df.columns}
 
+        # 对Unit Price (CIF, USD)进行四舍五入到小数点后4位，以确保相同价格的行能够正确合并
+        if 'Unit Price (CIF, USD)' in result_df.columns:
+            result_df['Unit Price (CIF, USD)'] = result_df['Unit Price (CIF, USD)'].round(4)
+            print("Rounded Unit Price (CIF, USD) to 4 decimal places for merging")
+
         grouped = result_df.groupby(['Part Number', 'Unit Price (CIF, USD)']).agg(valid_agg_dict).reset_index()
 
         # 重新计算Total Amount以确保准确性
@@ -712,17 +717,55 @@ def split_by_project_and_factory(df):
         print("WARNING: 'project'列不存在，添加默认值'大华'")
         df['project'] = '大华'
 
-    if 'factory' not in df.columns:
-        print("WARNING: 'factory'列不存在，添加默认值'默认工厂'")
-        df['factory'] = '默认工厂'
+    # 检查是否存在工厂地点列，如果不存在则使用factory列
+    factory_location_column = None
+    for col in df.columns:
+        if '工厂地点' in str(col):
+            factory_location_column = col
+            print(f"Found factory location column: {factory_location_column}")
+            break
+
+    # 如果找不到工厂地点列，则使用factory列
+    if not factory_location_column:
+        if 'factory' not in df.columns:
+            print("WARNING: '工厂地点'和'factory'列都不存在，添加默认值'默认工厂'")
+            df['factory'] = '默认工厂'
+            factory_column = 'factory'
+        else:
+            factory_column = 'factory'
+            print(f"Using existing 'factory' column for splitting")
+    else:
+        # 如果找到工厂地点列，将其复制到factory列以便后续处理
+        factory_column = factory_location_column
+        print(f"Using '{factory_location_column}' column for factory splitting")
 
     # Clean up project and factory values
     # Convert NaN, None and empty strings to default values
     df['project'] = df['project'].apply(lambda x: '大华' if pd.isna(x) or str(x).strip() == '' else str(x).strip())
-    df['factory'] = df['factory'].apply(lambda x: '默认工厂' if pd.isna(x) or str(x).strip() == '' else str(x).strip())
+    df[factory_column] = df[factory_column].apply(lambda x: '默认工厂' if pd.isna(x) or str(x).strip() == '' else str(x).strip())
 
-    print("Unique project values:", df['project'].unique())
-    print("Unique factory values:", df['factory'].unique())
+    # Print detailed debug information about factory values
+    print("\nDETAILED FACTORY VALUES DEBUG:")
+    print(f"Factory column: {factory_column}")
+    print(f"Factory column data type: {df[factory_column].dtype}")
+    print(f"Factory column value counts:")
+    print(df[factory_column].value_counts())
+
+    # Print first 20 rows of factory column for inspection
+    print("\nFirst 20 rows of factory column:")
+    for i, val in enumerate(df[factory_column].head(20)):
+        print(f"  Row {i+1}: '{val}' (type: {type(val)})")
+
+    # Ensure all values are properly converted to strings
+    df[factory_column] = df[factory_column].astype(str).apply(lambda x: x.strip())
+
+    print("\nAfter string conversion:")
+    print(f"Factory column data type: {df[factory_column].dtype}")
+    print(f"Factory column value counts:")
+    print(df[factory_column].value_counts())
+
+    print("\nUnique project values:", df['project'].unique())
+    print(f"Unique factory values from {factory_column}:", df[factory_column].unique())
 
     # Define the project categories with more robust string handling
     # 修改项目分类逻辑，使用包含关系而不是精确匹配
@@ -731,10 +774,10 @@ def split_by_project_and_factory(df):
     }
 
     # Get unique factories
-    factories = sorted(df['factory'].unique())
+    factories = sorted(df[factory_column].unique())
     if len(factories) == 0:
         factories = ['默认工厂']
-        df['factory'] = '默认工厂'
+        df[factory_column] = '默认工厂'
         print("WARNING: 没有有效的工厂值，使用'默认工厂'")
 
     # Dictionary to store split dataframes
@@ -748,7 +791,7 @@ def split_by_project_and_factory(df):
 
             for factory in factories:
                 key = (project_name, factory)
-                factory_df = project_df[project_df['factory'] == factory]
+                factory_df = project_df[project_df[factory_column] == factory]
 
                 split_dfs[key] = factory_df
                 print(f"Found {len(split_dfs[key])} rows for {project_name} - {factory}")
@@ -772,7 +815,36 @@ def split_by_project_and_factory(df):
                 split_dfs[key] = pd.DataFrame(columns=df.columns)
                 print(f"Added empty DataFrame for {project} - {factory}")
 
-    return split_dfs, project_categories
+    return split_dfs, project_categories, factory_column
+
+# Function to find a file in multiple locations
+def find_file(filename, output_dir='outputs'):
+    """
+    Find a file in multiple locations: current directory, output directory, or script directory.
+
+    Args:
+        filename: Name of the file to find
+        output_dir: Output directory to check
+
+    Returns:
+        Full path to the file if found, None otherwise
+    """
+    # Check in current directory
+    if os.path.exists(filename):
+        return filename
+
+    # Check in output_dir
+    file_in_output = os.path.join(output_dir, filename)
+    if os.path.exists(file_in_output):
+        return file_in_output
+
+    # Check in the script's directory
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    file_in_script_dir = os.path.join(script_dir, filename)
+    if os.path.exists(file_in_script_dir):
+        return file_in_script_dir
+
+    return None  # File not found
 
 # Function to generate valid invoice sheet name
 def generate_invoice_sheet_name(prefix="CXCI"):
@@ -1251,7 +1323,7 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
             print(f"Using '供应商开票名称' column '{description_col}' for DESCRIPTION as recommended")
         else:
             print(f"Using '{description_col}' for DESCRIPTION field")
-            
+
     # 填入海关描述（如果有）
     if customs_desc_col:
         result_df['Commodity Description (Customs)'] = packing_list_df[customs_desc_col]
@@ -2176,24 +2248,7 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
                 pl_h_file = 'pl_h.xlsx'  # First file for Packing List sheet
                 pl_f_file = 'pl_f.xlsx'  # Last file for Packing List sheet
 
-                # Function to find a file in multiple locations
-                def find_file(filename):
-                    # Check in current directory
-                    if os.path.exists(filename):
-                        return filename
-
-                    # Check in output_dir
-                    file_in_output = os.path.join(output_dir, filename)
-                    if os.path.exists(file_in_output):
-                        return file_in_output
-
-                    # Check in the script's directory
-                    script_dir = os.path.dirname(os.path.abspath(__file__))
-                    file_in_script_dir = os.path.join(script_dir, filename)
-                    if os.path.exists(file_in_script_dir):
-                        return file_in_script_dir
-
-                    return None  # File not found
+                # Use the find_file function defined at the top level
 
                 # Find the files
                 h_file_path = find_file(h_file)
@@ -2327,7 +2382,7 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
 
     # After creating result_df and before generating any output files
     # Split the data by project and factory
-    split_dfs, project_categories = split_by_project_and_factory(result_df)
+    split_dfs, project_categories, factory_column = split_by_project_and_factory(result_df)
 
     # Generate a single invoice file with multiple sheets for all splits
     reimport_invoice_path = os.path.join(output_dir, 'reimport_invoice.xlsx')
@@ -2446,36 +2501,49 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
                 project_safe = str(project).strip().replace(' ', '_')
                 factory_safe = str(factory).strip().replace(' ', '_')
 
-                # 创建独立的进口发票文件
+                # 创建独立的进口发票文件 - 使用工厂地点作为文件名的一部分
                 reimport_file_name = f'reimport_{project_safe}_{factory_safe}.xlsx'
                 reimport_file_path = os.path.join(output_dir, reimport_file_name)
 
                 # Create a copy for the invoice with safe column handling
                 required_columns = ['NO.', 'Material code', 'DESCRIPTION', 'CIF单价', 'Qty', 'Unit', 'CIF总价(FOB总价+运保费)', 'Total Net Weight (kg)']
-                
-                # Only add Commodity Description (Customs) if it exists 
+
+                # Only add Commodity Description (Customs) if it exists
                 if 'Commodity Description (Customs)' in df.columns:
                     required_columns.append('Commodity Description (Customs)')
-                
+
                 # Filter to only include columns that actually exist in the dataframe
                 available_columns = [col for col in required_columns if col in df.columns]
                 invoice_df = df[available_columns].copy()
-                
+
                 # 为进口发票使用进口清关货描 (Customs Description)
                 print(f"Processing import invoice {reimport_file_name}")
+
                 # 检查是否有进口清关货描列
-                if 'Commodity Description (Customs)' in invoice_df.columns and not invoice_df['Commodity Description (Customs)'].isna().all():
-                    print(f"Using customs description (进口清关货描) for import invoice {reimport_file_name}")
+                customs_desc_column = None
+                for col in df.columns:
+                    if '进口清关货描' in str(col):
+                        customs_desc_column = col
+                        print(f"Found import customs description column: {customs_desc_column}")
+                        break
+
+                if customs_desc_column and not df[customs_desc_column].isna().all():
+                    # 如果找到进口清关货描列并且不全为空，使用它
+                    print(f"Using import customs description (进口清关货描) for import invoice {reimport_file_name}")
+                    invoice_df['Commodity Description (Customs)'] = df[customs_desc_column]
+                elif 'Commodity Description (Customs)' in invoice_df.columns and not invoice_df['Commodity Description (Customs)'].isna().all():
+                    # 如果已有Commodity Description (Customs)列且不全为空，保留它
+                    print(f"Using existing customs description for import invoice {reimport_file_name}")
                 else:
                     # 如果没有清关货描或者全为空，使用普通描述作为替代
                     invoice_df['Commodity Description (Customs)'] = invoice_df['DESCRIPTION']
                     print(f"WARNING: No valid customs description found for {reimport_file_name}, using regular description as fallback")
-                
+
                 # 调整列顺序
                 reimport_columns = [
                     'S/N', 'Part Number', 'Commodity Description (Customs)', 'Unit Price (CIF, USD)', 'Quantity', 'Unit', 'Total Amount (CIF, USD)', 'Total Net Weight (kg)'
                 ]
-                
+
                 # 重命名列
                 invoice_df = invoice_df.rename(columns={
                     'NO.': 'S/N',
@@ -2486,12 +2554,12 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
                     'CIF总价(FOB总价+运保费)': 'Total Amount (CIF, USD)',
                     'Unit': 'Unit'
                 })
-                
+
                 # 选择需要的列
                 invoice_df = invoice_df[reimport_columns]
-                
+
                 # 保证Unit Price (CIF, USD)为美元价 - 人民币单价除以汇率转换为美元单价
-                invoice_df['Unit Price (CIF, USD)'] = round(invoice_df['Unit Price (CIF, USD)'] * exchange_rate,4) 
+                invoice_df['Unit Price (CIF, USD)'] = round(invoice_df['Unit Price (CIF, USD)'] * exchange_rate,4)
                 invoice_df['Total Amount (CIF, USD)'] = invoice_df['Unit Price (CIF, USD)'] * invoice_df['Quantity']
                 print(f"Converting prices from RMB to USD using exchange rate: {exchange_rate}")
 
@@ -2519,9 +2587,132 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
                 # Add all rows to the DataFrame
                 invoice_df = pd.concat([invoice_df, summary_row, empty_row, words_row], ignore_index=True)[reimport_columns]
 
-                # Save as individual reimport file
-                print(f"Saving individual reimport file for {project}_{factory}: {reimport_file_path}")
-                safe_save_to_excel(invoice_df, reimport_file_path)
+                # Save to a temporary file first
+                temp_reimport_file = os.path.join(output_dir, f'temp_{reimport_file_name}')
+                print(f"Saving temporary reimport file for {project}_{factory}: {temp_reimport_file}")
+                safe_save_to_excel(invoice_df, temp_reimport_file)
+
+                # Create a two-sheet workbook for merge.py (which requires at least 2 sheets)
+                try:
+                    # Load the temporary file
+                    temp_wb = load_workbook(temp_reimport_file)
+
+                    # Check if it has only one sheet
+                    if len(temp_wb.sheetnames) == 1:
+                        # Get the current sheet name
+                        current_sheet_name = temp_wb.sheetnames[0]
+
+                        # Create a dummy second sheet
+                        temp_wb.create_sheet("Dummy")
+
+                        # Save the modified workbook
+                        temp_wb.save(temp_reimport_file)
+                        print(f"Added dummy second sheet to {temp_reimport_file} for merge.py compatibility")
+                except Exception as e:
+                    print(f"Warning: Could not add second sheet to temporary file: {e}")
+
+                # Now use merge.py to merge with header and footer templates
+                # Find merge.py using the find_file function defined elsewhere
+                merge_py_path = find_file('merge.py')
+
+                if merge_py_path:
+                    print(f"Found merge.py at: {merge_py_path}")
+
+                    # Find header and footer files
+                    h_file_path = find_file('h.xlsx')
+                    f_file_path = find_file('f.xlsx')
+                    pl_h_file_path = find_file('pl_h.xlsx')
+                    pl_f_file_path = find_file('pl_f.xlsx')
+
+                    if h_file_path and f_file_path:
+                        # Prepare merge command
+                        if pl_h_file_path and pl_f_file_path:
+                            merge_cmd = [
+                                sys.executable,
+                                merge_py_path,
+                                h_file_path,
+                                temp_reimport_file,
+                                f_file_path,
+                                reimport_file_path,
+                                pl_h_file_path,
+                                pl_f_file_path
+                            ]
+                        else:
+                            merge_cmd = [
+                                sys.executable,
+                                merge_py_path,
+                                h_file_path,
+                                temp_reimport_file,
+                                f_file_path,
+                                reimport_file_path
+                            ]
+
+                        print(f"Running merge command for individual reimport: {' '.join(merge_cmd)}")
+
+                        try:
+                            # Execute merge command without check=True to handle non-zero exit codes
+                            result = subprocess.run(
+                                merge_cmd,
+                                check=False,  # Changed to False to prevent exception on non-zero exit
+                                capture_output=True,
+                                text=True
+                            )
+
+                            # Print output and errors
+                            if result.stdout:
+                                print("Individual Reimport Merge output:")
+                                print(result.stdout)
+
+                            if result.stderr:
+                                print("Individual Reimport Merge errors:")
+                                print(result.stderr)
+
+                            # Check return code
+                            if result.returncode == 0:
+                                print(f"Successfully merged files into: {reimport_file_path}")
+
+                                # Apply footer styling for import invoice
+                                apply_import_invoice_footer_styling(
+                                    reimport_file_path,
+                                    company_name=pc,
+                                    bank_name=bn,
+                                    account_no=ba,
+                                    swift_code=swn,
+                                    branch_address=badd,
+                                    company_address=pca
+                                )
+                            else:
+                                print(f"Merge command returned non-zero exit code: {result.returncode}")
+                                # If merging fails, use the temporary file as the final file
+                                if os.path.exists(temp_reimport_file):
+                                    shutil.copy(temp_reimport_file, reimport_file_path)
+                                    print(f"Used temporary file as final file: {reimport_file_path}")
+
+                        except Exception as e:
+                            print(f"Error during individual reimport file merging: {e}")
+                            # If merging fails, use the temporary file as the final file
+                            if os.path.exists(temp_reimport_file):
+                                shutil.copy(temp_reimport_file, reimport_file_path)
+                                print(f"Used temporary file as final file: {reimport_file_path}")
+                    else:
+                        print("Warning: Could not find h.xlsx or f.xlsx for merging")
+                        # If merge files not found, use the temporary file as the final file
+                        if os.path.exists(temp_reimport_file):
+                            shutil.copy(temp_reimport_file, reimport_file_path)
+                            print(f"Used temporary file as final file: {reimport_file_path}")
+                else:
+                    print("Warning: Could not find merge.py for merging")
+                    # If merge script not found, use the temporary file as the final file
+                    if os.path.exists(temp_reimport_file):
+                        shutil.copy(temp_reimport_file, reimport_file_path)
+                        print(f"Used temporary file as final file: {reimport_file_path}")
+
+                # Clean up temporary file
+                try:
+                    if os.path.exists(temp_reimport_file):
+                        os.remove(temp_reimport_file)
+                except:
+                    pass
 
                 # Save to combined workbook
                 invoice_df.to_excel(writer, sheet_name=ci_sheet_name, index=False)
@@ -2644,10 +2835,27 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
         # After styling, now merge the reimport invoice with the second sheet of h.xlsx
         print("Merging files for reimport invoice: Second sheet of h.xlsx, reimport_invoice.xlsx, f.xlsx")
 
+        # First, let's verify what sheets are in the reimport_invoice.xlsx file before merging
+        try:
+            pre_merge_wb = load_workbook(reimport_invoice_path)
+            print(f"BEFORE FINAL MERGE - Sheets in reimport_invoice.xlsx: {pre_merge_wb.sheetnames}")
+            for sheet_name in pre_merge_wb.sheetnames:
+                if sheet_name != 'PL':
+                    print(f"  Sheet '{sheet_name}' contains {len(list(pre_merge_wb[sheet_name].rows)) - 1} data rows")
+            pre_merge_wb.close()
+        except Exception as e:
+            print(f"Error checking sheets before merge: {e}")
+
         # Temporarily save reimport_invoice.xlsx to a backup file
         temp_reimport_file = os.path.join(output_dir, 'temp_reimport_invoice.xlsx')
+        backup_reimport_file = os.path.join(output_dir, 'backup_reimport_invoice.xlsx')
         try:
             import shutil
+            # Create a backup copy that we'll keep for debugging
+            shutil.copy(reimport_invoice_path, backup_reimport_file)
+            print(f"Created backup of reimport_invoice.xlsx at {backup_reimport_file}")
+
+            # Create the temporary copy for merging
             shutil.copy(reimport_invoice_path, temp_reimport_file)
 
             # Prepare file paths for merging
@@ -2674,6 +2882,14 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
 
                 if merge_py_path:
                     print(f"Found merge.py at: {merge_py_path}")
+
+                    # IMPORTANT: Let's check what's in the h.xlsx file
+                    try:
+                        h_wb = load_workbook(h_file_path)
+                        print(f"Sheets in h.xlsx: {h_wb.sheetnames}")
+                        h_wb.close()
+                    except Exception as e:
+                        print(f"Error checking h.xlsx sheets: {e}")
 
                     # Call merge.py with the second sheet of h.xlsx as first parameter
                     import subprocess
@@ -2707,7 +2923,7 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
                         # Use subprocess.run with stdout and stderr captured to diagnose issues
                         result = subprocess.run(
                             merge_cmd,
-                            check=True,
+                            check=False,  # Changed to False to prevent exception on non-zero exit
                             capture_output=True,
                             text=True
                         )
@@ -2721,9 +2937,50 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
                             print("Reimport Merge errors:")
                             print(result.stderr)
 
-                        # If successful, verify the file exists and update A1 and A2 with company info
-                        if os.path.exists(reimport_invoice_path):
-                            print(f"Successfully merged files into: {reimport_invoice_path}")
+                        # Check return code
+                        if result.returncode == 0:
+                            # If successful, verify the file exists and update A1 and A2 with company info
+                            if os.path.exists(reimport_invoice_path):
+                                print(f"Successfully merged files into: {reimport_invoice_path}")
+
+                                # Check what sheets are in the merged file
+                                try:
+                                    post_merge_wb = load_workbook(reimport_invoice_path)
+                                    print(f"AFTER FINAL MERGE - Sheets in reimport_invoice.xlsx: {post_merge_wb.sheetnames}")
+                                    for sheet_name in post_merge_wb.sheetnames:
+                                        if sheet_name != 'PL':
+                                            print(f"  Sheet '{sheet_name}' contains {len(list(post_merge_wb[sheet_name].rows)) - 1} data rows")
+                                    post_merge_wb.close()
+                                except Exception as e:
+                                    print(f"Error checking sheets after merge: {e}")
+
+                                # If we lost sheets in the merge, restore from backup and skip the final merge
+                                try:
+                                    pre_merge_wb = load_workbook(backup_reimport_file)
+                                    post_merge_wb = load_workbook(reimport_invoice_path)
+
+                                    if len(pre_merge_wb.sheetnames) > len(post_merge_wb.sheetnames):
+                                        print(f"WARNING: Lost sheets during merge! Pre-merge had {len(pre_merge_wb.sheetnames)} sheets, post-merge has {len(post_merge_wb.sheetnames)} sheets")
+                                        print(f"Restoring from backup to preserve all sheets")
+                                        shutil.copy(backup_reimport_file, reimport_invoice_path)
+                                        print(f"Restored reimport_invoice.xlsx from backup")
+
+                                    pre_merge_wb.close()
+                                    post_merge_wb.close()
+                                except Exception as e:
+                                    print(f"Error comparing pre/post merge sheets: {e}")
+                            else:
+                                print(f"Error: Merged file not created at {reimport_invoice_path}")
+                                # Restore original reimport_invoice.xlsx if merging failed
+                                if os.path.exists(backup_reimport_file):
+                                    shutil.copy(backup_reimport_file, reimport_invoice_path)
+                                    print("Restored original reimport_invoice.xlsx from backup")
+                        else:
+                            print(f"Merge command returned non-zero exit code: {result.returncode}")
+                            # Restore original reimport_invoice.xlsx if merging failed
+                            if os.path.exists(backup_reimport_file):
+                                shutil.copy(backup_reimport_file, reimport_invoice_path)
+                                print("Restored original reimport_invoice.xlsx from backup")
 
                             # Now update cells A1 and A2 with company name and address from policy file
                             wb = load_workbook(reimport_invoice_path)
@@ -2776,12 +3033,6 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
                             # Save the modified workbook
                             wb.save(reimport_invoice_path)
                             print(f"Updated A1 and A2 cells with company information from policy file")
-                        else:
-                            print(f"Error: Merged reimport file not created at {reimport_invoice_path}")
-                    except subprocess.CalledProcessError as e:
-                        print(f"Error running merge script for reimport: {e}")
-                        if hasattr(e, 'stderr') and e.stderr:
-                            print(f"Error details: {e.stderr}")
                     except Exception as e:
                         print(f"Error during reimport file merging: {e}")
                         # Restore original reimport_invoice.xlsx if merging failed
@@ -2897,7 +3148,7 @@ def apply_import_invoice_footer_styling(workbook_path, company_name, bank_name, 
                     cell_value = ws.cell(row=words_row_idx, column=col_idx).value
                     if cell_value:
                         full_text += " " + str(cell_value)
-            
+
             # If no content found or incomplete, create a complete text
             if not full_text or "SAY USD" not in full_text:
                 full_text = f"Amount in Words: SAY USD {amount_words} ONLY."
@@ -2909,23 +3160,23 @@ def apply_import_invoice_footer_styling(workbook_path, company_name, bank_name, 
 
             # Set the full text in the first cell
             ws.cell(row=words_row_idx, column=1).value = full_text
-            
+
             # Clear other cells in the row
             for col_idx in range(2, max_column + 1):
                 ws.cell(row=words_row_idx, column=col_idx).value = None
 
             # Merge all cells in the row
             ws.merge_cells(start_row=words_row_idx, start_column=1, end_row=words_row_idx, end_column=max_column)
-            
+
             # Apply styling to the merged cell
             merged_cell = ws.cell(row=words_row_idx, column=1)
             merged_cell.alignment = Alignment(horizontal='left', vertical='center')
             merged_cell.font = Font(bold=True)
-            
+
             # Apply light green fill
             light_green_fill = PatternFill(start_color="E2EFDA", end_color="E2EFDA", fill_type="solid")
             merged_cell.fill = light_green_fill
-            
+
             # Apply border
             thin_border = Border(
                 left=Side(style='thin'),
@@ -2962,7 +3213,7 @@ def apply_import_invoice_footer_styling(workbook_path, company_name, bank_name, 
             # Delete rows in reverse order to maintain correct indices
             for row_idx in sorted(rows_to_delete, reverse=True):
                 ws.delete_rows(row_idx)
-                
+
             # Start adding rows from the row after the words_row_idx
             current_row = words_row_idx + 1
 

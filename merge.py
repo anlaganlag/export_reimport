@@ -104,10 +104,10 @@ def load_workbook_safely(file_path):
 
 def merge_three_excel_files(first_file, middle_file, last_file, output_file, first_sheet_first_file=None, first_sheet_last_file=None):
     """
-    Merge exactly three Excel files with specific requirements:
-    - First file used entirely
-    - Middle file - second sheet for merging, first sheet preserved
-    - Last file used entirely
+    Merge Excel files with specific requirements:
+    - First file used for headers (h.xlsx)
+    - Middle file - first sheet is PL, remaining sheets are invoices
+    - Last file used for footers (f.xlsx)
     - All merged cells and formatting preserved
 
     If first_sheet_first_file and first_sheet_last_file are provided, they will be used
@@ -115,25 +115,26 @@ def merge_three_excel_files(first_file, middle_file, last_file, output_file, fir
     """
     print(f"Merging files: {first_file}, {middle_file}, {last_file}")
 
-    # Process middle file first to extract both sheets
+    # Process middle file first to extract all sheets
     middle_wb = load_workbook_safely(middle_file)
-    if not middle_wb or len(middle_wb.sheetnames) < 2:
-        print(f"Error: Middle file must have at least 2 sheets")
+    if not middle_wb or len(middle_wb.sheetnames) < 1:
+        print(f"Error: Middle file must have at least 1 sheet")
         return False
 
     # Get original sheet names from middle file to preserve them
     pl_sheet_name = middle_wb.sheetnames[0]  # First sheet (Packing List)
-    invoice_sheet_name = middle_wb.sheetnames[1]  # Second sheet (Invoice)
+    invoice_sheet_names = middle_wb.sheetnames[1:]  # All remaining sheets (Invoices)
 
-    print(f"Using sheet names from middle file: '{pl_sheet_name}' and '{invoice_sheet_name}'")
+    print(f"Found sheets in middle file:")
+    print(f"- Packing List: '{pl_sheet_name}'")
+    print(f"- Invoice sheets: {invoice_sheet_names}")
 
     # Create output workbook
     merged_wb = openpyxl.Workbook()
-    merged_sheet = merged_wb.active
-    merged_sheet.title = invoice_sheet_name  # Use original invoice sheet name instead of hardcoding
-
+    
     # Create and copy Packing List from middle file's first sheet
-    packing_list_sheet = merged_wb.create_sheet(pl_sheet_name)
+    packing_list_sheet = merged_wb.active
+    packing_list_sheet.title = pl_sheet_name
 
     # Extract column widths from middle file's first sheet
     middle_pl_sheet = middle_wb[pl_sheet_name]
@@ -142,48 +143,6 @@ def merge_three_excel_files(first_file, middle_file, last_file, output_file, fir
         col_letter = openpyxl.utils.get_column_letter(col_idx)
         if cell.value and col_letter in middle_pl_sheet.column_dimensions:
             pl_column_widths[cell.value] = middle_pl_sheet.column_dimensions[col_letter].width
-
-    # Extract column widths from middle file's second sheet
-    middle_ci_sheet = middle_wb[invoice_sheet_name]
-    ci_column_widths = {}
-    for col_idx, cell in enumerate(middle_ci_sheet[1], 1):
-        col_letter = openpyxl.utils.get_column_letter(col_idx)
-        if cell.value and col_letter in middle_ci_sheet.column_dimensions:
-            ci_column_widths[cell.value] = middle_ci_sheet.column_dimensions[col_letter].width
-
-    # Determine if we're merging a reimport invoice or export invoice based on filename
-    is_reimport = 'reimport' in middle_file.lower()
-
-    # Prepare data for merging Commercial Invoice
-    # For reimport invoices, use the second sheet of the first file (h.xlsx)
-    if is_reimport:
-        print("Detected reimport invoice - using second sheet of h.xlsx as first parameter")
-        files_to_merge = [
-            (first_file, lambda wb: wb[wb.sheetnames[1]] if len(wb.sheetnames) > 1 else wb.active),
-            (middle_file, lambda wb: wb[wb.sheetnames[1]]),
-            (last_file, lambda wb: wb.active)
-        ]
-    else:
-        # For export invoices, use the original approach
-        files_to_merge = [
-            (first_file, lambda wb: wb.active),
-            (middle_file, lambda wb: wb[wb.sheetnames[1]]),
-            (last_file, lambda wb: wb.active)
-        ]
-
-    # Merge sheets vertically
-    row_offset = 0
-    for file_path, sheet_selector in files_to_merge:
-        wb = load_workbook_safely(file_path)
-        if not wb:
-            return False
-
-        sheet = sheet_selector(wb)
-        print(f"Processing {invoice_sheet_name}: {file_path}")
-        row_offset += append_sheet_with_offset(sheet, merged_sheet, row_offset, file_path)
-
-    # Apply column widths to Commercial Invoice
-    apply_column_widths(merged_sheet, ci_column_widths)
 
     # Handle Packing List sheet merging if first_sheet_first_file and first_sheet_last_file are provided
     if first_sheet_first_file and first_sheet_last_file:
@@ -214,13 +173,65 @@ def merge_three_excel_files(first_file, middle_file, last_file, output_file, fir
         print(f"Copying first sheet from {middle_file}")
         copy_sheet(middle_wb[pl_sheet_name], packing_list_sheet)
 
-    # Reorder sheets
-    merged_wb._sheets = [merged_wb[pl_sheet_name], merged_wb[invoice_sheet_name]]
+    # Process each invoice sheet
+    for invoice_sheet_name in invoice_sheet_names:
+        print(f"\nProcessing invoice sheet: {invoice_sheet_name}")
+        
+        # Create new sheet for this invoice
+        invoice_sheet = merged_wb.create_sheet(invoice_sheet_name)
+        
+        # Extract column widths from middle file's invoice sheet
+        middle_invoice_sheet = middle_wb[invoice_sheet_name]
+        invoice_column_widths = {}
+        for col_idx, cell in enumerate(middle_invoice_sheet[1], 1):
+            col_letter = openpyxl.utils.get_column_letter(col_idx)
+            if cell.value and col_letter in middle_invoice_sheet.column_dimensions:
+                invoice_column_widths[cell.value] = middle_invoice_sheet.column_dimensions[col_letter].width
+
+        # Load first file (h.xlsx) and get its second sheet for header
+        first_wb = load_workbook_safely(first_file)
+        if not first_wb or len(first_wb.sheetnames) < 2:
+            print(f"Error: First file (h.xlsx) must have at least 2 sheets")
+            return False
+
+        # Get the second sheet from h.xlsx
+        h_invoice_sheet = first_wb[first_wb.sheetnames[1]]
+        
+        # Load last file (f.xlsx) for footer
+        last_wb = load_workbook_safely(last_file)
+        if not last_wb:
+            print(f"Error: Could not load last file (f.xlsx)")
+            return False
+            
+        f_invoice_sheet = last_wb.active
+
+        # Merge sheets vertically for this invoice
+        row_offset = 0
+        
+        # Add header from h.xlsx (second sheet)
+        print(f"Adding header from {first_file} (second sheet)")
+        row_offset += append_sheet_with_offset(h_invoice_sheet, invoice_sheet, row_offset, first_file)
+        
+        # Add content from middle file
+        print(f"Adding content from {middle_file} ({invoice_sheet_name})")
+        row_offset += append_sheet_with_offset(middle_invoice_sheet, invoice_sheet, row_offset, middle_file)
+        
+        # Add footer from f.xlsx
+        print(f"Adding footer from {last_file}")
+        row_offset += append_sheet_with_offset(f_invoice_sheet, invoice_sheet, row_offset, last_file)
+        
+        # Apply column widths to this invoice sheet
+        apply_column_widths(invoice_sheet, invoice_column_widths)
 
     # Save result
     try:
+        # Reorder sheets - PL first, then all invoice sheets
+        sheet_order = [pl_sheet_name] + invoice_sheet_names
+        merged_wb._sheets = [merged_wb[name] for name in sheet_order]
+        
         merged_wb.save(output_file)
-        print(f"Successfully saved merged file to: {output_file}")
+        print(f"\nSuccessfully saved merged file to: {output_file}")
+        print(f"Final sheet order: {sheet_order}")
         return True
     except Exception as e:
         print(f"Error saving output file {output_file}: {e}")
@@ -229,21 +240,28 @@ def merge_three_excel_files(first_file, middle_file, last_file, output_file, fir
 if __name__ == "__main__":
     if len(sys.argv) < 5:
         print("Usage: python merge.py <first_file.xlsx> <middle_file.xlsx> <last_file.xlsx> <output_file.xlsx> [first_sheet_first_file.xlsx] [first_sheet_last_file.xlsx]")
+        # Return error code but don't exit the process
         sys.exit(1)
 
-    files = [os.path.abspath(sys.argv[i]) for i in range(1, 5)]
+    try:
+        files = [os.path.abspath(sys.argv[i]) for i in range(1, 5)]
 
-    # Check if first sheet files are provided
-    first_sheet_first_file = os.path.abspath(sys.argv[5]) if len(sys.argv) > 5 else None
-    first_sheet_last_file = os.path.abspath(sys.argv[6]) if len(sys.argv) > 6 else None
+        # Check if first sheet files are provided
+        first_sheet_first_file = os.path.abspath(sys.argv[5]) if len(sys.argv) > 5 else None
+        first_sheet_last_file = os.path.abspath(sys.argv[6]) if len(sys.argv) > 6 else None
 
-    success = merge_three_excel_files(
-        files[0], files[1], files[2], files[3],
-        first_sheet_first_file, first_sheet_last_file
-    )
+        success = merge_three_excel_files(
+            files[0], files[1], files[2], files[3],
+            first_sheet_first_file, first_sheet_last_file
+        )
 
-    if not success:
-        print("Merge operation failed!")
+        if not success:
+            print("Merge operation failed!")
+            # Return error code
+            sys.exit(1)
+    except Exception as e:
+        print(f"Error during merge operation: {e}")
+        # Return error code
         sys.exit(1)
 
 # 在Windows系统下自动打开合并后的Excel文件
