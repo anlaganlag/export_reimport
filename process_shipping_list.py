@@ -1822,6 +1822,13 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
                 output_columns = [col for col in pl_output_columns if col != 'project']
                 packing_df = packing_df[output_columns]
 
+                # 确保S/N列从1开始编号
+                if 'S/N' in packing_df.columns:
+                    # 在添加汇总行和页脚行之前重新编号
+                    packing_df = packing_df.reset_index(drop=True)
+                    packing_df['S/N'] = range(1, len(packing_df) + 1)
+                    print("Reset export packing list S/N to start from 1")
+
                 # 添加汇总行（只对数字列计算总和）
                 summary_cols = ['Quantity', 'Total Gross Weight (kg)', 'Total Net Weight (kg)', 'Total Carton Quantity', 'Total Volume (CBM)']
                 summary_packing = {'名称': 'Total'}
@@ -2330,6 +2337,26 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
         # 将页脚行添加到数据框
         footer_df = pd.DataFrame(footer_rows)
         complete_pl_df = pd.concat([complete_pl_df, footer_df], ignore_index=True)
+
+        # 确保S/N列从1开始编号
+        if 'S/N' in complete_pl_df.columns:
+            # 识别页脚行 - 通常是包含特定文本的行
+            footer_mask = complete_pl_df['S/N'].astype(str).str.contains('PACKED IN|NET WEIGHT|GROSS WEIGHT|TOTAL MEASUREMENT|COUNTRY OF ORIGIN', na=False, regex=True)
+            # 识别Total行
+            total_mask = complete_pl_df['名称'] == 'Total'
+
+            # 提取数据行、Total行和页脚行
+            data_rows = complete_pl_df[~(footer_mask | total_mask)].copy()
+            total_rows = complete_pl_df[total_mask].copy()
+            footer_rows = complete_pl_df[footer_mask].copy()
+
+            if not data_rows.empty:
+                # 重新编号数据行，从1开始
+                data_rows['S/N'] = range(1, len(data_rows) + 1)
+
+                # 按顺序合并所有行：数据行、Total行、页脚行
+                complete_pl_df = pd.concat([data_rows, total_rows, footer_rows], ignore_index=True)
+                print("Reset import packing list S/N to start from 1")
 
         # Save packing list sheet
         complete_pl_df.to_excel(writer, sheet_name='PL', index=False)
