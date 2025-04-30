@@ -10,6 +10,11 @@ from openpyxl.utils.cell import coordinate_from_string, column_index_from_string
 import shutil
 import logging
 import datetime
+import re
+import sys
+import json
+import numpy as np
+from openpyxl.styles.numbers import FORMAT_NUMBER_COMMA_SEPARATED1, FORMAT_NUMBER_00
 
 # Make sure outputs directory exists
 if not os.path.exists('outputs'):
@@ -19,6 +24,41 @@ if not os.path.exists('outputs'):
     except Exception as e:
         print(f"Error creating outputs directory: {e}")
         raise
+
+# Define constants
+# Unit translation dictionary for converting Chinese units to English
+UNIT_TRANSLATION = {
+    "个": "PCS",
+    "件": "PCS",
+    "只": "PCS",
+    "台": "SET",
+    "套": "SET",
+    "箱": "BOX",
+    "盒": "BOX",
+    "包": "PKG",
+    "卷": "ROLL",
+    "米": "MTR",
+    "千克": "KG",
+    "公斤": "KG",
+    "千米": "KM",
+    "升": "L",
+    "吨": "TON",
+    "对": "PAIR",
+    "组": "SET",
+    "批": "LOT",
+    "袋": "BAG",
+    "瓶": "BTL"
+}
+
+def translate_unit(unit):
+    """
+    Translate Chinese unit to English
+    """
+    if not unit or not isinstance(unit, str):
+        return "PCS"  # Default to PCS if unit is empty or not a string
+    
+    # Return the translation if found in dictionary, otherwise return the original unit
+    return UNIT_TRANSLATION.get(unit, unit)
 
 def apply_font_style(cell, is_bold=False):
     """Helper function to apply font style to a cell."""
@@ -2449,6 +2489,11 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
                 invoice_df['Unit Price (CIF, USD)'] = round(invoice_df['Unit Price (CIF, USD)'] * exchange_rate,4) 
                 invoice_df['Total Amount (CIF, USD)'] = invoice_df['Unit Price (CIF, USD)'] * invoice_df['Quantity']
                 print(f"Converting prices from RMB to USD using exchange rate: {exchange_rate}")
+
+                # Translate Chinese units to English
+                if 'Unit' in invoice_df.columns:
+                    invoice_df['Unit'] = invoice_df['Unit'].apply(translate_unit)
+                    print(f"Translated units to English for {reimport_file_name}")
 
                 # 合并相同Part Number和Unit Price的行
                 invoice_df = merge_india_invoice_rows(invoice_df)
