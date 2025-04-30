@@ -10,6 +10,11 @@ from openpyxl.utils.cell import coordinate_from_string, column_index_from_string
 import shutil
 import logging
 import datetime
+import re
+import sys
+import json
+import numpy as np
+from openpyxl.styles.numbers import FORMAT_NUMBER_COMMA_SEPARATED1, FORMAT_NUMBER_00
 
 # Make sure outputs directory exists
 if not os.path.exists('outputs'):
@@ -19,6 +24,41 @@ if not os.path.exists('outputs'):
     except Exception as e:
         print(f"Error creating outputs directory: {e}")
         raise
+
+# Define constants
+# Unit translation dictionary for converting Chinese units to English
+UNIT_TRANSLATION = {
+    "个": "PCS",
+    "件": "PCS",
+    "只": "PCS",
+    "台": "SET",
+    "套": "SET",
+    "箱": "BOX",
+    "盒": "BOX",
+    "包": "PKG",
+    "卷": "ROLL",
+    "米": "MTR",
+    "千克": "KG",
+    "公斤": "KG",
+    "千米": "KM",
+    "升": "L",
+    "吨": "TON",
+    "对": "PAIR",
+    "组": "SET",
+    "批": "LOT",
+    "袋": "BAG",
+    "瓶": "BTL"
+}
+
+def translate_unit(unit):
+    """
+    Translate Chinese unit to English
+    """
+    if not unit or not isinstance(unit, str):
+        return "PCS"  # Default to PCS if unit is empty or not a string
+    
+    # Return the translation if found in dictionary, otherwise return the original unit
+    return UNIT_TRANSLATION.get(unit, unit)
 
 def apply_font_style(cell, is_bold=False):
     """Helper function to apply font style to a cell."""
@@ -504,7 +544,7 @@ def merge_india_invoice_rows(df):
     # Group by Part Number and Unit Price only, then aggregate
     try:
         # 确保所有必要的列都存在于结果DataFrame中
-        required_columns = ['S/N', 'Part Number', 'DESCRIPTION', 'Unit Price (CIF, USD)',
+        required_columns = ['S/N', 'Part Number', 'Commodity Description (Customs)', 'Unit Price (CIF, USD)',
                            'Quantity', 'Unit', 'Total Amount (CIF, USD)', 'Total Net Weight (kg)']
 
         for col in required_columns:
@@ -513,7 +553,7 @@ def merge_india_invoice_rows(df):
                     result_df[col] = range(1, len(result_df) + 1)
                 elif col == 'Unit':
                     result_df[col] = 'PCS'  # 默认单位
-                elif col == 'DESCRIPTION':
+                elif col == 'Commodity Description (Customs)':
                     result_df[col] = result_df['Part Number'] if 'Part Number' in result_df.columns else 'Unknown'
                 else:
                     result_df[col] = 0
@@ -524,7 +564,7 @@ def merge_india_invoice_rows(df):
             'Total Amount (CIF, USD)': 'sum',
             'Total Net Weight (kg)': 'sum',
             # Keep the first occurrence of other fields
-            'DESCRIPTION': 'first',
+            'Commodity Description (Customs)': 'first',
             'Unit': 'first'
         }
 
@@ -626,7 +666,7 @@ def print_column_mappings(mappings):
 
     # Define the expected column list
     expected_columns = [
-        'NO.', 'Material code', 'DESCRIPTION', 'Model NO.', 'Unit Price', 'Qty', 'Unit',
+        'NO.', 'Material code', 'DESCRIPTION', 'Commodity Description (Customs)','Model NO.', 'Unit Price', 'Qty', 'Unit',
         'net weight', 'factory', 'project', 'end use'
     ]
 
@@ -1018,7 +1058,7 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
     # 修改: 将 '供应商开票名称' 放在匹配模式的最前面，优先使用该字段作为DESCRIPTION
     description_col = find_column_with_pattern(packing_list_df, ['供应商开票名称', 'Commercial Invoice Description', '清关英文货描(关务提供)', '描述', 'description'], 'DESCRIPTION')
     # 新增：查找进口清关货描（Commodity Description (Customs)）列
-    customs_desc_col = find_column_with_pattern(packing_list_df, ['进口清关货描', 'Commodity Description (Customs)'], 'Commodity Description (Customs)')
+    customs_desc_col = find_column_with_pattern(packing_list_df, ['进口清关货描', 'Commodity Description (Customs)', 'Customs Description', 'Import Customs Description', '进口清关英文货描', 'Customs Commodity Description'], 'Commodity Description (Customs)')
     model_col = find_column_with_pattern(packing_list_df, ['Model Number', '型号', '物料型号', '货物型号', 'model'], 'Model NO.')
     unit_price_col = find_column_with_pattern(packing_list_df, ['Unit Price (Excl. Tax, CNY)()', 'unit price', '采购单价不含税', '不含税单价', '单价'], 'Unit Price')
     qty_col = find_column_with_pattern(packing_list_df, ['Quantity', 'quantity', '数量', 'qty'], 'Qty')
@@ -1210,15 +1250,20 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
         if '供应商开票名称' in str(description_col):
             print(f"Using '供应商开票名称' column '{description_col}' for DESCRIPTION as recommended")
         else:
-            print(f"Using '{description_col}' as the source for DESCRIPTION")
+            print(f"Using '{description_col}' for DESCRIPTION field")
+            
+    # 填入海关描述（如果有）
+    if customs_desc_col:
+        result_df['Commodity Description (Customs)'] = packing_list_df[customs_desc_col]
+        column_mappings['Commodity Description (Customs)'] = customs_desc_col
+        print(f"Using '{customs_desc_col}' for Commodity Description (Customs) field - this will be used for import invoices")
+    elif description_col:  # 如果没有清关货描，则使用普通描述作为替代
+        result_df['Commodity Description (Customs)'] = packing_list_df[description_col]
+        column_mappings['Commodity Description (Customs)'] = description_col
+        print(f"No customs description found, using '{description_col}' for Commodity Description (Customs) as fallback")
     else:
-        # Description is essential - default to Material code if not found
-        if material_code_col:
-            result_df['DESCRIPTION'] = packing_list_df[material_code_col]
-            print("WARNING: Description column not found, using Material code as Description")
-        else:
-            result_df['DESCRIPTION'] = "Unknown Material"
-            print("WARNING: Description and Material code columns not found")
+        result_df['Commodity Description (Customs)'] = ''
+        print("Warning: No description column found for Commodity Description (Customs)")
 
     if model_col:
         result_df['Model NO.'] = packing_list_df[model_col]
@@ -1582,7 +1627,7 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
 
     # Define output column sets
     cif_output_columns = [
-        'NO.', 'Material code', 'DESCRIPTION', 'Model NO.', 'Unit Price', 'Qty', 'Unit', 'Amount',
+        'NO.', 'Material code', 'DESCRIPTION', 'Commodity Description (Customs)','Model NO.', 'Unit Price', 'Qty', 'Unit', 'Amount',
         'net weight', '采购单价', '采购总价', 'FOB单价', 'FOB总价', '总保费', '总运费', '每公斤摊的运保费',
         '该项对应的运保费', 'CIF总价(FOB总价+运保费)', 'CIF单价', '单价USD数值', '单位',
         'factory', 'project', 'end use'
@@ -1822,6 +1867,13 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
                 output_columns = [col for col in pl_output_columns if col != 'project']
                 packing_df = packing_df[output_columns]
 
+                # 确保S/N列从1开始编号
+                if 'S/N' in packing_df.columns:
+                    # 在添加汇总行和页脚行之前重新编号
+                    packing_df = packing_df.reset_index(drop=True)
+                    packing_df['S/N'] = range(1, len(packing_df) + 1)
+                    print("Reset export packing list S/N to start from 1")
+
                 # 添加汇总行（只对数字列计算总和）
                 summary_cols = ['Quantity', 'Total Gross Weight (kg)', 'Total Net Weight (kg)', 'Total Carton Quantity', 'Total Volume (CBM)']
                 summary_packing = {'名称': 'Total'}
@@ -1960,6 +2012,8 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
                         ws.column_dimensions[get_column_letter(col_idx)].width = 25  # Wider for Amount
                     elif col_name == '名称':
                         ws.column_dimensions[get_column_letter(col_idx)].width = 30  # Wider for Description
+                    elif col_name == 'Commodity Description (Customs)':
+                        ws.column_dimensions[get_column_letter(col_idx)].width = 35  # Wider for Customs Description
                     elif col_name == 'Model Number':
                         ws.column_dimensions[get_column_letter(col_idx)].width = 20  # Wider for Model Number
                     elif col_name == 'Total Net Weight (kg)':
@@ -2331,12 +2385,32 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
         footer_df = pd.DataFrame(footer_rows)
         complete_pl_df = pd.concat([complete_pl_df, footer_df], ignore_index=True)
 
+        # 确保S/N列从1开始编号
+        if 'S/N' in complete_pl_df.columns:
+            # 识别页脚行 - 通常是包含特定文本的行
+            footer_mask = complete_pl_df['S/N'].astype(str).str.contains('PACKED IN|NET WEIGHT|GROSS WEIGHT|TOTAL MEASUREMENT|COUNTRY OF ORIGIN', na=False, regex=True)
+            # 识别Total行
+            total_mask = complete_pl_df['名称'] == 'Total'
+
+            # 提取数据行、Total行和页脚行
+            data_rows = complete_pl_df[~(footer_mask | total_mask)].copy()
+            total_rows = complete_pl_df[total_mask].copy()
+            footer_rows = complete_pl_df[footer_mask].copy()
+
+            if not data_rows.empty:
+                # 重新编号数据行，从1开始
+                data_rows['S/N'] = range(1, len(data_rows) + 1)
+
+                # 按顺序合并所有行：数据行、Total行、页脚行
+                complete_pl_df = pd.concat([data_rows, total_rows, footer_rows], ignore_index=True)
+                print("Reset import packing list S/N to start from 1")
+
         # Save packing list sheet
         complete_pl_df.to_excel(writer, sheet_name='PL', index=False)
 
         # Process each split for Commercial Invoice sheets only
         # Generate base invoice number and increment for each sheet
-        base_invoice_name = generate_invoice_sheet_name(prefix="RIMP")
+        base_invoice_name = generate_invoice_sheet_name(prefix="RECI")
         # Extract the numeric part for incrementing
         invoice_prefix = base_invoice_name[:-4]  # Everything except last 4 digits
         invoice_number = int(base_invoice_name[-4:])  # Last 4 digits as integer
@@ -2371,32 +2445,62 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
                 reimport_file_name = f'reimport_{project_safe}_{factory_safe}.xlsx'
                 reimport_file_path = os.path.join(output_dir, reimport_file_name)
 
-                # Create a copy for the invoice
-                invoice_df = df[['NO.', 'Material code', 'DESCRIPTION', 'CIF单价', 'Qty', 'Unit', 'CIF总价(FOB总价+运保费)', 'Total Net Weight (kg)']].copy()
+                # Create a copy for the invoice with safe column handling
+                required_columns = ['NO.', 'Material code', 'DESCRIPTION', 'CIF单价', 'Qty', 'Unit', 'CIF总价(FOB总价+运保费)', 'Total Net Weight (kg)']
+                
+                # Only add Commodity Description (Customs) if it exists 
+                if 'Commodity Description (Customs)' in df.columns:
+                    required_columns.append('Commodity Description (Customs)')
+                
+                # Filter to only include columns that actually exist in the dataframe
+                available_columns = [col for col in required_columns if col in df.columns]
+                invoice_df = df[available_columns].copy()
+                
+                # 为进口发票使用进口清关货描 (Customs Description)
+                print(f"Processing import invoice {reimport_file_name}")
+                # 检查是否有进口清关货描列
+                if 'Commodity Description (Customs)' in invoice_df.columns and not invoice_df['Commodity Description (Customs)'].isna().all():
+                    print(f"Using customs description (进口清关货描) for import invoice {reimport_file_name}")
+                else:
+                    # 如果没有清关货描或者全为空，使用普通描述作为替代
+                    invoice_df['Commodity Description (Customs)'] = invoice_df['DESCRIPTION']
+                    print(f"WARNING: No valid customs description found for {reimport_file_name}, using regular description as fallback")
+                
                 # 调整列顺序
                 reimport_columns = [
-                    'S/N', 'Part Number', 'DESCRIPTION', 'Unit Price (CIF, USD)', 'Quantity', 'Unit', 'Total Amount (CIF, USD)', 'Total Net Weight (kg)'
+                    'S/N', 'Part Number', 'Commodity Description (Customs)', 'Unit Price (CIF, USD)', 'Quantity', 'Unit', 'Total Amount (CIF, USD)', 'Total Net Weight (kg)'
                 ]
+                
+                # 重命名列
                 invoice_df = invoice_df.rename(columns={
                     'NO.': 'S/N',
                     'Material code': 'Part Number',
+                    'Commodity Description (Customs)': 'Commodity Description (Customs)',
                     'CIF单价': 'Unit Price (CIF, USD)',
                     'Qty': 'Quantity',
                     'CIF总价(FOB总价+运保费)': 'Total Amount (CIF, USD)',
                     'Unit': 'Unit'
                 })
+                
+                # 选择需要的列
                 invoice_df = invoice_df[reimport_columns]
-                # 保证Unit Price (CIF, USD)为美元价
-                if 'Unit Price (CIF, USD)' in invoice_df.columns:
-                    invoice_df['Unit Price (CIF, USD)'] = round(invoice_df['Unit Price (CIF, USD)'] * exchange_rate,4)
-                    invoice_df['Total Amount (CIF, USD)'] = invoice_df['Unit Price (CIF, USD)'] * invoice_df['Quantity']
+                
+                # 保证Unit Price (CIF, USD)为美元价 - 人民币单价除以汇率转换为美元单价
+                invoice_df['Unit Price (CIF, USD)'] = round(invoice_df['Unit Price (CIF, USD)'] * exchange_rate,4) 
+                invoice_df['Total Amount (CIF, USD)'] = invoice_df['Unit Price (CIF, USD)'] * invoice_df['Quantity']
+                print(f"Converting prices from RMB to USD using exchange rate: {exchange_rate}")
 
-                    # 合并相同Part Number和Unit Price的行
+                # Translate Chinese units to English
+                if 'Unit' in invoice_df.columns:
+                    invoice_df['Unit'] = invoice_df['Unit'].apply(translate_unit)
+                    print(f"Translated units to English for {reimport_file_name}")
+
+                # 合并相同Part Number和Unit Price的行
                 invoice_df = merge_india_invoice_rows(invoice_df)
 
                 # Add summary row to invoice
                 summary_invoice = {col: '' for col in reimport_columns}
-                summary_invoice['DESCRIPTION'] = 'Total'
+                summary_invoice['Commodity Description (Customs)'] = 'Total'
                 summary_invoice['Part Number'] = ''
                 for col in ['Quantity', 'Total Amount (CIF, USD)', 'Total Net Weight (kg)']:
                     if col in invoice_df.columns:
@@ -2458,6 +2562,10 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
                     ws.column_dimensions[get_column_letter(col_idx)].width = 25  # Wider for Amount
                 elif col_name == '名称':
                     ws.column_dimensions[get_column_letter(col_idx)].width = 30  # Wider for Description
+                elif col_name == 'Commodity Description (Customs)':
+                    ws.column_dimensions[get_column_letter(col_idx)].width = 35  # Wider for Customs Description
+                elif col_name == 'Model Number':
+                    ws.column_dimensions[get_column_letter(col_idx)].width = 20  # Wider for Model Number
                 elif col_name == 'Total Net Weight (kg)':
                     ws.column_dimensions[get_column_letter(col_idx)].width = 20  # Wider for Net Weight
                 else:
@@ -2774,16 +2882,55 @@ def apply_import_invoice_footer_styling(workbook_path, company_name, bank_name, 
                 amount_words = num_to_words(amount_value)
                 print(f"Converted amount {amount_value} to words: {amount_words}")
 
-            # Store the original "Amount in Words:" row content
-            original_amount_text = ""
-            for col_idx in range(1, max_column + 1):
-                cell_value = ws.cell(row=words_row_idx, column=col_idx).value
-                if cell_value and col_idx > 1:  # Skip the first column which has "Amount in Words:"
-                    original_amount_text = str(cell_value)
-                    break
+            # Get the full text for "Amount in Words" row
+            full_text = ""
+            first_cell_text = ws.cell(row=words_row_idx, column=1).value
+            if first_cell_text and "Amount in Words:" in str(first_cell_text):
+                full_text = first_cell_text
+                # Check if there's content in other cells in the same row
+                for col_idx in range(2, max_column + 1):
+                    cell_value = ws.cell(row=words_row_idx, column=col_idx).value
+                    if cell_value:
+                        full_text += " " + str(cell_value)
+            
+            # If no content found or incomplete, create a complete text
+            if not full_text or "SAY USD" not in full_text:
+                full_text = f"Amount in Words: SAY USD {amount_words} ONLY."
+
+            # Unmerge any existing merged cells in this row
+            for merged_range in list(ws.merged_cells.ranges):
+                if merged_range.min_row <= words_row_idx <= merged_range.max_row:
+                    ws.unmerge_cells(str(merged_range))
+
+            # Set the full text in the first cell
+            ws.cell(row=words_row_idx, column=1).value = full_text
+            
+            # Clear other cells in the row
+            for col_idx in range(2, max_column + 1):
+                ws.cell(row=words_row_idx, column=col_idx).value = None
+
+            # Merge all cells in the row
+            ws.merge_cells(start_row=words_row_idx, start_column=1, end_row=words_row_idx, end_column=max_column)
+            
+            # Apply styling to the merged cell
+            merged_cell = ws.cell(row=words_row_idx, column=1)
+            merged_cell.alignment = Alignment(horizontal='left', vertical='center')
+            merged_cell.font = Font(bold=True)
+            
+            # Apply light green fill
+            light_green_fill = PatternFill(start_color="E2EFDA", end_color="E2EFDA", fill_type="solid")
+            merged_cell.fill = light_green_fill
+            
+            # Apply border
+            thin_border = Border(
+                left=Side(style='thin'),
+                right=Side(style='thin'),
+                top=Side(style='thin'),
+                bottom=Side(style='thin')
+            )
+            merged_cell.border = thin_border
 
             # Prepare the footer content with the correct format for Amount in Words
-            # Skip the "Amount in Words:" since we'll preserve the original
             footer_rows = [
                 {"col1": "COUNTRY OF ORIGIN: ", "col2": ""},
                 {"col1": "Payment Term: ", "col2": ""},
@@ -2795,17 +2942,6 @@ def apply_import_invoice_footer_styling(workbook_path, company_name, bank_name, 
                 {"col1": "BRANCH ADDRESS:" + branch_address, "col2": ""},
                 {"col1": "COMPANY ADDRESS:" + company_address, "col2": ""}
             ]
-
-            # Apply light green fill
-            light_green_fill = PatternFill(start_color="E2EFDA", end_color="E2EFDA", fill_type="solid")
-
-            # Create a thin border
-            thin_border = Border(
-                left=Side(style='thin'),
-                right=Side(style='thin'),
-                top=Side(style='thin'),
-                bottom=Side(style='thin')
-            )
 
             # Delete existing rows that might contain the footer information
             # Skip the "Amount in Words:" row
@@ -2821,79 +2957,7 @@ def apply_import_invoice_footer_styling(workbook_path, company_name, bank_name, 
             # Delete rows in reverse order to maintain correct indices
             for row_idx in sorted(rows_to_delete, reverse=True):
                 ws.delete_rows(row_idx)
-
-            # Apply styling to the original "Amount in Words:" row
-            for col_idx in range(1, max_column + 1):
-                cell = ws.cell(row=words_row_idx, column=col_idx)
-                cell.fill = light_green_fill
-                cell.font = Font(bold=True)
-
-                # Apply borders
-                is_leftmost_col = (col_idx == 1)
-                is_rightmost_col = (col_idx == max_column)
-
-                top_border = Side(style='thin')
-                bottom_border = Side(style='thin')
-                left_border = Side(style='thin' if is_leftmost_col else 'none')
-                right_border = Side(style='thin' if is_rightmost_col else 'none')
-
-                cell.border = Border(
-                    left=left_border,
-                    right=right_border,
-                    top=top_border,
-                    bottom=bottom_border
-                )
-
-                if col_idx == 1:
-                    cell.alignment = Alignment(horizontal='left', vertical='center')
-                else:
-                    cell.alignment = Alignment(horizontal='left', vertical='center')
-
-            # Set "Amount in Words:" in the first cell and merge cells if needed
-            first_cell = ws.cell(row=words_row_idx, column=1)
-            if "Amount in Words:" not in str(first_cell.value):
-                first_cell.value = "Amount in Words:"
-
-            # Clear all cells except the first one and the content cell
-            content_cell = None
-            content_value = ""
-
-            # Find cell with content (should be in column 2 or later)
-            for col_idx in range(2, max_column + 1):
-                cell_value = ws.cell(row=words_row_idx, column=col_idx).value
-                if cell_value:
-                    content_cell = ws.cell(row=words_row_idx, column=col_idx)
-                    content_value = str(cell_value)
-                    break
-
-            # If no content found, use the previously stored or generated amount text
-            if not content_value:
-                content_value = original_amount_text or f"SAY USD {amount_words} ONLY."
-
-            # First merge any existing ranges for this row to avoid merge conflicts
-            for merged_range in list(ws.merged_cells.ranges):
-                if merged_range.min_row <= words_row_idx <= merged_range.max_row:
-                    ws.unmerge_cells(
-                        start_row=merged_range.min_row,
-                        start_column=merged_range.min_col,
-                        end_row=merged_range.max_row,
-                        end_column=merged_range.max_col
-                    )
-
-            # Set content in second cell
-            second_cell = ws.cell(row=words_row_idx, column=2)
-            second_cell.value = content_value
-
-            # Clear other cells in the row
-            for col_idx in range(3, max_column + 1):
-                ws.cell(row=words_row_idx, column=col_idx).value = None
-
-            # Split into two parts: "Amount in Words:" and the content
-            # Do not merge the first column
-            if max_column > 2:
-                # Merge from column 2 to the end
-                ws.merge_cells(start_row=words_row_idx, start_column=2, end_row=words_row_idx, end_column=max_column)
-
+                
             # Start adding rows from the row after the words_row_idx
             current_row = words_row_idx + 1
 

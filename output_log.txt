@@ -1,48 +1,234 @@
-��ʼ�����ļ�:
-- װ�䵥: testfiles/original_packing_list.xlsx
-- �����ļ�: testfiles/policy.xlsx
-- ���Ŀ¼: outputs
-����: ����Excel�ļ�ʧ�ܣ���ʹ��ԭʼ�ļ�: name 'clean_excel_file' is not defined
-Reading Excel file: testfiles/original_packing_list.xlsx
-Method 1 failed due to Excel filter issue: Value must be either numerical or a string containing a wildcard
-Method 2 failed due to Excel filter issue: Value must be either numerical or a string containing a wildcard
-Method 3 failed due to Excel filter issue: Value must be either numerical or a string containing a wildcard
-Method 4 failed due to Excel filter issue: Value must be either numerical or a string containing a wildcard
-Method 5 failed due to Excel filter issue: Value must be either numerical or a string containing a wildcard
-�����ļ�ʱ����: Value must be either numerical or a string containing a wildcard
-����λ��:     raise ValueError("Value must be either numerical or a string containing a wildcard")
-ʹ�� --debug �������Բ鿴��ϸ������Ϣ
+开始处理文件:
+- 装箱单: testfiles\original_packing_list.xlsx
+- 政策文件: testfiles\policy.xlsx
+- 输出目录: outputs
+Reading Excel file: testfiles\original_packing_list.xlsx
+Skipping 2 rows as specified
 
-�������� 0 �ж�ȡ�����ļ�:
-ǰ5��: [['�ɹ�װ�䵥���', 'CXCJ202501220l'], ['�ܾ���(KG)', 3156.66], ['���˷�(RMB)', 6339.01], ['�˷ѵ���(RMB/KG)', 2.00813834876103], ['�Ӽ���', 0.05]]
-����: ['�ֶ�', 'ֵ']
+提取的政策参数:
+packing_list_no: CXCJ202501220l
+total_net_weight: 3156.66
+total_freight: 6339.01
+freight_unit_price: 2.00813834876103
+markup_percentage: 0.05
+insurance_coefficient: 1.1
+insurance_rate: 0.0005
+exchange_rate: 0.139122692302341
+company_name: Shibo Chuangxiang Digital Technology (Shenzhen) Co., LTD
+company_address: Room 1501, Shenzhen International Qianhai Yidu Tower, No.99, Gangcheng Street, Nanshan Street, Qianhai Shenzhen-Hong Kong Cooperation Zone, Shenzhen
+bank_account: 811020101280058376
+bank_name: China Citic Bank Shenzhen Branch
+bank_address: 8F, Citic Security Tower, Zhongxin Futian Dist. Futian Shenzhen China
+swift_no: CIBKCNBJ518
+Found h.xlsx at: h.xlsx
+Successfully updated header file with company information
+Successfully updated pl_h.xlsx with company information
+Original packing list columns:
+  序号
+  料号
+  供应商
+  项目名称
+  工厂地点
+  进口清关货描
+  供应商开票名称
+  EPR物料名称
+  型号
+  数量
+  单位
+  纸箱尺寸
+  单件体积
+  总体积
+  单件毛重
+  总毛重
+  单件净重
+  总净重
+  每箱数量
+  总件数
+  箱号
+  栈板尺寸
+  栈板编号
+  出口报关方式
+  采购公司
+  采购单价(不含税)
+  开票税率
+  Unnamed: 27
+  Unnamed: 28
 
-�������� 1 �ж�ȡ�����ļ�:
-ǰ5��: [['�ܾ���(KG)', 3156.66], ['���˷�(RMB)', 6339.01], ['�˷ѵ���(RMB/KG)', 2.00813834876103], ['�Ӽ���', 0.05], ['����ϵ��', 1.1]]
-����: ['�ɹ�װ�䵥���', 'CXCJ202501220l']
+Verifying first 10 rows of data:
+  Row 1: 1.0
+  Row 2: 2.0
+  Row 3: 3.0
+  Row 4: 4.0
+  Row 5: 5.0
+  Row 6: 6.0
+  Row 7: 13.0
+  Row 8: 14.0
+  Row 9: 19.0
+  Row 10: 20.0
 
-�������� 2 �ж�ȡ�����ļ�:
-ǰ5��: [['���˷�(RMB)', 6339.01], ['�˷ѵ���(RMB/KG)', 2.00813834876103], ['�Ӽ���', 0.05], ['����ϵ��', 1.1], ['���շ���', 0.0005]]
-����: ['�ܾ���(KG)', 3156.66]
+Packing List output columns defined:
+['S/N', 'Part Number', '名称', 'Model Number', 'Quantity', 'Total Carton Quantity', 'Total Volume (CBM)', 'Total Gross Weight (kg)', 'Total Net Weight (kg)', 'Carton Number']
 
-�������� 3 �ж�ȡ�����ļ�:
-ǰ5��: [['�˷ѵ���(RMB/KG)', 2.00813834876103], ['�Ӽ���', 0.05], ['����ϵ��', 1.1], ['���շ���', 0.0005], ['����(RMB/��Ԫ)', 0.139122692302341]]
-����: ['���˷�(RMB)', 6339.01]
+Finding column mappings...
+Found column '序号' for NO.
+Found column '料号' for Material code
+Found column '供应商开票名称' for DESCRIPTION
+Found column '进口清关货描' for Commodity Description (Customs)
+Found column '型号' for Model NO.
+Found column '采购单价(不含税)' for Unit Price
+Found column '数量' for Qty
+Found column '单位' for Unit
+Found exact total net weight match: 总净重
+Selected net weight column for both invoice and packing list: 总净重
+Using '总净重' for all net weight values
+Found column '总毛重' for G.W (KG)
+Found column '工厂地点' for factory
+Found column '项目名称' for project
+WARNING: Could not find a column matching patterns ['end use', '用途'] for end use
+Found column '总件数' for CTNS
+Found column '总体积' for Carton MEASUREMENT
+Found column '箱号' for Carton NO.
+Found column '出口报关方式' for Trade Type
+Using '供应商开票名称' column '供应商开票名称' for DESCRIPTION as recommended
+Found customs description column '进口清关货描' for import invoice
+Using total gross weight column: 总毛重 for G.W (KG)
+Using '供应商开票名称' column '供应商开票名称' for packing list 名称 as well
+Successfully mapped project column from '项目名称'
 
-װ�䵥�ļ��ṹ:
-�� 1 ��: ['�ɹ�װ�䵥', nan, nan, '�ɹ�װ�䵥��ţ�', 'CXCI2025012201']...
-�� 2 ��: ['S/N', 'Part Number', 'Supplier', 'Project', 'Plant Location']...
-�� 3 ��: ['���', '�Ϻ�', '��Ӧ��', '��Ŀ����', '�����ص�']...
-�� 4 ��: [1, 'C100.C05-032-04-00', '���', 'SMT�����豸���', 'Silvassa']...
-�� 5 ��: [2, 'E100.020310008', '��÷����', 'SMT�����豸���', 'Silvassa']...
+Column mappings summary:
 
-���Բ�ͬ�ı�ͷ���ö�ȡװ�䵥:
+Found column mappings:
+  NO. <- 序号
+  Material code <- 料号
+  DESCRIPTION <- 供应商开票名称
+  Model NO. <- 型号
+  Unit Price <- 采购单价(不含税)
+  Qty <- 数量
+  Unit <- 单位
+  net weight <- 总净重
+  factory <- 工厂地点
+  project <- 项目名称
 
-��׼��ȡ:
-��׼��ȡ����: Value must be either numerical or a string containing a wildcard
+Missing column mappings:
+  end use - No matching column found in the source file
 
-�༶��ͷ��ȡ [��2-3��]:
-�༶��ͷ��ȡ����: Value must be either numerical or a string containing a wildcard
+Found 12 out of 11 expected column mappings (109.1%)
 
-�������У��༶��ͷ��ȡ:
-�������ж༶��ͷ��ȡ����: Value must be either numerical or a string containing a wildcard
+Found net weight column: 总净重
+Sample net weight values:
+  Row 1: 1120.0
+  Row 2: 250.0
+  Row 3: 420.0
+  Row 4: 1000.0
+  Row 5: 1000.0
+
+贸易类型统计：
+  一般贸易物料数量: 24
+  买单贸易物料数量: 0
+Converted net weight to numeric. Example values: 0    1120.0
+1     250.0
+2     420.0
+3    1000.0
+4    1000.0
+Name: net weight, dtype: float64
+Total net weight calculated: 4529.59 kg
+
+Summary statistics:
+  Total items: 24
+  Total net weight: 4529.59 kg
+  Unit freight rate: ¥1.39946661839151 per kg
+  Markup percentage: 5.0%
+  Exchange rate: ¥0.139122692302341 per USD
+
+CIF发票工厂值:
+  工厂唯一值: ['Silvassa']
+
+CIF发票项目值:
+  项目唯一值: ['麦格米特' '大华' '波峰焊配件']
+Successfully saved and styled: outputs\pl_original_invoice.xlsx
+
+General trade count in result_df: 21
+General trade count in pl_result_df: 21
+
+Columns in pl_result_df:
+['S/N', 'Part Number', '名称', 'Model Number', 'Quantity', 'Total Carton Quantity', 'Total Volume (CBM)', 'Total Gross Weight (kg)', 'Total Net Weight (kg)', 'Carton Number', 'project', 'Trade Type', 'Shipper', 'factory']
+
+Columns in pl_df:
+['S/N', 'Part Number', '名称', 'Model Number', 'Quantity', 'Total Carton Quantity', 'Total Volume (CBM)', 'Total Gross Weight (kg)', 'Total Net Weight (kg)', 'Carton Number', 'project', 'Trade Type', 'Shipper', 'factory']
+Removed existing file: outputs\export_invoice.xlsx
+Reset export packing list S/N to start from 1
+
+Packing List columns before saving:
+['S/N', 'Part Number', '名称', 'Model Number', 'Quantity', 'Total Carton Quantity', 'Total Volume (CBM)', 'Total Gross Weight (kg)', 'Total Net Weight (kg)', 'Carton Number']
+Error merging cells in Packing List: File is not a zip file
+Error applying footer styling: File is not a zip file
+Using invoice sheet name: CXCI202504304785
+Successfully merged cells in Packing List for outputs\export_invoice.xlsx
+Successfully applied footer styling to PL sheet
+Successfully saved and styled export file with multiple sheets: outputs\export_invoice.xlsx
+Merging files: h.xlsx, export_invoice.xlsx, f.xlsx
+Found files for merging Commercial Invoice:
+  h.xlsx: h.xlsx
+  f.xlsx: f.xlsx
+Found files for merging Packing List:
+  pl_h.xlsx: pl_h.xlsx
+  pl_f.xlsx: pl_f.xlsx
+Found merge.py at: merge.py
+Running merge command: D:\project\export_reimport\.venv\Scripts\python.exe merge.py h.xlsx outputs\temp_export_invoice.xlsx f.xlsx outputs\export_invoice.xlsx pl_h.xlsx pl_f.xlsx
+Merge output:
+Merging files: D:\project\export_reimport\h.xlsx, D:\project\export_reimport\outputs\temp_export_invoice.xlsx, D:\project\export_reimport\f.xlsx
+Using sheet names from middle file: 'PL' and 'CXCI202504304785'
+Detected reimport invoice - using second sheet of h.xlsx as first parameter
+Processing CXCI202504304785: D:\project\export_reimport\h.xlsx
+Processing CXCI202504304785: D:\project\export_reimport\outputs\temp_export_invoice.xlsx
+Processing CXCI202504304785: D:\project\export_reimport\f.xlsx
+Merging PL with: D:\project\export_reimport\pl_h.xlsx, D:\project\export_reimport\outputs\temp_export_invoice.xlsx, D:\project\export_reimport\pl_f.xlsx
+Processing PL: D:\project\export_reimport\pl_h.xlsx
+Processing PL: D:\project\export_reimport\outputs\temp_export_invoice.xlsx
+Processing PL: D:\project\export_reimport\pl_f.xlsx
+Successfully saved merged file to: D:\project\export_reimport\outputs\export_invoice.xlsx
+
+Successfully merged files into: outputs\export_invoice.xlsx
+Available columns for splitting: ['NO.', 'Material code', 'DESCRIPTION', 'Model NO.', 'Unit Price', 'Qty', 'Unit', 'Amount', 'net weight', '采购单价', '采购总价', 'FOB单价', 'FOB总价', '总保费', '总运费', '每公斤摊的运保费', '该项对应的运保费', 'CIF总价(FOB总价+运保费)', 'CIF单价', '单价USD数值', '单位', 'factory', 'project', 'end use', 'G.W (KG)', 'Trade Type', 'Shipper', 'Original_Unit', 'Total Net Weight (kg)']
+Unique project values: ['麦格米特' '大华' '波峰焊配件']
+Unique factory values: ['Silvassa']
+Found 21 rows for project 工厂
+Found 21 rows for 工厂 - Silvassa
+Added empty DataFrame for 大华 - Silvassa
+Added empty DataFrame for 麦格米特 - Silvassa
+Warning: Could not remove existing file: [WinError 32] 另一个程序正在使用此文件，进程无法访问。: 'outputs\\reimport_invoice.xlsx'
+处理文件时出错: [Errno 13] Permission denied: 'outputs\\reimport_invoice.xlsx'
+
+尝试跳过 0 行读取政策文件:
+前5行: [['采购装箱单编号', 'CXCJ202501220l'], ['总净重(KG)', 3156.66], ['总运费(RMB)', 6339.01], ['运费单价(RMB/KG)', 2.00813834876103], ['加价率', 0.05]]
+列名: ['字段', '值']
+
+尝试跳过 1 行读取政策文件:
+前5行: [['总净重(KG)', 3156.66], ['总运费(RMB)', 6339.01], ['运费单价(RMB/KG)', 2.00813834876103], ['加价率', 0.05], ['保险系数', 1.1]]
+列名: ['采购装箱单编号', 'CXCJ202501220l']
+
+尝试跳过 2 行读取政策文件:
+前5行: [['总运费(RMB)', 6339.01], ['运费单价(RMB/KG)', 2.00813834876103], ['加价率', 0.05], ['保险系数', 1.1], ['保险费率', 0.0005]]
+列名: ['总净重(KG)', 3156.66]
+
+尝试跳过 3 行读取政策文件:
+前5行: [['运费单价(RMB/KG)', 2.00813834876103], ['加价率', 0.05], ['保险系数', 1.1], ['保险费率', 0.0005], ['汇率(RMB/美元)', 0.139122692302341]]
+列名: ['总运费(RMB)', 6339.01]
+
+装箱单文件结构:
+第 1 行: [nan, nan, nan, nan, nan]...
+第 2 行: ['S/N', 'Part Number', 'Supplier', 'Project', 'Plant Location']...
+第 3 行: ['序号', '料号', '供应商', '项目名称', '工厂地点']...
+第 4 行: [1, 'E100.0111800001', '思泰克', '麦格米特', 'Silvassa']...
+第 5 行: [2, 'E100.019600001', '弘旺', '麦格米特', 'Silvassa']...
+
+尝试不同的表头配置读取装箱单:
+
+标准读取:
+列名: ['Unnamed: 0', 'Unnamed: 1', 'Unnamed: 2', 'Unnamed: 3', 'Unnamed: 4']...
+
+多级表头读取 [第2-3行]:
+列名: [('S/N', '序号'), ('Part Number', '料号'), ('Supplier', '供应商'), ('Project', '项目名称'), ('Plant Location', '工厂地点')]...
+
+跳过首行，多级表头读取:
+列名: [('S/N', '序号'), ('Part Number', '料号'), ('Supplier', '供应商'), ('Project', '项目名称'), ('Plant Location', '工厂地点')]...
