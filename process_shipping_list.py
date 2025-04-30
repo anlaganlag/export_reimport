@@ -504,7 +504,7 @@ def merge_india_invoice_rows(df):
     # Group by Part Number and Unit Price only, then aggregate
     try:
         # 确保所有必要的列都存在于结果DataFrame中
-        required_columns = ['S/N', 'Part Number', 'DESCRIPTION', 'Unit Price (CIF, USD)',
+        required_columns = ['S/N', 'Part Number', 'Commodity Description (Customs)', 'Unit Price (CIF, USD)',
                            'Quantity', 'Unit', 'Total Amount (CIF, USD)', 'Total Net Weight (kg)']
 
         for col in required_columns:
@@ -513,7 +513,7 @@ def merge_india_invoice_rows(df):
                     result_df[col] = range(1, len(result_df) + 1)
                 elif col == 'Unit':
                     result_df[col] = 'PCS'  # 默认单位
-                elif col == 'DESCRIPTION':
+                elif col == 'Commodity Description (Customs)':
                     result_df[col] = result_df['Part Number'] if 'Part Number' in result_df.columns else 'Unknown'
                 else:
                     result_df[col] = 0
@@ -524,7 +524,7 @@ def merge_india_invoice_rows(df):
             'Total Amount (CIF, USD)': 'sum',
             'Total Net Weight (kg)': 'sum',
             # Keep the first occurrence of other fields
-            'DESCRIPTION': 'first',
+            'Commodity Description (Customs)': 'first',
             'Unit': 'first'
         }
 
@@ -626,7 +626,7 @@ def print_column_mappings(mappings):
 
     # Define the expected column list
     expected_columns = [
-        'NO.', 'Material code', 'DESCRIPTION', 'Model NO.', 'Unit Price', 'Qty', 'Unit',
+        'NO.', 'Material code', 'DESCRIPTION', 'Commodity Description (Customs)','Model NO.', 'Unit Price', 'Qty', 'Unit',
         'net weight', 'factory', 'project', 'end use'
     ]
 
@@ -1018,7 +1018,7 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
     # 修改: 将 '供应商开票名称' 放在匹配模式的最前面，优先使用该字段作为DESCRIPTION
     description_col = find_column_with_pattern(packing_list_df, ['供应商开票名称', 'Commercial Invoice Description', '清关英文货描(关务提供)', '描述', 'description'], 'DESCRIPTION')
     # 新增：查找进口清关货描（Commodity Description (Customs)）列
-    customs_desc_col = find_column_with_pattern(packing_list_df, ['进口清关货描', 'Commodity Description (Customs)'], 'Commodity Description (Customs)')
+    customs_desc_col = find_column_with_pattern(packing_list_df, ['进口清关货描', 'Commodity Description (Customs)', 'Customs Description', 'Import Customs Description', '进口清关英文货描', 'Customs Commodity Description'], 'Commodity Description (Customs)')
     model_col = find_column_with_pattern(packing_list_df, ['Model Number', '型号', '物料型号', '货物型号', 'model'], 'Model NO.')
     unit_price_col = find_column_with_pattern(packing_list_df, ['Unit Price (Excl. Tax, CNY)()', 'unit price', '采购单价不含税', '不含税单价', '单价'], 'Unit Price')
     qty_col = find_column_with_pattern(packing_list_df, ['Quantity', 'quantity', '数量', 'qty'], 'Qty')
@@ -1210,15 +1210,20 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
         if '供应商开票名称' in str(description_col):
             print(f"Using '供应商开票名称' column '{description_col}' for DESCRIPTION as recommended")
         else:
-            print(f"Using '{description_col}' as the source for DESCRIPTION")
+            print(f"Using '{description_col}' for DESCRIPTION field")
+            
+    # 填入海关描述（如果有）
+    if customs_desc_col:
+        result_df['Commodity Description (Customs)'] = packing_list_df[customs_desc_col]
+        column_mappings['Commodity Description (Customs)'] = customs_desc_col
+        print(f"Using '{customs_desc_col}' for Commodity Description (Customs) field - this will be used for import invoices")
+    elif description_col:  # 如果没有清关货描，则使用普通描述作为替代
+        result_df['Commodity Description (Customs)'] = packing_list_df[description_col]
+        column_mappings['Commodity Description (Customs)'] = description_col
+        print(f"No customs description found, using '{description_col}' for Commodity Description (Customs) as fallback")
     else:
-        # Description is essential - default to Material code if not found
-        if material_code_col:
-            result_df['DESCRIPTION'] = packing_list_df[material_code_col]
-            print("WARNING: Description column not found, using Material code as Description")
-        else:
-            result_df['DESCRIPTION'] = "Unknown Material"
-            print("WARNING: Description and Material code columns not found")
+        result_df['Commodity Description (Customs)'] = ''
+        print("Warning: No description column found for Commodity Description (Customs)")
 
     if model_col:
         result_df['Model NO.'] = packing_list_df[model_col]
@@ -1582,7 +1587,7 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
 
     # Define output column sets
     cif_output_columns = [
-        'NO.', 'Material code', 'DESCRIPTION', 'Model NO.', 'Unit Price', 'Qty', 'Unit', 'Amount',
+        'NO.', 'Material code', 'DESCRIPTION', 'Commodity Description (Customs)','Model NO.', 'Unit Price', 'Qty', 'Unit', 'Amount',
         'net weight', '采购单价', '采购总价', 'FOB单价', 'FOB总价', '总保费', '总运费', '每公斤摊的运保费',
         '该项对应的运保费', 'CIF总价(FOB总价+运保费)', 'CIF单价', '单价USD数值', '单位',
         'factory', 'project', 'end use'
@@ -1967,6 +1972,8 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
                         ws.column_dimensions[get_column_letter(col_idx)].width = 25  # Wider for Amount
                     elif col_name == '名称':
                         ws.column_dimensions[get_column_letter(col_idx)].width = 30  # Wider for Description
+                    elif col_name == 'Commodity Description (Customs)':
+                        ws.column_dimensions[get_column_letter(col_idx)].width = 35  # Wider for Customs Description
                     elif col_name == 'Model Number':
                         ws.column_dimensions[get_column_letter(col_idx)].width = 20  # Wider for Model Number
                     elif col_name == 'Total Net Weight (kg)':
@@ -2363,7 +2370,7 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
 
         # Process each split for Commercial Invoice sheets only
         # Generate base invoice number and increment for each sheet
-        base_invoice_name = generate_invoice_sheet_name(prefix="RIMP")
+        base_invoice_name = generate_invoice_sheet_name(prefix="RECI")
         # Extract the numeric part for incrementing
         invoice_prefix = base_invoice_name[:-4]  # Everything except last 4 digits
         invoice_number = int(base_invoice_name[-4:])  # Last 4 digits as integer
@@ -2398,32 +2405,57 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
                 reimport_file_name = f'reimport_{project_safe}_{factory_safe}.xlsx'
                 reimport_file_path = os.path.join(output_dir, reimport_file_name)
 
-                # Create a copy for the invoice
-                invoice_df = df[['NO.', 'Material code', 'DESCRIPTION', 'CIF单价', 'Qty', 'Unit', 'CIF总价(FOB总价+运保费)', 'Total Net Weight (kg)']].copy()
+                # Create a copy for the invoice with safe column handling
+                required_columns = ['NO.', 'Material code', 'DESCRIPTION', 'CIF单价', 'Qty', 'Unit', 'CIF总价(FOB总价+运保费)', 'Total Net Weight (kg)']
+                
+                # Only add Commodity Description (Customs) if it exists 
+                if 'Commodity Description (Customs)' in df.columns:
+                    required_columns.append('Commodity Description (Customs)')
+                
+                # Filter to only include columns that actually exist in the dataframe
+                available_columns = [col for col in required_columns if col in df.columns]
+                invoice_df = df[available_columns].copy()
+                
+                # 为进口发票使用进口清关货描 (Customs Description)
+                print(f"Processing import invoice {reimport_file_name}")
+                # 检查是否有进口清关货描列
+                if 'Commodity Description (Customs)' in invoice_df.columns and not invoice_df['Commodity Description (Customs)'].isna().all():
+                    print(f"Using customs description (进口清关货描) for import invoice {reimport_file_name}")
+                else:
+                    # 如果没有清关货描或者全为空，使用普通描述作为替代
+                    invoice_df['Commodity Description (Customs)'] = invoice_df['DESCRIPTION']
+                    print(f"WARNING: No valid customs description found for {reimport_file_name}, using regular description as fallback")
+                
                 # 调整列顺序
                 reimport_columns = [
-                    'S/N', 'Part Number', 'DESCRIPTION', 'Unit Price (CIF, USD)', 'Quantity', 'Unit', 'Total Amount (CIF, USD)', 'Total Net Weight (kg)'
+                    'S/N', 'Part Number', 'Commodity Description (Customs)', 'Unit Price (CIF, USD)', 'Quantity', 'Unit', 'Total Amount (CIF, USD)', 'Total Net Weight (kg)'
                 ]
+                
+                # 重命名列
                 invoice_df = invoice_df.rename(columns={
                     'NO.': 'S/N',
                     'Material code': 'Part Number',
+                    'Commodity Description (Customs)': 'Commodity Description (Customs)',
                     'CIF单价': 'Unit Price (CIF, USD)',
                     'Qty': 'Quantity',
                     'CIF总价(FOB总价+运保费)': 'Total Amount (CIF, USD)',
                     'Unit': 'Unit'
                 })
+                
+                # 选择需要的列
                 invoice_df = invoice_df[reimport_columns]
-                # 保证Unit Price (CIF, USD)为美元价
-                if 'Unit Price (CIF, USD)' in invoice_df.columns:
-                    invoice_df['Unit Price (CIF, USD)'] = round(invoice_df['Unit Price (CIF, USD)'] * exchange_rate,4)
-                    invoice_df['Total Amount (CIF, USD)'] = invoice_df['Unit Price (CIF, USD)'] * invoice_df['Quantity']
+                
+                # 保证Unit Price (CIF, USD)为美元价 - 人民币单价除以汇率转换为美元单价
+                invoice_df['Unit Price (CIF, USD)'] = round(invoice_df['Unit Price (CIF, USD)'] * exchange_rate,4) 
+                invoice_df['Total Amount (CIF, USD)'] = invoice_df['Unit Price (CIF, USD)'] * invoice_df['Quantity']
+                print(f"Converting prices from RMB to USD using exchange rate: {exchange_rate}")
 
-                    # 合并相同Part Number和Unit Price的行
+                # 合并相同Part Number和Unit Price的行
                 invoice_df = merge_india_invoice_rows(invoice_df)
 
                 # Add summary row to invoice
                 summary_invoice = {col: '' for col in reimport_columns}
-                summary_invoice['DESCRIPTION'] = 'Total'
+                summary_invoice['Commodity Description (Customs)'] = 'Total'
                 summary_invoice['Part Number'] = ''
                 for col in ['Quantity', 'Total Amount (CIF, USD)', 'Total Net Weight (kg)']:
                     if col in invoice_df.columns:
@@ -2485,6 +2517,10 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
                     ws.column_dimensions[get_column_letter(col_idx)].width = 25  # Wider for Amount
                 elif col_name == '名称':
                     ws.column_dimensions[get_column_letter(col_idx)].width = 30  # Wider for Description
+                elif col_name == 'Commodity Description (Customs)':
+                    ws.column_dimensions[get_column_letter(col_idx)].width = 35  # Wider for Customs Description
+                elif col_name == 'Model Number':
+                    ws.column_dimensions[get_column_letter(col_idx)].width = 20  # Wider for Model Number
                 elif col_name == 'Total Net Weight (kg)':
                     ws.column_dimensions[get_column_letter(col_idx)].width = 20  # Wider for Net Weight
                 else:
