@@ -1336,11 +1336,16 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
     if material_code_col:
         pl_result_df['Part Number'] = packing_list_df[material_code_col]
 
-    if description_col:
+    # 修改：优先使用进口清关货描作为PL的"名称"列
+    if customs_desc_col:
+        pl_result_df['名称'] = packing_list_df[customs_desc_col]
+        print(f"PL '名称'列已替换为进口清关货描: {customs_desc_col}")
+    elif description_col:
         pl_result_df['名称'] = packing_list_df[description_col]
-        # 添加日志，显示使用的是相同的描述源
-        if '供应商开票名称' in str(description_col):
-            print(f"Using '供应商开票名称' column '{description_col}' for packing list 名称 as well")
+        print(f"PL '名称'列未找到进口清关货描，使用描述字段: {description_col}")
+    else:
+        pl_result_df['名称'] = ''
+        print("PL '名称'列未找到任何可用字段，填空")
 
     if model_col:
         pl_result_df['Model Number'] = packing_list_df[model_col]
