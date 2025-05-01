@@ -612,7 +612,7 @@ class InputValidator:
             return {"success": False, "message": f"验证政策文件编号时出错: {str(e)}。文件路径: {policy_file_path}"}
     
     def validate_exchange_rate_decimal(self, policy_file_path):
-        """验证汇率保留4位小数
+        """验证汇率值是否存在且为有效数字
         
         Args:
             policy_file_path: 政策文件路径
@@ -622,38 +622,19 @@ class InputValidator:
         """
         try:
             # 读取政策文件
-            policy_df = pd.read_excel(policy_file_path)
+            policy_df = pd.read_excel(policy_file_path, index_col=0)
             
-            # 查找汇率列
-            exchange_col = find_column_with_pattern(policy_df, ["汇率", "Exchange Rate"])
-            
-            if exchange_col is None:
-                return {"success": False, "message": "未找到汇率列"}
-            
-            # 获取汇率值
-            exchange_rates = policy_df[exchange_col].dropna()
-            if exchange_rates.empty:
-                return {"success": False, "message": "汇率列无数据"}
-            
-            # 验证是否保留4位小数
-            invalid_rates = []
-            for rate in exchange_rates:
-                # 将数字转为字符串检查小数位数
-                rate_str = str(rate)
-                if '.' in rate_str:
-                    decimal_part = rate_str.split('.')[1]
-                    if len(decimal_part) != 4:
-                        invalid_rates.append(rate)
-            
-            if invalid_rates:
-                return {
-                    "success": False, 
-                    "message": f"以下汇率未保留4位小数: {', '.join(map(str, invalid_rates))}"
-                }
+            # 直接通过索引获取汇率值
+            try:
+                exchange_rate = float(policy_df.loc['汇率(RMB/美元)', '值'])
+                return {"success": True, "message": "汇率验证通过"}
+            except KeyError:
+                return {"success": False, "message": "未找到汇率(RMB/美元)行"}
+            except ValueError:
+                return {"success": False, "message": "汇率值无法转换为数字"}
                 
-            return {"success": True, "message": "汇率小数位验证通过"}
         except Exception as e:
-            return {"success": False, "message": f"验证汇率小数位时出错: {str(e)}"}
+            return {"success": False, "message": f"验证汇率时出错: {str(e)}"}
     
     def validate_company_bank_info(self, policy_file_path):
         """验证政策文件包含公司信息和银行信息

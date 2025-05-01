@@ -16,7 +16,7 @@
       "required_fields": ["Total", "合计"]
     },
     "exchange_rate": {
-      "decimal_places": 4
+      "decimal_places": null
     },
     "company_bank_info": {
       "required_fields": ["Company Name", "Bank", "Account"]
