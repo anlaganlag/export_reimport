@@ -70,10 +70,25 @@ class InputValidator:
             dict: 含success和message的验证结果
         """
         try:
-            # 直接读取第一行进行验证，不跳过任何行
-            header_rows = pd.read_excel(file_path, nrows=1, header=None)
-            # 读取Excel文件第一行第一列(A1单元格)的内容
-            header_text = str(header_rows.iloc[0, 0])
+            # 读取前几行进行检测，确保不使用第一行作为列名
+            header_rows = pd.read_excel(file_path, nrows=3, header=None)
+            
+            # 打印调试信息
+            print("DEBUG: 读取到的表头内容：")
+            for i in range(min(3, len(header_rows))):
+                row_content = []
+                for j in range(len(header_rows.columns)):
+                    if pd.notna(header_rows.iloc[i, j]):
+                        row_content.append(str(header_rows.iloc[i, j]))
+                print(f"Row {i+1}: {' | '.join(row_content)}")
+            
+            # 获取第一行内容（标题行）
+            first_row = []
+            for j in range(len(header_rows.columns)):
+                if pd.notna(header_rows.iloc[0, j]):
+                    first_row.append(str(header_rows.iloc[0, j]))
+            header_text = ' '.join(first_row)
+            print(f"DEBUG: 完整的第一行内容: {header_text}")
             
             # 检查是否包含必要标题文本
             required_headers = ["采购装箱单"]
@@ -90,11 +105,26 @@ class InputValidator:
                 }
                 
             # 检查是否包含编号
-            id_match = re.search(r'[A-Za-z0-9-]+', header_text)
+            # 修改正则表达式以匹配更多格式的编号，包括带有"编号："的情况
+            id_patterns = [
+                r'编号[：:]\s*([A-Za-z]{2,4}\d{8,12})',  # 匹配 "编号：CXCI202501201" 格式
+                r'(?:单号[：:]|No\.:|[A-Za-z]{2,4})[：:\s]*([A-Za-z0-9-]+)',  # 匹配其他格式
+                r'([A-Za-z]{2,4}\d{8,12})'  # 直接匹配编号格式
+            ]
+            
+            id_match = None
+            for pattern in id_patterns:
+                match = re.search(pattern, header_text)
+                if match:
+                    id_match = match
+                    print(f"DEBUG: 找到编号，使用模式 {pattern}")
+                    print(f"DEBUG: 匹配到的编号: {match.group(1) if len(match.groups()) > 0 else match.group(0)}")
+                    break
+            
             if not id_match:
                 return {
                     "success": False, 
-                    "message": f"表头未包含编号。实际值: '{header_text[:50]}...'。验收标准: 文件表头应包含采购单编号(如PL-20250418-0001格式)。正确示例: '采购装箱单 PL-20250418-0001'"
+                    "message": f"表头未包含编号。实际值: '{header_text[:50]}...'。验收标准: 文件表头应包含采购单编号。正确示例: '采购装箱单 编号：CXCI202501201'"
                 }
                 
             # 检测文件结构（在验证完表头后）
@@ -102,7 +132,7 @@ class InputValidator:
                 
             return {
                 "success": True, 
-                "message": f"采购装箱单表头验证通过。找到标题: '{', '.join(found_headers)}', 编号: '{id_match.group(0)}'"
+                "message": f"采购装箱单表头验证通过。找到标题: '{', '.join(found_headers)}', 编号: '{id_match.group(1) if len(id_match.groups()) > 0 else id_match.group(0)}'"
             }
         except Exception as e:
             return {"success": False, "message": f"验证表头时出错: {str(e)}。文件路径: {file_path}"}
@@ -117,11 +147,20 @@ class InputValidator:
             str: 提取的编号，若未找到则返回None
         """
         try:
-            header_rows = pd.read_excel(file_path, nrows=1, header=None)
-            header_text = str(header_rows.iloc[0, 0])
-            match = re.search(r'(\w+-\d+|\w+\d+)', header_text)
-            if match:
-                return match.group(1)
+            header_rows = pd.read_excel(file_path, nrows=3, header=None)
+            
+            # 遍历前几行寻找编号
+            for i in range(min(3, len(header_rows))):
+                if pd.notna(header_rows.iloc[i, 0]):
+                    header_text = str(header_rows.iloc[i, 0])
+                    # 首先尝试匹配带标识的编号
+                    match = re.search(r'(?:编号:|单号:|No\.:|[A-Za-z]{2,4})[:\s]*([A-Za-z0-9-]+)', header_text)
+                    if match:
+                        return match.group(1)
+                    # 然后尝试直接匹配编号格式
+                    match = re.search(r'[A-Za-z]{2,4}\d{8,12}', header_text)
+                    if match:
+                        return match.group(0)
             return None
         except Exception:
             return None
@@ -563,51 +602,58 @@ class InputValidator:
                 }
                 
             # 读取政策文件
-            policy_df = pd.read_excel(policy_file_path)
+            policy_df = pd.read_excel(policy_file_path, index_col=0)
+            print(f"DEBUG: 政策文件内容：\n{policy_df.head()}")
             
             # 查找编号列或表头
             id_found = False
             policy_id = None
             
-            # 先检查表头
-            header_rows = pd.read_excel(policy_file_path, nrows=1, header=None)
-            header_text = str(header_rows.iloc[0, 0])
-            match = re.search(r'(\w+-\d+|\w+\d+)', header_text)
-            if match:
-                policy_id = match.group(1)
+            # 检查是否有"采购装箱单编号"作为索引
+            if "采购装箱单编号" in policy_df.index:
+                policy_id = str(policy_df.loc["采购装箱单编号", "值"])
                 id_found = True
+                print(f"DEBUG: 在政策文件中找到编号: {policy_id}")
             
-            # 如果表头没找到，检查编号列
+            # 如果没找到，尝试其他可能的索引名
             if not id_found:
-                id_cols = ["编号", "Number", "ID", "单号", "装箱单号", "Policy No", "参考编号"]
-                for col in id_cols:
-                    if col in policy_df.columns and not policy_df[col].empty:
-                        policy_id = str(policy_df[col].iloc[0])
+                possible_indices = ["编号", "Number", "ID", "单号", "装箱单号", "Policy No", "参考编号"]
+                for idx in possible_indices:
+                    if idx in policy_df.index:
+                        policy_id = str(policy_df.loc[idx, "值"])
                         id_found = True
+                        print(f"DEBUG: 在政策文件中找到编号: {policy_id}")
                         break
-                        
-                # 尝试查找包含这些关键词的列
-                if not id_found:
-                    for col in policy_df.columns:
-                        if any(key in str(col) for key in ["编号", "号", "ID", "No"]):
-                            policy_id = str(policy_df[col].iloc[0])
-                            id_found = True
-                            break
             
             if not id_found or policy_id is None:
                 return {
                     "success": False, 
                     "message": f"未在政策文件中找到编号。验收标准: 政策文件应包含与装箱单匹配的编号(参见文档第21行要求)。正确示例: 表头包含'Policy No: PL-20250418-0001'或有单独的'编号'列。"
                 }
-                
-            # 比较编号是否一致
-            if packing_list_id not in policy_id and policy_id not in packing_list_id:
+            
+            # 清理编号字符串，移除可能的空格和特殊字符
+            policy_id = policy_id.strip()
+            packing_list_id = packing_list_id.strip()
+            
+            # 标准化编号：将小写l替换为数字1，将大写O替换为数字0
+            policy_id_normalized = policy_id.replace('l', '1').replace('O', '0')
+            packing_list_id_normalized = packing_list_id.replace('l', '1').replace('O', '0')
+            
+            # 提取数字部分进行比较
+            policy_numbers = ''.join(filter(str.isdigit, policy_id_normalized))
+            packing_list_numbers = ''.join(filter(str.isdigit, packing_list_id_normalized))
+            
+            print(f"DEBUG: 政策文件编号数字部分: {policy_numbers}")
+            print(f"DEBUG: 装箱单编号数字部分: {packing_list_numbers}")
+            
+            # 如果数字部分相同，认为是同一个编号
+            if policy_numbers == packing_list_numbers:
+                return {"success": True, "message": "政策文件编号验证通过"}
+            else:
                 return {
                     "success": False, 
                     "message": f"政策文件编号({policy_id})与采购装箱单编号({packing_list_id})不一致。验收标准: 两个文件的编号应保持一致(参见文档第21行要求)。"
                 }
-                
-            return {"success": True, "message": "政策文件编号验证通过"}
         except Exception as e:
             return {"success": False, "message": f"验证政策文件编号时出错: {str(e)}。文件路径: {policy_file_path}"}
     
@@ -693,13 +739,21 @@ class InputValidator:
         results = {}
         
         # 采购装箱单验证
-        results["packing_list_header"] = self.validate_packing_list_header(packing_list_path)
+        header_result = self.validate_packing_list_header(packing_list_path)
+        results["packing_list_header"] = header_result
+        
+        # 从header_result中提取编号
+        packing_list_id = None
+        if header_result["success"]:
+            # 从成功消息中提取编号
+            match = re.search(r'编号: \'([^\']+)\'', header_result["message"])
+            if match:
+                packing_list_id = match.group(1)
+                print(f"DEBUG: 从表头验证结果中提取到编号: {packing_list_id}")
+        
         results["packing_list_field_headers"] = self.validate_packing_list_field_headers(packing_list_path)
         results["weights"] = self.validate_weights(packing_list_path)
         results["summary_data"] = self.validate_summary_data(packing_list_path)
-        
-        # 提取采购装箱单编号
-        packing_list_id = self.extract_id(packing_list_path)
         
         # 政策文件验证
         results["policy_file_id"] = self.validate_policy_file_id(policy_file_path, packing_list_id)
