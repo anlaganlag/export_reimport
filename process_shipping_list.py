@@ -2582,8 +2582,15 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
                 # Create empty row and words row
                 empty_row = pd.DataFrame([{col: '' for col in reimport_columns}])
                 words_row = pd.DataFrame([{col: '' for col in reimport_columns}])
+
+                # Calculate the total amount for THIS specific invoice
+                this_invoice_total = summary_invoice.get('Total Amount (CIF, USD)', 0)
+                # Convert to words using the specific invoice amount
+                this_invoice_amount_words = num_to_words(this_invoice_total)
+                print(f"Generated Amount in Words for {project}_{factory}: {this_invoice_amount_words} (from amount: {this_invoice_total})")
+
                 words_row['S/N'] = 'Amount in Words:'
-                words_row['Part Number'] = f"SAY USD {total_amount_words} ONLY."
+                words_row['Part Number'] = f"SAY USD {this_invoice_amount_words} ONLY."
                 # Add all rows to the DataFrame
                 invoice_df = pd.concat([invoice_df, summary_row, empty_row, words_row], ignore_index=True)[reimport_columns]
 
