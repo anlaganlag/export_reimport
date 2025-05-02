@@ -712,6 +712,21 @@ def split_by_project_and_factory(df):
     """Split the dataframe by project and factory."""
     print("Available columns for splitting:", df.columns.tolist())
 
+    # 过滤掉表头行 - 检查第一行是否包含列名或中文字段名
+    if len(df) > 0:
+        first_row = df.iloc[0]
+        is_header_row = False
+
+        # 检查第一行是否是表头行（包含列名或中文字段名）
+        for col, val in first_row.items():
+            if isinstance(val, str) and (val in df.columns or '工厂' in val or '序号' in val or '料号' in val):
+                is_header_row = True
+                break
+
+        if is_header_row:
+            print("检测到第一行是表头行，将其过滤掉")
+            df = df.iloc[1:].reset_index(drop=True)
+
     # 确保必要的列存在
     if 'project' not in df.columns:
         print("WARNING: 'project'列不存在，添加默认值'大华'")
