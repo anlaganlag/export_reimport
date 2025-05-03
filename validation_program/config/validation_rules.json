@@ -66,8 +66,12 @@
       "merge_identical_prices": true
     },
     "split_logic": {
-      "by_project": true,
+      "by_project": false,
       "by_factory": true
+    },
+    "sheet_naming": {
+      "first_sheet_name": "PL",
+      "invoice_sheet_pattern": "^[A-Z0-9]+$"
     }
   },
   "input_validation_rules": [
@@ -217,4 +221,4 @@
       "low_error_percentage": 10.0
     }
   }
-} 
+}

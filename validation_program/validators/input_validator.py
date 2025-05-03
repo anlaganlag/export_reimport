@@ -190,7 +190,7 @@ class InputValidator:
             # 必须字段列表
             required_chinese =  ["序号", "料号", "供应商", "项目名称", "工厂地点", "进口清关货描", "供应商开票名称", "物料名称", "型号", "数量", "单位", "纸箱尺寸", "单件体积", "总体积", "单件毛重", "总毛重", "总净重", "每箱数量", "总件数", "箱号", "栈板尺寸", "栈板编号", "出口报关方式", "采购公司", "采购单价(不含税)", "开票税率"]
 
-            required_english =  ["S/N", "Part Number", "Supplier", "Project", "Plant Location", "Commodity Description (Customs)", "Commercial Invoice Description", "EPR Part NameEPR", "Model Number", "Quantity", "Unit", "Carton Size (L×W×H in mm)", "Unit Volume (CBM)", "Total Volume (CBM)", "Gross Weight per Unit (kg)", "Total Gross Weight (kg)", "Total Net Weight (kg)", "Quantity per Carton", "Total Carton Quantity", "Carton Number", "Pallet Size (L×W×H in mm)", "Pallet ID", "Export Declaration Method", "Purchasing Company", "Unit Price (Excl. Tax, CNY)()", "Tax Rate (%)"]
+            required_english =  ["S/N", "Part Number", "Supplier", "Project", "Plant Location", "Commodity Description (Customs)", "Commercial Invoice Description", "Model Number", "Quantity", "Unit", "Carton Size (L×W×H in mm)", "Unit Volume (CBM)", "Total Volume (CBM)", "Gross Weight per Unit (kg)", "Total Gross Weight (kg)", "Total Net Weight (kg)", "Quantity per Carton", "Total Carton Quantity", "Carton Number", "Pallet Size (L×W×H in mm)", "Pallet ID", "Export Declaration Method", "Purchasing Company", "Tax Rate (%)"]
             
             # 如果发现表头结构不同，尝试其他组合
             if not any(req.lower() in str(x).lower() for x in english_row if pd.notna(x) for req in required_english):
@@ -260,103 +260,82 @@ class InputValidator:
         Returns:
             dict: 含success和message的验证结果
         """
+        print(f"开始验证净重毛重 - 文件: {file_path}")
         try:
-            # 检测文件结构如果还没检测过
             if self.skiprows == 0:
                 self.detect_file_structure(file_path)
-                
-            # 读取数据行，跳过表头
-            df = read_excel_to_df(file_path, skiprows=self.skiprows+2)  # 跳过标题行和字段名行
-            
-            # 查找净重和毛重列
+            print(f"跳过行数: {self.skiprows+2}")
+            df = read_excel_to_df(file_path, skiprows=self.skiprows+2)
+            print(f"成功读取数据，共 {len(df)} 行")
             net_weight_col = find_column_with_pattern(df, ["Total Net Weight (kg)", "总净重"])
             gross_weight_col = find_column_with_pattern(df, ["Total Gross Weight (kg)", "总毛重"])
             carton_number_col = find_column_with_pattern(df, ["Carton Number", "箱号"])
-            
+            print(f"列索引 - 净重: {net_weight_col}, 毛重: {gross_weight_col}, 箱号: {carton_number_col}")
             if net_weight_col is None or gross_weight_col is None:
                 return {"success": False, "message": "未找到净重或毛重列。验收标准: 装箱单必须包含总净重和总毛重列。"}
-                
             if carton_number_col is None:
                 return {"success": False, "message": "未找到箱号列。验收标准: 装箱单必须包含箱号列。"}
-            
-            # 安全转换函数 - 将任何值转换为浮点数
-            def safe_convert_to_float(val):
-                if pd.isna(val):
+
+            # 优化的安全转换函数，记录被容错的异常值
+            def safe_convert_to_float(val, row_idx, col_name, error_log):
+                if val is None or pd.isna(val) or val == "":
                     return 0.0
-                
-                # 如果是数值类型，直接转换
                 if isinstance(val, (int, float)):
                     return float(val)
-                
-                # 转换为字符串进行处理
                 val_str = str(val).strip()
-                
-                # 检查是否为通配符字符串
-                if '*' in val_str or '?' in val_str:
+                if not val_str:
                     return 0.0
-                
+                # 检查是否为通配符字符串
+                if any(x in val_str for x in ['*', '?']):
+                    error_log.append(f"第{row_idx+1}行{col_name}为通配符'{val_str}'，自动按0处理")
+                    return 0.0
                 try:
-                    # 尝试直接转换为浮点数
                     return float(val_str)
                 except (ValueError, TypeError):
                     try:
-                        # 移除所有非数字字符（保留小数点和负号）
                         clean_str = ''.join(c for c in val_str if c.isdigit() or c in '.-')
-                        # 确保字符串不为空且格式有效
                         if clean_str and not clean_str.count('.') > 1:
                             return float(clean_str)
+                        error_log.append(f"第{row_idx+1}行{col_name}值'{val_str}'无法解析，自动按0处理")
                         return 0.0
                     except Exception:
+                        error_log.append(f"第{row_idx+1}行{col_name}值'{val_str}'无法解析，自动按0处理")
                         return 0.0
-            
-            # 创建字典存储每个箱号的总净重和总毛重
+
             carton_net_weights = {}
             carton_gross_weights = {}
-            carton_rows = {}  # 存储每个箱号对应的行号
-            
-            # 扫描所有行，按箱号汇总净重和毛重
+            carton_rows = {}
+            error_log = []  # 新增：记录被容错的异常值
             for idx, row in df.iterrows():
                 try:
-                    # 获取当前箱号
                     if pd.notna(row[carton_number_col]):
                         current_carton = str(row[carton_number_col])
-                        
-                        # 初始化箱号记录
                         if current_carton not in carton_rows:
                             carton_rows[current_carton] = []
                             carton_net_weights[current_carton] = 0.0
                             carton_gross_weights[current_carton] = 0.0
-                            
-                        # 记录行号 (加上跳过的行数和索引起始为0的调整)
-                        carton_rows[current_carton].append(idx + self.skiprows + 3)  
-                        
-                        # 获取净重和毛重值
-                        net_weight_value = safe_convert_to_float(row[net_weight_col])
-                        gross_weight_value = safe_convert_to_float(row[gross_weight_col])
-                        
-                        # 累加净重
+                        carton_rows[current_carton].append(idx + self.skiprows + 3)
+                        try:
+                            net_weight_raw = row[net_weight_col] if net_weight_col < len(row) else None
+                        except:
+                            net_weight_raw = None
+                        try:
+                            gross_weight_raw = row[gross_weight_col] if gross_weight_col < len(row) else None
+                        except:
+                            gross_weight_raw = None
+                        net_weight_value = safe_convert_to_float(net_weight_raw, idx, "净重", error_log)
+                        gross_weight_value = safe_convert_to_float(gross_weight_raw, idx, "毛重", error_log)
                         carton_net_weights[current_carton] += net_weight_value
-                        
-                        # 累加毛重
                         carton_gross_weights[current_carton] += gross_weight_value
                 except Exception as e:
-                    print(f"处理第{idx+1}行时出错: {str(e)}")
+                    error_log.append(f"处理第{idx+1}行时出错: {str(e)}，自动跳过")
                     continue
-            
-            # 检查每个箱号的总净重是否小于总毛重
             invalid_cartons = []
-            
             for carton, total_net_weight in carton_net_weights.items():
-                # 跳过净重为0的箱号
-                if total_net_weight <= 0:
-                    continue
-                
-                # 获取该箱号的毛重
                 gross_weight = carton_gross_weights.get(carton, 0.0)
-                if gross_weight <= 0:
+                if total_net_weight <= 0 or gross_weight <= 0:
+                    error_log.append(f"箱号 {carton} 的净重({total_net_weight})或毛重({gross_weight})为0或无效，自动跳过")
                     continue
-                    
-                # 检查总净重是否大于总毛重
                 if total_net_weight > gross_weight:
                     invalid_cartons.append({
                         "carton": carton,
@@ -364,7 +343,6 @@ class InputValidator:
                         "net_weight": total_net_weight,
                         "gross_weight": gross_weight
                     })
-            
             if invalid_cartons:
                 error_messages = []
                 for item in invalid_cartons:
@@ -372,12 +350,14 @@ class InputValidator:
                         f"箱号 {item['carton']} 的总净重 {item['net_weight']:.2f} 大于总毛重 {item['gross_weight']:.2f}, "
                         f"涉及行: {', '.join(map(str, item['rows']))}"
                     )
-                return {
-                    "success": False, 
-                    "message": "以下箱号的总净重大于总毛重，不符合验收标准:\n" + "\n".join(error_messages)
-                }
-                
-            return {"success": True, "message": "净重毛重验证通过，所有箱号的总净重均小于总毛重"}
+                msg = "以下箱号的总净重大于总毛重，不符合验收标准:\n" + "\n".join(error_messages)
+                if error_log:
+                    msg += "\n\n【自动容错提示】:\n" + "\n".join(error_log)
+                return {"success": False, "message": msg}
+            msg = "净重毛重验证通过，所有箱号的总净重均小于总毛重"
+            if error_log:
+                msg += "\n\n【自动容错提示】:\n" + "\n".join(error_log)
+            return {"success": True, "message": msg}
         except Exception as e:
             return {"success": False, "message": f"验证净重毛重时出错: {str(e)}"}
     

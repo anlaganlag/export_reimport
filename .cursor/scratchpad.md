@@ -41,6 +41,7 @@ Converting the process_shipping_list.py script into a Streamlit web application 
 - [x] 尝试用不同输入文件组合执行校验程序
 - [x] 检查output_log.txt和validation_report.md，收集详细错误信息
 - [ ] 等待用户提供正确的采购装箱单和政策文件，或指示如何处理文件缺失问题
+- [x] 修复净重/毛重校验容错逻辑，兼容非数值格式，自动容错并报告
 
 ## Current Status / Progress Tracking
 Project is complete with all major tasks finished. The application now includes:
@@ -53,9 +54,16 @@ Project is complete with all major tasks finished. The application now includes:
 
 正在执行：
 - [ ] reimport印度进口发票"名称"字段名替换为"Commodity Description (Customs)"，且取值逻辑改为"进口清关货描"列。
+- [x] 校验程序已修复净重/毛重字段异常格式容错，遇到空、字符串、特殊符号、单位等自动转为0，校验报告有容错提示。
 
 ## Executor's Feedback or Assistance Requests
-无
+本次已完成：
+- 优化了净重/毛重校验函数，所有非标准格式（空、字符串、特殊符号、单位等）自动容错为0。
+- 校验报告中增加了容错提示，便于用户追溯异常数据。
+- 校验逻辑已严格按"同箱号净重总和 < 毛重总和"标准执行。
+- 已通过典型异常数据单元测试。
+
+请用户Planner确认修复效果，如需进一步测试或有新需求请告知。
 
 ## Lessons
 1. Always provide bilingual interface for better accessibility
@@ -65,6 +73,7 @@ Project is complete with all major tasks finished. The application now includes:
 5. Use virtual environments for dependency management
 6. Include clear success criteria for each task
 7. Maintain processing logic while improving user interface
+8. 校验程序应对所有输入数据类型健壮容错，遇到异常值自动转为0并在报告中提示，避免整体流程中断。
 
 ## 2024-任务：reimport印度进口发票"名称"字段替换为"Commodity Description (Customs)"及其取值逻辑调整
 
