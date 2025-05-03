@@ -9,9 +9,18 @@ def get_output_files(output_dir):
             files.append(os.path.join(output_dir, file))
     return files
 
-def read_excel_to_df(file_path, sheet_name=0):
-    """读取Excel文件到DataFrame"""
-    return pd.read_excel(file_path, sheet_name=sheet_name)
+def read_excel_to_df(file_path, sheet_name=0, skiprows=None):
+    """读取Excel文件到DataFrame
+    
+    Args:
+        file_path: Excel文件路径
+        sheet_name: 工作表名称或索引，默认为0
+        skiprows: 要跳过的行数，默认为None
+    
+    Returns:
+        pandas.DataFrame: 读取的数据表
+    """
+    return pd.read_excel(file_path, sheet_name=sheet_name, skiprows=skiprows)
 
 def compare_numeric_values(value1, value2, precision=0.0001):
     """比较两个数值是否相等(考虑精度)"""
@@ -131,4 +140,4 @@ def find_column_with_pattern(df, patterns, exact=False):
         return None
     except Exception as e:
         print(f"ERROR: 查找列时出错: {str(e)}")
-        raise Exception(f"查找模式{patterns}的列时出错: {str(e)}") 
+        raise Exception(f"查找模式{patterns}的列时出错: {str(e)}")

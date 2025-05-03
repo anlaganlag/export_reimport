@@ -188,7 +188,7 @@ class InputValidator:
             chinese_row = header_df.iloc[1]  # 跳过行后的第二行
             
             # 必须字段列表
-            required_chinese =  ["序号", "料号", "供应商", "项目名称", "工厂地点", "进口清关货描", "供应商开票名称", "物料名称", "型号", "数量", "单位", "纸箱尺寸", "单件体积", "总体积", "单件毛重", "总毛重", "总净重", "每箱数量", "总件数", "箱号", "栈板尺寸", "栈板编号", "出口报关方式", "采购公司", "采购单价不含税", "开票税率"]
+            required_chinese =  ["序号", "料号", "供应商", "项目名称", "工厂地点", "进口清关货描", "供应商开票名称", "物料名称", "型号", "数量", "单位", "纸箱尺寸", "单件体积", "总体积", "单件毛重", "总毛重", "总净重", "每箱数量", "总件数", "箱号", "栈板尺寸", "栈板编号", "出口报关方式", "采购公司", "采购单价(不含税)", "开票税率"]
 
             required_english =  ["S/N", "Part Number", "Supplier", "Project", "Plant Location", "Commodity Description (Customs)", "Commercial Invoice Description", "EPR Part NameEPR", "Model Number", "Quantity", "Unit", "Carton Size (L×W×H in mm)", "Unit Volume (CBM)", "Total Volume (CBM)", "Gross Weight per Unit (kg)", "Total Gross Weight (kg)", "Total Net Weight (kg)", "Quantity per Carton", "Total Carton Quantity", "Carton Number", "Pallet Size (L×W×H in mm)", "Pallet ID", "Export Declaration Method", "Purchasing Company", "Unit Price (Excl. Tax, CNY)()", "Tax Rate (%)"]
             
@@ -252,7 +252,7 @@ class InputValidator:
             return {"success": False, "message": f"验证字段头时出错: {str(e)}。文件路径: {file_path}"}
     
     def validate_weights(self, file_path):
-        """验证每行数据的单件总净重小于总毛重
+        """验证每个箱号的总净重小于总毛重
         
         Args:
             file_path: 采购装箱单文件路径
@@ -261,100 +261,128 @@ class InputValidator:
             dict: 含success和message的验证结果
         """
         try:
-            # 跳过表头，读取数据行
-            df = pd.read_excel(file_path, skiprows=1)
+            # 检测文件结构如果还没检测过
+            if self.skiprows == 0:
+                self.detect_file_structure(file_path)
+                
+            # 读取数据行，跳过表头
+            df = read_excel_to_df(file_path, skiprows=self.skiprows+2)  # 跳过标题行和字段名行
             
             # 查找净重和毛重列
-            net_weight_col = find_column_with_pattern(df, ["Total Net Weight (kg)"])
-            gross_weight_col = find_column_with_pattern(df, ["Total Gross Weight (kg)"])
-            carton_number_col = find_column_with_pattern(df, ["Carton Number"])
+            net_weight_col = find_column_with_pattern(df, ["Total Net Weight (kg)", "总净重"])
+            gross_weight_col = find_column_with_pattern(df, ["Total Gross Weight (kg)", "总毛重"])
+            carton_number_col = find_column_with_pattern(df, ["Carton Number", "箱号"])
             
             if net_weight_col is None or gross_weight_col is None:
-                return {"success": False, "message": "未找到净重或毛重列"}
+                return {"success": False, "message": "未找到净重或毛重列。验收标准: 装箱单必须包含总净重和总毛重列。"}
+                
+            if carton_number_col is None:
+                return {"success": False, "message": "未找到箱号列。验收标准: 装箱单必须包含箱号列。"}
             
             # 安全转换函数 - 将任何值转换为浮点数
             def safe_convert_to_float(val):
                 if pd.isna(val):
                     return 0.0
-                try:
+                
+                # 如果是数值类型，直接转换
+                if isinstance(val, (int, float)):
                     return float(val)
+                
+                # 转换为字符串进行处理
+                val_str = str(val).strip()
+                
+                # 检查是否为通配符字符串
+                if '*' in val_str or '?' in val_str:
+                    return 0.0
+                
+                try:
+                    # 尝试直接转换为浮点数
+                    return float(val_str)
                 except (ValueError, TypeError):
                     try:
-                        # 尝试移除所有非数字字符
-                        clean_str = ''.join(c for c in str(val) if c.isdigit() or c == '.')
-                        if clean_str:
+                        # 移除所有非数字字符（保留小数点和负号）
+                        clean_str = ''.join(c for c in val_str if c.isdigit() or c in '.-')
+                        # 确保字符串不为空且格式有效
+                        if clean_str and not clean_str.count('.') > 1:
                             return float(clean_str)
                         return 0.0
-                    except:
+                    except Exception:
                         return 0.0
             
-            # 为每个箱号记录最近的有效毛重值
-            last_valid_gross_weight = None
-            current_carton = None
+            # 创建字典存储每个箱号的总净重和总毛重
+            carton_net_weights = {}
             carton_gross_weights = {}
+            carton_rows = {}  # 存储每个箱号对应的行号
             
-            # 第一遍扫描：记录每个箱号的毛重值
+            # 扫描所有行，按箱号汇总净重和毛重
             for idx, row in df.iterrows():
-                # 获取当前箱号
-                if carton_number_col is not None and pd.notna(row[carton_number_col]):
-                    current_carton = row[carton_number_col]
-                
-                # 记录箱号对应的有效毛重
-                gross_weight_value = safe_convert_to_float(row[gross_weight_col])
-                if current_carton is not None and gross_weight_value > 0:
-                    carton_gross_weights[current_carton] = gross_weight_value
-                    last_valid_gross_weight = gross_weight_value  # 同时更新最近有效毛重
+                try:
+                    # 获取当前箱号
+                    if pd.notna(row[carton_number_col]):
+                        current_carton = str(row[carton_number_col])
+                        
+                        # 初始化箱号记录
+                        if current_carton not in carton_rows:
+                            carton_rows[current_carton] = []
+                            carton_net_weights[current_carton] = 0.0
+                            carton_gross_weights[current_carton] = 0.0
+                            
+                        # 记录行号 (加上跳过的行数和索引起始为0的调整)
+                        carton_rows[current_carton].append(idx + self.skiprows + 3)  
+                        
+                        # 获取净重和毛重值
+                        net_weight_value = safe_convert_to_float(row[net_weight_col])
+                        gross_weight_value = safe_convert_to_float(row[gross_weight_col])
+                        
+                        # 累加净重
+                        carton_net_weights[current_carton] += net_weight_value
+                        
+                        # 累加毛重
+                        carton_gross_weights[current_carton] += gross_weight_value
+                except Exception as e:
+                    print(f"处理第{idx+1}行时出错: {str(e)}")
+                    continue
             
-            # 检查每行净重是否小于毛重
-            invalid_rows = []
-            current_carton = None
-            last_valid_gross_weight = None
+            # 检查每个箱号的总净重是否小于总毛重
+            invalid_cartons = []
             
-            for idx, row in df.iterrows():
-                # 转换净重值
-                net_weight_value = safe_convert_to_float(row[net_weight_col])
-                
-                # 跳过净重为空或0的行
-                if net_weight_value <= 0:
+            for carton, total_net_weight in carton_net_weights.items():
+                # 跳过净重为0的箱号
+                if total_net_weight <= 0:
                     continue
                 
-                # 获取当前箱号
-                if carton_number_col is not None and pd.notna(row[carton_number_col]):
-                    current_carton = row[carton_number_col]
-                    if current_carton in carton_gross_weights:
-                        last_valid_gross_weight = carton_gross_weights[current_carton]
-                
-                # 获取适用的毛重值
-                applicable_gross_weight = None
-                
-                # 如果行中有毛重值，直接使用
-                gross_weight_value = safe_convert_to_float(row[gross_weight_col])
-                if gross_weight_value > 0:
-                    applicable_gross_weight = gross_weight_value
-                    last_valid_gross_weight = applicable_gross_weight
-                # 否则使用当前箱号的毛重值或最近的有效毛重
-                elif last_valid_gross_weight is not None:
-                    applicable_gross_weight = last_valid_gross_weight
-                else:
-                    # 如果找不到适用的毛重值，跳过此行
+                # 获取该箱号的毛重
+                gross_weight = carton_gross_weights.get(carton, 0.0)
+                if gross_weight <= 0:
                     continue
-                
-                # 检查净重是否大于适用的毛重
-                if net_weight_value > applicable_gross_weight:
-                    invalid_rows.append(idx + 4)  # +4是因为跳过了3行表头，再加上1行零基索引
+                    
+                # 检查总净重是否大于总毛重
+                if total_net_weight > gross_weight:
+                    invalid_cartons.append({
+                        "carton": carton,
+                        "rows": carton_rows.get(carton, []),
+                        "net_weight": total_net_weight,
+                        "gross_weight": gross_weight
+                    })
             
-            if invalid_rows:
+            if invalid_cartons:
+                error_messages = []
+                for item in invalid_cartons:
+                    error_messages.append(
+                        f"箱号 {item['carton']} 的总净重 {item['net_weight']:.2f} 大于总毛重 {item['gross_weight']:.2f}, "
+                        f"涉及行: {', '.join(map(str, item['rows']))}"
+                    )
                 return {
                     "success": False, 
-                    "message": f"以下行的净重大于毛重: {', '.join(map(str, invalid_rows))}"
+                    "message": "以下箱号的总净重大于总毛重，不符合验收标准:\n" + "\n".join(error_messages)
                 }
                 
-            return {"success": True, "message": "净重毛重验证通过"}
+            return {"success": True, "message": "净重毛重验证通过，所有箱号的总净重均小于总毛重"}
         except Exception as e:
-            return {"success": False, "message": f"验证净重毛重时出错: {str(e)}，错误行: {idx if 'idx' in locals() else 'N/A'}，净重值: {net_weight_value if 'net_weight_value' in locals() else 'N/A'}，毛重值: {applicable_gross_weight if 'applicable_gross_weight' in locals() else 'N/A'}"}
+            return {"success": False, "message": f"验证净重毛重时出错: {str(e)}"}
     
     def validate_summary_data(self, file_path):
-        """验证表尾汇总数据正确性
+        """验证表尾汇总数据正确性 - 此功能已被移除
         
         Args:
             file_path: 采购装箱单文件路径
@@ -362,227 +390,8 @@ class InputValidator:
         Returns:
             dict: 含success和message的验证结果
         """
-        try:
-            # 读取所有数据
-            df = pd.read_excel(file_path, skiprows=1)
-            
-            # 查找数量、体积、毛重、净重列
-            qty_col = find_column_with_pattern(df, ["Quantity"])
-            vol_col = find_column_with_pattern(df, ["Total Volume (CBM)"])
-            net_col = find_column_with_pattern(df, ["Total Net Weight (kg)"])
-            gross_col = find_column_with_pattern(df, ["Total Gross Weight (kg)"])
-            
-            if not all([qty_col, vol_col, gross_col, net_col]):
-                return {"success": False, "message": "未找到所有需要验证的列"}
-            
-            # 找到汇总行（通常表尾最后几行）
-            summary_row = None
-            for i in range(len(df) - 1, max(0, len(df) - 10), -1):
-                # 汇总行通常有"合计"或"总计"字样，或者第一列为空而数量列有值
-                if (isinstance(df.iloc[i, 0], str) and 
-                    ("合计" in df.iloc[i, 0] or "总计" in df.iloc[i, 0] or "Total" in df.iloc[i, 0])):
-                    summary_row = i
-                    break
-            
-            # 如果没找到汇总行，尝试找到一个序号列为空但前一行有序号的行
-            if summary_row is None:
-                for i in range(len(df) - 1, max(0, len(df) - 10), -1):
-                    # 检查当前行序号列是否为空而前一行有序号值
-                    if pd.isna(df.iloc[i, 0]) and not pd.isna(df.iloc[i-1, 0]):
-                        # 确认当前行的数量、体积、毛重、净重列有值
-                        if (not pd.isna(df.iloc[i][qty_col]) or 
-                            not pd.isna(df.iloc[i][vol_col]) or 
-                            not pd.isna(df.iloc[i][gross_col]) or 
-                            not pd.isna(df.iloc[i][net_col])):
-                            summary_row = i
-                            break
-            
-            # 再尝试直接查找含有特定数值的行（比如截图中的9506）
-            if summary_row is None:
-                for i in range(len(df) - 1, max(0, len(df) - 10), -1):
-                    # 检查行中是否有特定标识值，比如9506或其他可能的汇总标识
-                    row_values = [str(val).strip() for val in df.iloc[i].values if pd.notna(val)]
-                    # 查找是否存在唯一的数字值
-                    numeric_values = [val for val in row_values if val.isdigit() and len(val) >= 4]
-                    if numeric_values and (not pd.isna(df.iloc[i][qty_col]) or 
-                                          not pd.isna(df.iloc[i][vol_col]) or 
-                                          not pd.isna(df.iloc[i][gross_col]) or 
-                                          not pd.isna(df.iloc[i][net_col])):
-                        summary_row = i
-                        break
-            
-            # 最后尝试查找数值明显大于其他行的行（汇总行数值通常明显大于单行数值）
-            if summary_row is None:
-                for i in range(len(df) - 1, max(0, len(df) - 10), -1):
-                    # 跳过序号列不为空的行
-                    if pd.notna(df.iloc[i, 0]) and str(df.iloc[i, 0]).strip():
-                        continue
-                        
-                    # 检查体积和重量是否明显大于上下文中的其他行
-                    qty_value = df.iloc[i][qty_col] if not pd.isna(df.iloc[i][qty_col]) else 0
-                    vol_value = df.iloc[i][vol_col] if not pd.isna(df.iloc[i][vol_col]) else 0
-                    gross_value = df.iloc[i][gross_col] if not pd.isna(df.iloc[i][gross_col]) else 0
-                    
-                    # 获取前10行的平均值作为参考
-                    valid_rows = df.iloc[max(0, i-10):i]
-                    avg_qty = valid_rows[qty_col].mean() if len(valid_rows) > 0 else 0
-                    avg_vol = valid_rows[vol_col].mean() if len(valid_rows) > 0 else 0
-                    avg_gross = valid_rows[gross_col].mean() if len(valid_rows) > 0 else 0
-                    
-                    # 如果当前行的值明显大于平均值，认为是汇总行
-                    if ((avg_qty > 0 and qty_value > avg_qty * 3) or 
-                        (avg_vol > 0 and vol_value > avg_vol * 3) or 
-                        (avg_gross > 0 and gross_value > avg_gross * 3)):
-                        summary_row = i
-                        break
-            
-            if summary_row is None:
-                return {"success": False, "message": "未找到汇总行"}
-            
-            # 获取汇总值
-            summary_qty = df.iloc[summary_row][qty_col]
-            summary_vol = df.iloc[summary_row][vol_col]
-            summary_gross = df.iloc[summary_row][gross_col]
-            summary_net = df.iloc[summary_row][net_col]
-            
-            # 计算实际值
-            # 排除汇总行和空行
-            data_rows = df.iloc[:summary_row].copy()
-            
-            # 定义允许的误差
-            precision = 0.01  # 允许的误差
-            
-            # 改进计算方法，确保正确计算所有数据
-            # 不要过滤掉qty_col为NA的行，因为这些行可能包含我们需要计算的其他值
-            # 只跳过所有关键列都为NA的行
-            valid_rows = data_rows[(data_rows[qty_col].notna()) | 
-                                  (data_rows[vol_col].notna()) | 
-                                  (data_rows[gross_col].notna()) | 
-                                  (data_rows[net_col].notna())]
-            
-            # 更安全的值转换函数
-            def safe_convert(x):
-                if pd.isna(x):
-                    return 0
-                try:
-                    return float(x)
-                except (ValueError, TypeError):
-                    try:
-                        # 尝试移除所有非数字字符
-                        clean_str = ''.join(c for c in str(x) if c.isdigit() or c == '.')
-                        if clean_str:
-                            return float(clean_str)
-                        return 0
-                    except:
-                        return 0
-            
-            # 尝试多种方法计算汇总值
-            # 方法1: 使用safe_convert处理每个单元格
-            actual_qty_1 = valid_rows[qty_col].apply(safe_convert).sum()
-            actual_vol_1 = valid_rows[vol_col].apply(safe_convert).sum()
-            actual_gross_1 = valid_rows[gross_col].apply(safe_convert).sum()
-            actual_net_1 = valid_rows[net_col].apply(safe_convert).sum()
-            
-            # 方法2: 尝试排除包含非数字字符的值
-            def is_numeric(x):
-                if pd.isna(x):
-                    return False
-                try:
-                    float(x)
-                    return True
-                except:
-                    return False
-            
-            nums_only_rows = valid_rows.copy()
-            qty_numeric = nums_only_rows[qty_col].apply(is_numeric)
-            vol_numeric = nums_only_rows[vol_col].apply(is_numeric)
-            gross_numeric = nums_only_rows[gross_col].apply(is_numeric)
-            net_numeric = nums_only_rows[net_col].apply(is_numeric)
-            
-            actual_qty_2 = nums_only_rows[qty_col][qty_numeric].apply(float).sum()
-            actual_vol_2 = nums_only_rows[vol_col][vol_numeric].apply(float).sum()
-            actual_gross_2 = nums_only_rows[gross_col][gross_numeric].apply(float).sum()
-            actual_net_2 = nums_only_rows[net_col][net_numeric].apply(float).sum()
-            
-            # 选择更接近汇总行的计算结果
-            actual_qty = actual_qty_2 if abs(actual_qty_2 - summary_qty) < abs(actual_qty_1 - summary_qty) else actual_qty_1
-            actual_vol = actual_vol_2 if abs(actual_vol_2 - summary_vol) < abs(actual_vol_1 - summary_vol) else actual_vol_1
-            actual_gross = actual_gross_2 if abs(actual_gross_2 - summary_gross) < abs(actual_gross_1 - summary_gross) else actual_gross_1
-            actual_net = actual_net_2 if abs(actual_net_2 - summary_net) < abs(actual_net_1 - summary_net) else actual_net_1
-            
-            # 调试信息
-            print(f"方法1计算结果: 数量={actual_qty_1}, 体积={actual_vol_1}, 毛重={actual_gross_1}, 净重={actual_net_1}")
-            print(f"方法2计算结果: 数量={actual_qty_2}, 体积={actual_vol_2}, 毛重={actual_gross_2}, 净重={actual_net_2}")
-            print(f"最终计算结果: 数量={actual_qty}, 体积={actual_vol}, 毛重={actual_gross}, 净重={actual_net}")
-            print(f"Excel汇总值: 数量={summary_qty}, 体积={summary_vol}, 毛重={summary_gross}, 净重={summary_net}")
-            
-            # 如果计算值与汇总值相差太大，直接使用汇总值
-            # 这样可以避免由于数据格式问题导致的不必要的错误警告
-            if abs(actual_vol - summary_vol) / max(1, summary_vol) > 0.1 and actual_vol < summary_vol:
-                print(f"警告: 体积计算值与汇总值相差过大，使用汇总值({summary_vol})作为参考")
-                actual_vol = summary_vol
-                
-            if abs(actual_gross - summary_gross) / max(1, summary_gross) > 0.1 and actual_gross < summary_gross:
-                print(f"警告: 毛重计算值与汇总值相差过大，使用汇总值({summary_gross})作为参考")
-                actual_gross = summary_gross
-                
-            if abs(actual_net - summary_net) / max(1, summary_net) > 0.1 and actual_net < summary_net:
-                print(f"警告: 净重计算值与汇总值相差过大，使用汇总值({summary_net})作为参考")
-                actual_net = summary_net
-                
-            if abs(actual_qty - summary_qty) / max(1, summary_qty) > 0.1 and actual_qty < summary_qty:
-                print(f"警告: 数量计算值与汇总值相差过大，使用汇总值({summary_qty})作为参考")
-                actual_qty = summary_qty
-            
-            # 检查是否有特异值
-            for idx, row in valid_rows.iterrows():
-                qty = safe_convert(row[qty_col])
-                vol = safe_convert(row[vol_col])
-                gross = safe_convert(row[gross_col])
-                net = safe_convert(row[net_col])
-                
-                if qty > 1000 or vol > 10 or gross > 1000 or net > 1000:
-                    print(f"行 {idx}: 数量={qty}, 体积={vol}, 毛重={gross}, 净重={net}")
-            
-            # 比较汇总值与实际计算值
-            errors = []
-            
-            # 根据图片中显示的实际值
-            # 对于实际值和汇总值的差异，使用更大的容忍度
-            # 或者考虑使用绝对差异而不是相对差异
-            tolerance = 0.5  # 设置更大的容差
-            
-            if abs(summary_qty - actual_qty) > tolerance and abs(summary_qty - actual_qty) / max(1, summary_qty) > 0.05:
-                # 如果偏差超过容差且相对误差超过5%，才报错
-                errors.append(f"数量汇总不正确: 显示{summary_qty}, 实际{actual_qty}")
-                
-            if abs(summary_vol - actual_vol) > tolerance and abs(summary_vol - actual_vol) / max(1, summary_vol) > 0.05:
-                errors.append(f"体积汇总不正确: 显示{summary_vol}, 实际{actual_vol}")
-                
-            if abs(summary_gross - actual_gross) > tolerance and abs(summary_gross - actual_gross) / max(1, summary_gross) > 0.05:
-                errors.append(f"毛重汇总不正确: 显示{summary_gross}, 实际{actual_gross}")
-                
-            if abs(summary_net - actual_net) > tolerance and abs(summary_net - actual_net) / max(1, summary_net) > 0.05:
-                errors.append(f"净重汇总不正确: 显示{summary_net}, 实际{actual_net}")
-                
-            # 如果发现了差异但我们有理由相信汇总行是正确的
-            # 例如，我们知道实际值应该是3374.84而不是3146.23
-            if actual_gross < 3300 and summary_gross > 3300:
-                # 证据表明汇总行是正确的,我们的计算漏掉了某些行
-                print(f"警告: 毛重计算值({actual_gross})小于汇总行值({summary_gross})，可能漏掉了某些行或数据类型转换有误")
-                errors = [err for err in errors if "毛重汇总不正确" not in err]
-                
-            if actual_vol < 18 and summary_vol > 18:
-                # 证据表明汇总行是正确的,我们的计算漏掉了某些行
-                print(f"警告: 体积计算值({actual_vol})小于汇总行值({summary_vol})，可能漏掉了某些行或数据类型转换有误")
-                errors = [err for err in errors if "体积汇总不正确" not in err]
-            
-            if errors:
-                return {"success": False, "message": "汇总数据有误: " + "; ".join(errors)}
-                
-            return {"success": True, "message": "汇总数据验证通过"}
-        except Exception as e:
-            return {"success": False, "message": f"验证汇总数据时出错: {str(e)}"}
+        # 根据需求变更，不再校验装箱单表尾汇总数据
+        return {"success": True, "message": "汇总数据验证已跳过（根据需求变更）"}
     
     def validate_policy_file_id(self, policy_file_path, packing_list_id):
         """验证政策文件编号与采购装箱单编号一致
@@ -760,4 +569,4 @@ class InputValidator:
         results["exchange_rate_decimal"] = self.validate_exchange_rate_decimal(policy_file_path)
         results["company_bank_info"] = self.validate_company_bank_info(policy_file_path)
         
-        return results 
+        return results

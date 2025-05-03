@@ -1147,7 +1147,7 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
     # 新增：查找进口清关货描（Commodity Description (Customs)）列
     customs_desc_col = find_column_with_pattern(packing_list_df, ['进口清关货描', 'Commodity Description (Customs)', 'Customs Description', 'Import Customs Description', '进口清关英文货描', 'Customs Commodity Description'], 'Commodity Description (Customs)')
     model_col = find_column_with_pattern(packing_list_df, ['Model Number', '型号', '物料型号', '货物型号', 'model'], 'Model NO.')
-    unit_price_col = find_column_with_pattern(packing_list_df, ['Unit Price (Excl. Tax, CNY)()', 'unit price', '采购单价不含税', '不含税单价', '单价'], 'Unit Price')
+    unit_price_col = find_column_with_pattern(packing_list_df, ['Unit Price (Excl. Tax, CNY)()', 'unit price', '采购单价(不含税)', '不含税单价', '单价'], 'Unit Price')
     qty_col = find_column_with_pattern(packing_list_df, ['Quantity', 'quantity', '数量', 'qty'], 'Qty')
     unit_col = find_column_with_pattern(packing_list_df, ['Unit', '单位', '单位中文'], 'Unit')
 

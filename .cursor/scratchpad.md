@@ -37,6 +37,10 @@ Converting the process_shipping_list.py script into a Streamlit web application 
   - Added comprehensive README.md with instructions
   - Added troubleshooting guide
 - [ ] Task 7: Reimport发票字段名替换为Commodity Description (Customs)并取值自进口清关货描
+- [x] 检查testfiles/origin和testfiles/sample目录下的输入文件是否存在
+- [x] 尝试用不同输入文件组合执行校验程序
+- [x] 检查output_log.txt和validation_report.md，收集详细错误信息
+- [ ] 等待用户提供正确的采购装箱单和政策文件，或指示如何处理文件缺失问题
 
 ## Current Status / Progress Tracking
 Project is complete with all major tasks finished. The application now includes:
