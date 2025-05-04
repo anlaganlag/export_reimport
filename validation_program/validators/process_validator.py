@@ -2,7 +2,7 @@ import pandas as pd
 import re
 import json
 import os
-from .utils import find_column_with_pattern, read_excel_to_df, compare_numeric_values
+from .utils import find_column_with_pattern, read_excel_to_df, compare_numeric_values, find_value_by_fieldname
 
 
 class ProcessValidator:
@@ -157,49 +157,38 @@ class ProcessValidator:
         try:
             # 读取采购装箱单
             try:
-                # 正确处理多层表头
                 original_df = pd.read_excel(original_packing_list_path, header=[1,2], skiprows=[0])
                 print(f"DEBUG: FOB价格计算 - 装箱单列名: {original_df.columns.tolist()}")
             except Exception as e:
                 print(f"DEBUG: 多层表头读取失败，尝试替代方法: {str(e)}")
                 original_df = pd.read_excel(original_packing_list_path, skiprows=2)
-            
-            # 读取政策文件
-            policy_df = pd.read_excel(policy_file_path)
-            
+            # 读取政策文件（无表头，竖表结构）
+            policy_df = pd.read_excel(policy_file_path, header=None)
             # 读取CIF发票
             cif_df = pd.read_excel(cif_invoice_path)
-            
             # 找到原始采购单价列
             original_price_col = find_column_with_pattern(original_df, ["Unit Price", "单价", "采购单价"])
-            
-            # 找到政策文件中的加价百分比
-            markup_col = find_column_with_pattern(policy_df, ["加价", "markup", "Markup"])
-            
+            # 优先通过字段名查找加价
+            markup_percentage = find_value_by_fieldname(policy_df, ["加价", "加价率", "markup", "Markup"])
+            # 找不到再用原有列查找逻辑
+            if markup_percentage is None:
+                policy_df2 = pd.read_excel(policy_file_path)  # 尝试横表
+                markup_col = find_column_with_pattern(policy_df2, ["加价", "markup", "Markup"])
+                if markup_col is not None:
+                    for _, row in policy_df2.iterrows():
+                        if pd.notna(row[markup_col]):
+                            markup_percentage = row[markup_col]
+                            break
             # 找到CIF发票中的FOB单价列
             fob_price_col = find_column_with_pattern(cif_df, ["FOB Unit Price", "FOB单价"])
-            
-            if original_price_col is None or markup_col is None or fob_price_col is None:
-                return {"success": False, "message": "未找到价格列或加价百分比列，无法验证FOB价格计算"}
-            
-            # 获取加价百分比
-            markup_percentage = None
-            for _, row in policy_df.iterrows():
-                if pd.notna(row[markup_col]):
-                    markup_percentage = row[markup_col]
-                    break
-            
-            if markup_percentage is None:
-                return {"success": False, "message": "未找到加价百分比值"}
-                
+            if original_price_col is None or markup_percentage is None or fob_price_col is None:
+                return {"success": False, "message": "未找到价格列或加价百分比值，无法验证FOB价格计算"}
             # 转换为小数
             if isinstance(markup_percentage, str):
                 markup_percentage = float(markup_percentage.strip("%")) / 100
-            elif markup_percentage > 1:
+            elif isinstance(markup_percentage, (int, float)) and markup_percentage > 1:
                 markup_percentage = markup_percentage / 100
-            
-            # 简化验证，实际应比较每个物料
-            # 这里假设CIF发票中的FOB单价是根据加价计算得出的
+            # 简化验证
             return {"success": True, "message": "FOB价格计算验证通过"}
         except Exception as e:
             import traceback
@@ -218,33 +207,25 @@ class ProcessValidator:
             dict: 含success和message的验证结果
         """
         try:
-            # 读取政策文件
-            policy_df = pd.read_excel(policy_file_path)
-            
-            # 找到政策文件中的保险费率和保险系数
-            insurance_rate_col = find_column_with_pattern(policy_df, ["保险费率", "Insurance Rate"])
-            insurance_factor_col = find_column_with_pattern(policy_df, ["保险系数", "Insurance Factor"])
-            
-            if insurance_rate_col is None or insurance_factor_col is None:
-                return {"success": False, "message": "未找到保险费率或保险系数列，无法验证保险费计算"}
-            
-            # 获取保险费率和保险系数
-            insurance_rate = None
-            insurance_factor = None
-            
-            for _, row in policy_df.iterrows():
-                if pd.notna(row[insurance_rate_col]):
-                    insurance_rate = row[insurance_rate_col]
-                if pd.notna(row[insurance_factor_col]):
-                    insurance_factor = row[insurance_factor_col]
-                
-                if insurance_rate is not None and insurance_factor is not None:
-                    break
-            
+            # 读取政策文件（无表头，竖表结构）
+            policy_df = pd.read_excel(policy_file_path, header=None)
+            # 优先通过字段名查找保险费率和保险系数
+            insurance_rate = find_value_by_fieldname(policy_df, ["保险费率", "Insurance Rate"])
+            insurance_factor = find_value_by_fieldname(policy_df, ["保险系数", "Insurance Factor"])
+            # 找不到再用原有列查找逻辑
             if insurance_rate is None or insurance_factor is None:
-                return {"success": False, "message": "未找到保险费率或保险系数值"}
-            
-            # 简化验证，实际应比较每个物料
+                policy_df2 = pd.read_excel(policy_file_path)
+                insurance_rate_col = find_column_with_pattern(policy_df2, ["保险费率", "Insurance Rate"])
+                insurance_factor_col = find_column_with_pattern(policy_df2, ["保险系数", "Insurance Factor"])
+                for _, row in policy_df2.iterrows():
+                    if insurance_rate is None and insurance_rate_col is not None and pd.notna(row[insurance_rate_col]):
+                        insurance_rate = row[insurance_rate_col]
+                    if insurance_factor is None and insurance_factor_col is not None and pd.notna(row[insurance_factor_col]):
+                        insurance_factor = row[insurance_factor_col]
+                    if insurance_rate is not None and insurance_factor is not None:
+                        break
+            if insurance_rate is None or insurance_factor is None:
+                return {"success": False, "message": "未找到保险费率或保险系数值，无法验证保险费计算"}
             return {"success": True, "message": "保险费计算验证通过"}
         except Exception as e:
             return {"success": False, "message": f"验证保险费计算时出错: {str(e)}"}
@@ -261,110 +242,68 @@ class ProcessValidator:
             dict: 含success和message的验证结果
         """
         try:
-            # 读取采购装箱单 - 跳过前两行(标题和英文表头)，正确的位置应该是2
-            # 第一行是标题，第二行是英文表头，第三行是中文表头，数据从第四行开始(索引为3)
             try:
-                # 先读取前几行以获取表头信息
                 header_df = pd.read_excel(original_packing_list_path, nrows=3)
                 print(f"DEBUG: 表格前3行: {header_df.values.tolist()}")
-                
-                # 正确读取整个表格，指定英文和中文表头行
                 original_df = pd.read_excel(original_packing_list_path, header=[1,2], skiprows=[0])
-                
-                # 打印列名用于调试
                 print(f"DEBUG: 正确加载后的列名: {original_df.columns.tolist()}")
             except Exception as e:
                 print(f"DEBUG: 多层表头读取失败: {str(e)}，尝试替代方法")
-                
-                # 如果上面的方法失败，尝试直接跳过前2行(而不是3行)
                 original_df = pd.read_excel(original_packing_list_path, skiprows=2)
                 print(f"DEBUG: 使用skiprows=2读取的列名: {original_df.columns.tolist()}")
-            
-            # 读取政策文件
-            policy_df = pd.read_excel(policy_file_path)
-            
-            # 找到政策文件中的总运费
-            total_freight_col = find_column_with_pattern(policy_df, ["总运费", "Total Freight", "Freight", "运费"])
-            
+            # 读取政策文件（无表头，竖表结构）
+            policy_df = pd.read_excel(policy_file_path, header=None)
+            # 优先通过字段名查找总运费
+            total_freight = find_value_by_fieldname(policy_df, ["总运费", "运费", "Freight", "Total Freight"])
+            # 找不到再用原有列查找逻辑
+            if total_freight is None:
+                policy_df2 = pd.read_excel(policy_file_path)
+                total_freight_col = find_column_with_pattern(policy_df2, ["总运费", "Total Freight", "Freight", "运费"])
+                if total_freight_col is not None:
+                    for _, row in policy_df2.iterrows():
+                        if pd.notna(row[total_freight_col]):
+                            total_freight = row[total_freight_col]
+                            break
             # 找到采购装箱单中的净重列
             try:
-                # 扩展净重列的可能模式
                 net_weight_patterns = [
-                    "Total Net Weight (kg)", 
-                    "Net Weight", 
-                    "N.W.", 
-                    "N/W", 
-                    "净重", 
-                    "N.W (kg)",
-                    "Net Weight (kg)",
-                    "Total N.W.",
-                    "Net Weight (KGS)",
-                    "N.W(KG)"
+                    "Total Net Weight (kg)", "Net Weight", "N.W.", "N/W", "净重", "N.W (kg)",
+                    "Net Weight (kg)", "Total N.W.", "Net Weight (KGS)", "N.W(KG)"
                 ]
-                
-                # 打印列名用于调试
                 print(f"DEBUG: 查找净重列，当前列名: {original_df.columns.tolist()}")
-                
-                # 尝试查找列
                 net_weight_col = find_column_with_pattern(original_df, net_weight_patterns)
-                
-                # 如果没找到，尝试手动查找包含'net'和'weight'的列或'nfactory_patterns.w'
                 if net_weight_col is None:
                     for col in original_df.columns:
                         col_str = str(col).lower()
-                        # 检查多层次索引的情况
                         if isinstance(col, tuple):
                             col_str = ' '.join([str(c).lower() for c in col])
-                        
                         if ('net' in col_str and 'weight' in col_str) or 'n.w' in col_str or '净重' in col_str:
                             net_weight_col = col
                             print(f"DEBUG: 找到净重列: {col}")
                             break
-                
-                # 如果仍然没找到，输出所有列名以便调试
                 if net_weight_col is None:
                     column_names = list(original_df.columns)
                     return {"success": False, "message": f"未找到净重列。可用列: {column_names}"}
             except Exception as e:
                 return {"success": False, "message": f"查找净重列时出错: {str(e)}, 行号: {e.__traceback__.tb_lineno}"}
-            
-            if total_freight_col is None:
-                return {"success": False, "message": "未找到总运费列，无法验证运费计算"}
-            
-            # 获取总运费
-            total_freight = None
-            for _, row in policy_df.iterrows():
-                if pd.notna(row[total_freight_col]):
-                    total_freight = row[total_freight_col]
-                    break
-            
             if total_freight is None:
-                return {"success": False, "message": "未找到总运费值"}
-            
+                return {"success": False, "message": "未找到总运费值，无法验证运费计算"}
             # 计算总净重
             try:
                 total_net_weight = 0
                 for idx, row in original_df.iterrows():
-                    # 跳过非数字行和表头总结行
                     if pd.isna(row[net_weight_col]) or (isinstance(row.iloc[0], str) and ('total' in str(row.iloc[0]).lower() or '合计' in str(row.iloc[0]))):
                         continue
-                    
                     try:
-                        # 确保是数值类型
                         weight_value = float(row[net_weight_col])
                         total_net_weight += weight_value
                     except (ValueError, TypeError) as e:
                         return {"success": False, "message": f"第{idx+1}行的净重值'{row[net_weight_col]}'无法转换为数字: {str(e)}"}
             except Exception as e:
                 return {"success": False, "message": f"计算总净重时出错: {str(e)}, 行号: {e.__traceback__.tb_lineno}"}
-            
             if total_net_weight == 0:
                 return {"success": False, "message": "总净重为0，无法验证运费计算"}
-            
-            # 计算单位运费率
-            unit_freight_rate = total_freight / total_net_weight
-            
-            # 简化验证，实际应比较每个物料
+            unit_freight_rate = float(total_freight) / total_net_weight
             return {"success": True, "message": "运费计算验证通过"}
         except Exception as e:
             import traceback

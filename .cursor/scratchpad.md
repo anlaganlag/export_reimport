@@ -42,6 +42,8 @@ Converting the process_shipping_list.py script into a Streamlit web application 
 - [x] 检查output_log.txt和validation_report.md，收集详细错误信息
 - [ ] 等待用户提供正确的采购装箱单和政策文件，或指示如何处理文件缺失问题
 - [x] 修复净重/毛重校验容错逻辑，兼容非数值格式，自动容错并报告
+- [x] 校验程序支持政策文件竖表结构（字段名在A列，值在B列），加价、总运费、保险系数、保险费率等均可正确识别，兼容横表兜底。
+- [x] find_value_by_fieldname已升级为模糊匹配，支持如"总运费(RMB)"等带括号或单位的字段，所有类似字段无需精确匹配即可自动识别。
 
 ## Current Status / Progress Tracking
 Project is complete with all major tasks finished. The application now includes:
@@ -62,6 +64,8 @@ Project is complete with all major tasks finished. The application now includes:
 - 校验报告中增加了容错提示，便于用户追溯异常数据。
 - 校验逻辑已严格按"同箱号净重总和 < 毛重总和"标准执行。
 - 已通过典型异常数据单元测试。
+- 校验程序已支持政策文件为竖表结构（A列为字段名，B列为值），加价、总运费、保险系数、保险费率等均可正确识别，兼容横表兜底。
+- find_value_by_fieldname已升级为模糊匹配，支持如"总运费(RMB)"等带括号或单位的字段，所有类似字段无需精确匹配即可自动识别。
 
 请用户Planner确认修复效果，如需进一步测试或有新需求请告知。
 

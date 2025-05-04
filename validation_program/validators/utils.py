@@ -141,3 +141,20 @@ def find_column_with_pattern(df, patterns, exact=False):
     except Exception as e:
         print(f"ERROR: 查找列时出错: {str(e)}")
         raise Exception(f"查找模式{patterns}的列时出错: {str(e)}")
+
+def find_value_by_fieldname(df, fieldnames, field_col=0, value_col=1):
+    """
+    在DataFrame中通过字段名查找对应的值（模糊匹配，A列内容包含任一字段名即可）
+    :param df: DataFrame
+    :param fieldnames: 字段名列表
+    :param field_col: 字段名所在列索引，默认0
+    :param value_col: 值所在列索引，默认1
+    :return: 找到的值或None
+    """
+    for i, v in enumerate(df.iloc[:, field_col]):
+        if pd.notna(v):
+            v_str = str(v).strip()
+            for name in fieldnames:
+                if name in v_str:
+                    return df.iloc[i, value_col]
+    return None

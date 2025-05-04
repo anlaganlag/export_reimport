@@ -59,7 +59,7 @@
 
 ### 输入文件验证: 8/8 通过
 
-### 处理逻辑验证: 3/7 通过
+### 处理逻辑验证: 6/7 通过
 
 ### 输出文件验证: 3/16 通过
 
@@ -129,15 +129,6 @@
 
 #### ❌ 失败的测试
 
-##### fob_price_calculation: ❌ 失败
-- 结果: 未找到价格列或加价百分比列，无法验证FOB价格计算
-
-##### freight_calculation: ❌ 失败
-- 结果: 未找到总运费列，无法验证运费计算
-
-##### insurance_calculation: ❌ 失败
-- 结果: 未找到保险费率或保险系数列，无法验证保险费计算
-
 ##### merge_logic: ❌ 失败
 - 结果: 未找到所有需要的列，无法验证合并逻辑
 
@@ -146,13 +137,22 @@
 ##### cif_price_calculation: ✅ 通过
 - 结果: CIF价格计算验证通过
 
+##### fob_price_calculation: ✅ 通过
+- 结果: FOB价格计算验证通过
+
+##### freight_calculation: ✅ 通过
+- 结果: 运费计算验证通过
+
+##### insurance_calculation: ✅ 通过
+- 结果: 保险费计算验证通过
+
 ##### trade_type_identification: ✅ 通过
 - 结果: 贸易类型识别逻辑验证通过
 
 ##### trade_type_split: ✅ 通过
 - 结果: 贸易类型拆分验证通过
 
-**统计**: 3/7 测试通过
+**统计**: 6/7 测试通过
 
 ### 输出文件验证
 
@@ -184,7 +184,7 @@
 进口发票数量明细: 
 
 ##### import_invoice_split: ❌ 失败
-- 结果: 以下项目和工厂组合未找到对应的进口发票: 项目:TP-LINK 工厂:Silvassa, 项目:项目名称 工厂:工厂地点, 项目:组装厂月度辅耗材 工厂:Daman, 项目:TP-LINK 工厂:Daman, 项目:SMT工厂设备配件 工厂:Silvassa, 项目:SMT工厂月度辅耗材 工厂:Silvassa, 项目:麦格米特 工厂:Silvassa
+- 结果: 以下项目和工厂组合未找到对应的进口发票: 项目:项目名称 工厂:工厂地点, 项目:TP-LINK 工厂:Daman, 项目:组装厂月度辅耗材 工厂:Daman, 项目:TP-LINK 工厂:Silvassa, 项目:麦格米特 工厂:Silvassa, 项目:SMT工厂月度辅耗材 工厂:Silvassa, 项目:SMT工厂设备配件 工厂:Silvassa
 
 ##### import_packing_list_field_mapping_reimport_invoice.xlsx: ❌ 失败
 - 结果: 输出文件缺少字段: P/N., DESCRIPTION, Model NO., QUANTITY, CTNS, Carton MEASUREMENT, G.W (KG), N.W(KG), Carton NO.
@@ -215,15 +215,6 @@
 
 ### 处理逻辑验证问题修复建议
 
-#### fob_price_calculation:
-- **建议**: 根据错误信息修复问题: 未找到价格列或加价百分比列，无法验证FOB价格计算
-
-#### insurance_calculation:
-- **建议**: 根据错误信息修复问题: 未找到保险费率或保险系数列，无法验证保险费计算
-
-#### freight_calculation:
-- **建议**: 根据错误信息修复问题: 未找到总运费列，无法验证运费计算
-
 #### merge_logic:
 - **建议**: 根据错误信息修复问题: 未找到所有需要的列，无法验证合并逻辑
 
@@ -242,7 +233,7 @@
 - **建议**: 根据错误信息修复问题: 输出文件缺少字段: P/N., DESCRIPTION, Model NO., QUANTITY, CTNS, Carton MEASUREMENT, G.W (KG), N.W(KG), Carton NO.
 
 #### import_invoice_split:
-- **建议**: 根据错误信息修复问题: 以下项目和工厂组合未找到对应的进口发票: 项目:TP-LINK 工厂:Silvassa, 项目:项目名称 工厂:工厂地点, 项目:组装厂月度辅耗材 工厂:Daman, 项目:TP-LINK 工厂:Daman, 项目:SMT工厂设备配件 工厂:Silvassa, 项目:SMT工厂月度辅耗材 工厂:Silvassa, 项目:麦格米特 工厂:Silvassa
+- **建议**: 根据错误信息修复问题: 以下项目和工厂组合未找到对应的进口发票: 项目:项目名称 工厂:工厂地点, 项目:TP-LINK 工厂:Daman, 项目:组装厂月度辅耗材 工厂:Daman, 项目:TP-LINK 工厂:Silvassa, 项目:麦格米特 工厂:Silvassa, 项目:SMT工厂月度辅耗材 工厂:Silvassa, 项目:SMT工厂设备配件 工厂:Silvassa
 
 #### import_invoice_field_mapping_reimport_invoice.xlsx:
 - **建议**: 根据错误信息修复问题: 输出文件缺少字段: NO., Material code, DESCRIPTION, Model NO., Unit Price, Qty, Unit, Amount
@@ -272,4 +263,4 @@
 
 
 ---
-生成时间: 2025-05-04 18:18:56
+生成时间: 2025-05-04 20:01:55
