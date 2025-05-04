@@ -25,13 +25,9 @@
 - 跳过文件处理: 否
 
 ### 检测到的输出文件
-- `backup_reimport_invoice.xlsx`
 - `cif_original_invoice.xlsx`
 - `export_invoice.xlsx`
-- `pl_original_invoice.xlsx`
 - `reimport_invoice.xlsx`
-- `reimport_工厂_Daman.xlsx`
-- `reimport_工厂_Silvassa.xlsx`
 
 ## 验收标准
 
@@ -61,7 +57,7 @@
 
 ### 处理逻辑验证: 6/7 通过
 
-### 输出文件验证: 3/16 通过
+### 输出文件验证: 3/12 通过
 
 ## 详细测试结果
 
@@ -173,27 +169,15 @@
 ##### import_invoice_field_mapping_reimport_invoice.xlsx: ❌ 失败
 - 结果: 输出文件缺少字段: NO., Material code, DESCRIPTION, Model NO., Unit Price, Qty, Unit, Amount
 
-##### import_invoice_field_mapping_reimport_工厂_Daman.xlsx: ❌ 失败
-- 结果: 输出文件缺少字段: NO., Material code, DESCRIPTION, Model NO., Unit Price, Qty, Unit, Amount
-
-##### import_invoice_field_mapping_reimport_工厂_Silvassa.xlsx: ❌ 失败
-- 结果: 输出文件缺少字段: NO., Material code, DESCRIPTION, Model NO., Unit Price, Qty, Unit, Amount
-
 ##### import_invoice_quantity: ❌ 失败
 - 结果: 进口发票总数量(0)与采购装箱单总数量(9506.0)不一致
 进口发票数量明细: 
 
 ##### import_invoice_split: ❌ 失败
-- 结果: 以下项目和工厂组合未找到对应的进口发票: 项目:项目名称 工厂:工厂地点, 项目:TP-LINK 工厂:Daman, 项目:组装厂月度辅耗材 工厂:Daman, 项目:TP-LINK 工厂:Silvassa, 项目:麦格米特 工厂:Silvassa, 项目:SMT工厂月度辅耗材 工厂:Silvassa, 项目:SMT工厂设备配件 工厂:Silvassa
+- 结果: 以下项目和工厂组合未找到对应的进口发票: 项目:麦格米特 工厂:Silvassa, 项目:SMT工厂设备配件 工厂:Silvassa, 项目:SMT工厂月度辅耗材 工厂:Silvassa, 项目:组装厂月度辅耗材 工厂:Daman, 项目:项目名称 工厂:工厂地点, 项目:TP-LINK 工厂:Daman, 项目:TP-LINK 工厂:Silvassa
 
 ##### import_packing_list_field_mapping_reimport_invoice.xlsx: ❌ 失败
 - 结果: 输出文件缺少字段: P/N., DESCRIPTION, Model NO., QUANTITY, CTNS, Carton MEASUREMENT, G.W (KG), N.W(KG), Carton NO.
-
-##### import_packing_list_field_mapping_reimport_工厂_Daman.xlsx: ❌ 失败
-- 结果: 无法读取输出文件: Worksheet named 'PL' not found
-
-##### import_packing_list_field_mapping_reimport_工厂_Silvassa.xlsx: ❌ 失败
-- 结果: 无法读取输出文件: Worksheet named 'PL' not found
 
 ##### import_packing_list_totals: ❌ 失败
 - 结果: 验证进口装箱单汇总数据时出错: can only concatenate str (not "int") to str
@@ -209,7 +193,7 @@
 ##### format_compliance: ✅ 通过
 - 结果: 文件格式一致性验证通过
 
-**统计**: 3/16 测试通过
+**统计**: 3/12 测试通过
 
 ## 解决方案建议
 
@@ -233,25 +217,13 @@
 - **建议**: 根据错误信息修复问题: 输出文件缺少字段: P/N., DESCRIPTION, Model NO., QUANTITY, CTNS, Carton MEASUREMENT, G.W (KG), N.W(KG), Carton NO.
 
 #### import_invoice_split:
-- **建议**: 根据错误信息修复问题: 以下项目和工厂组合未找到对应的进口发票: 项目:项目名称 工厂:工厂地点, 项目:TP-LINK 工厂:Daman, 项目:组装厂月度辅耗材 工厂:Daman, 项目:TP-LINK 工厂:Silvassa, 项目:麦格米特 工厂:Silvassa, 项目:SMT工厂月度辅耗材 工厂:Silvassa, 项目:SMT工厂设备配件 工厂:Silvassa
+- **建议**: 根据错误信息修复问题: 以下项目和工厂组合未找到对应的进口发票: 项目:麦格米特 工厂:Silvassa, 项目:SMT工厂设备配件 工厂:Silvassa, 项目:SMT工厂月度辅耗材 工厂:Silvassa, 项目:组装厂月度辅耗材 工厂:Daman, 项目:项目名称 工厂:工厂地点, 项目:TP-LINK 工厂:Daman, 项目:TP-LINK 工厂:Silvassa
 
 #### import_invoice_field_mapping_reimport_invoice.xlsx:
 - **建议**: 根据错误信息修复问题: 输出文件缺少字段: NO., Material code, DESCRIPTION, Model NO., Unit Price, Qty, Unit, Amount
 
 #### import_packing_list_field_mapping_reimport_invoice.xlsx:
 - **建议**: 根据错误信息修复问题: 输出文件缺少字段: P/N., DESCRIPTION, Model NO., QUANTITY, CTNS, Carton MEASUREMENT, G.W (KG), N.W(KG), Carton NO.
-
-#### import_invoice_field_mapping_reimport_工厂_Daman.xlsx:
-- **建议**: 根据错误信息修复问题: 输出文件缺少字段: NO., Material code, DESCRIPTION, Model NO., Unit Price, Qty, Unit, Amount
-
-#### import_packing_list_field_mapping_reimport_工厂_Daman.xlsx:
-- **建议**: 根据错误信息修复问题: 无法读取输出文件: Worksheet named 'PL' not found
-
-#### import_invoice_field_mapping_reimport_工厂_Silvassa.xlsx:
-- **建议**: 根据错误信息修复问题: 输出文件缺少字段: NO., Material code, DESCRIPTION, Model NO., Unit Price, Qty, Unit, Amount
-
-#### import_packing_list_field_mapping_reimport_工厂_Silvassa.xlsx:
-- **建议**: 根据错误信息修复问题: 无法读取输出文件: Worksheet named 'PL' not found
 
 #### import_invoice_quantity:
 - **建议**: 根据错误信息修复问题: 进口发票总数量(0)与采购装箱单总数量(9506.0)不一致
@@ -263,4 +235,4 @@
 
 
 ---
-生成时间: 2025-05-04 20:01:55
+生成时间: 2025-05-04 23:46:02

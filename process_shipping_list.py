@@ -15,6 +15,7 @@ import sys
 import json
 import numpy as np
 from openpyxl.styles.numbers import FORMAT_NUMBER_COMMA_SEPARATED1, FORMAT_NUMBER_00
+import glob # Added for file pattern matching
 
 # Make sure outputs directory exists
 if not os.path.exists('outputs'):
@@ -2574,7 +2575,7 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
                 invoice_df = invoice_df[reimport_columns]
 
                 # 保证Unit Price (CIF, USD)为美元价 - 人民币单价除以汇率转换为美元单价
-                invoice_df['Unit Price (CIF, USD)'] = round(invoice_df['Unit Price (CIF, USD)'] * exchange_rate,4)
+                invoice_df['Unit Price (CIF, USD)'] = round(invoice_df['Unit Price (CIF, USD)'] / exchange_rate, 4)
                 invoice_df['Total Amount (CIF, USD)'] = invoice_df['Unit Price (CIF, USD)'] * invoice_df['Quantity']
                 print(f"Converting prices from RMB to USD using exchange rate: {exchange_rate}")
 
@@ -2602,7 +2603,7 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
                 this_invoice_total = summary_invoice.get('Total Amount (CIF, USD)', 0)
                 # Convert to words using the specific invoice amount
                 this_invoice_amount_words = num_to_words(this_invoice_total)
-                print(f"Generated Amount in Words for {project}_{factory}: {this_invoice_amount_words} (from amount: {this_invoice_total})")
+                print(f"Generated Amount in Words for {project}_{factory}: {this_invoice_amount_words}")
 
                 words_row['S/N'] = 'Amount in Words:'
                 words_row['Part Number'] = f"SAY USD {this_invoice_amount_words} ONLY."
@@ -3085,8 +3086,8 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
 
         # Save the final results
         print(f"Successfully generated all files in {output_dir}:")
-        print(f"1. {os.path.basename(export_file_path)}")
-        print(f"2. {os.path.basename(reimport_invoice_path)}")
+        print(f"1. {os.path.basename(export_file_path)} (Export invoice)")
+        print(f"2. {os.path.basename(reimport_invoice_path)} (Reimport invoice)")
 
     except Exception as e:
         print(f"Warning: Could not apply styling to reimport invoice file: {e}")
@@ -3098,6 +3099,39 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
         if not gw_values.empty and gw_values.max() < gw_values.sum() * 0.5:  # 如果最大值远小于总和，可能使用了单件重量
             print("WARNING: G.W (KG) values seem too small, might be using unit weights instead of total weights")
             print(f"Max weight: {gw_values.max()}, Total weight: {gw_values.sum()}")
+
+    # Clean up unnecessary files at the end
+    print("\nCleaning up intermediate files...")
+    # Remove individual factory reimport files (if any were accidentally created or left over)
+    individual_reimport_pattern = os.path.join(output_dir, 'reimport_*_*.xlsx')
+    for f_path in glob.glob(individual_reimport_pattern):
+        try:
+            os.remove(f_path)
+            print(f"  Removed: {os.path.basename(f_path)}")
+        except Exception as e:
+            print(f"  Warning: Could not remove {os.path.basename(f_path)}: {e}")
+
+    # Remove pl_original_invoice.xlsx
+    pl_original_path = os.path.join(output_dir, 'pl_original_invoice.xlsx')
+    if os.path.exists(pl_original_path):
+        try:
+            os.remove(pl_original_path)
+            print(f"  Removed: {os.path.basename(pl_original_path)}")
+        except Exception as e:
+            print(f"  Warning: Could not remove {os.path.basename(pl_original_path)}: {e}")
+    else:
+        print(f"  Not found (already removed or never created): {os.path.basename(pl_original_path)}")
+
+    # Remove backup_reimport_invoice.xlsx
+    backup_reimport_path = os.path.join(output_dir, 'backup_reimport_invoice.xlsx')
+    if os.path.exists(backup_reimport_path):
+        try:
+            os.remove(backup_reimport_path)
+            print(f"  Removed: {os.path.basename(backup_reimport_path)}")
+        except Exception as e:
+            print(f"  Warning: Could not remove {os.path.basename(backup_reimport_path)}: {e}")
+    else:
+        print(f"  Not found (already removed or never created): {os.path.basename(backup_reimport_path)}")
 
     return result_df
 
