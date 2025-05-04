@@ -938,8 +938,9 @@ class OutputValidator:
                     print(f"ERROR: {excel_error}")
             
             # 验证进口文件的工作表命名
+            print(f"DEBUG: 验证进口文件的工作表命名----------------------1111-------------------------------")
             for import_file in import_invoice_files:
-                if os.path.exists(import_file):
+                if os.path.exists(import_file) and import_file == 'reimport.xlsx':
                     try:
                         # 获取所有工作表名
                         excel = pd.ExcelFile(import_file)

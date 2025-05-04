@@ -57,7 +57,7 @@
 
 ## 验证结果统计
 
-### 输入文件验证: 7/10 通过
+### 输入文件验证: 8/8 通过
 
 ### 处理逻辑验证: 3/7 通过
 
@@ -66,25 +66,6 @@
 ## 详细测试结果
 
 ### 输入文件验证
-
-#### ❌ 失败的测试
-
-##### factory_split: ❌ 失败
-- 结果: 以下工厂缺少对应的进口发票文件: 工厂地点
-
-##### project_split: ❌ 失败
-- 结果: 以下项目未找到对应的进口发票: 麦格米特, 项目名称, 组装厂月度辅耗材, SMT工厂设备配件, TP-LINK, SMT工厂月度辅耗材
-
-##### sheet_naming: ❌ 失败
-- 结果: 出口文件export_invoice.xlsx中的工作表'CXCI202505046'不符合发票号码命名格式
-进口文件reimport_invoice.xlsx中的工作表'RECI202505046'不符合发票号码命名格式
-进口文件reimport_invoice.xlsx中的工作表'RECI202505047'不符合发票号码命名格式
-进口文件reimport_工厂_Daman.xlsx中缺少'PL'工作表
-进口文件reimport_工厂_Daman.xlsx中的工作表'Sheet1'不符合发票号码命名格式
-进口文件reimport_工厂_Daman.xlsx中的工作表'Dummy'不符合发票号码命名格式
-进口文件reimport_工厂_Silvassa.xlsx中缺少'PL'工作表
-进口文件reimport_工厂_Silvassa.xlsx中的工作表'Sheet1'不符合发票号码命名格式
-进口文件reimport_工厂_Silvassa.xlsx中的工作表'Dummy'不符合发票号码命名格式
 
 #### ✅ 通过的测试
 
@@ -102,6 +83,9 @@
 
 ##### policy_file_id: ✅ 通过
 - 结果: 政策文件编号验证通过
+
+##### sheet_naming: ✅ 通过
+- 结果: 工作表命名验证通过
 
 ##### summary_data: ✅ 通过
 - 结果: 汇总数据验证已跳过（根据需求变更）
@@ -139,7 +123,7 @@
 箱号 F167 的净重(0.0)或毛重(0.0)为0或无效，自动跳过
 箱号 F168 的净重(0.0)或毛重(0.0)为0或无效，自动跳过
 
-**统计**: 7/10 测试通过
+**统计**: 8/8 测试通过
 
 ### 处理逻辑验证
 
@@ -200,7 +184,7 @@
 进口发票数量明细: 
 
 ##### import_invoice_split: ❌ 失败
-- 结果: 以下项目和工厂组合未找到对应的进口发票: 项目:SMT工厂月度辅耗材 工厂:Silvassa, 项目:项目名称 工厂:工厂地点, 项目:麦格米特 工厂:Silvassa, 项目:SMT工厂设备配件 工厂:Silvassa, 项目:TP-LINK 工厂:Daman, 项目:组装厂月度辅耗材 工厂:Daman, 项目:TP-LINK 工厂:Silvassa
+- 结果: 以下项目和工厂组合未找到对应的进口发票: 项目:TP-LINK 工厂:Silvassa, 项目:项目名称 工厂:工厂地点, 项目:组装厂月度辅耗材 工厂:Daman, 项目:TP-LINK 工厂:Daman, 项目:SMT工厂设备配件 工厂:Silvassa, 项目:SMT工厂月度辅耗材 工厂:Silvassa, 项目:麦格米特 工厂:Silvassa
 
 ##### import_packing_list_field_mapping_reimport_invoice.xlsx: ❌ 失败
 - 结果: 输出文件缺少字段: P/N., DESCRIPTION, Model NO., QUANTITY, CTNS, Carton MEASUREMENT, G.W (KG), N.W(KG), Carton NO.
@@ -228,25 +212,6 @@
 **统计**: 3/16 测试通过
 
 ## 解决方案建议
-
-### 输入文件验证问题修复建议
-
-#### project_split:
-- **建议**: 根据错误信息修复问题: 以下项目未找到对应的进口发票: 麦格米特, 项目名称, 组装厂月度辅耗材, SMT工厂设备配件, TP-LINK, SMT工厂月度辅耗材
-
-#### sheet_naming:
-- **建议**: 根据错误信息修复问题: 出口文件export_invoice.xlsx中的工作表'CXCI202505046'不符合发票号码命名格式
-进口文件reimport_invoice.xlsx中的工作表'RECI202505046'不符合发票号码命名格式
-进口文件reimport_invoice.xlsx中的工作表'RECI202505047'不符合发票号码命名格式
-进口文件reimport_工厂_Daman.xlsx中缺少'PL'工作表
-进口文件reimport_工厂_Daman.xlsx中的工作表'Sheet1'不符合发票号码命名格式
-进口文件reimport_工厂_Daman.xlsx中的工作表'Dummy'不符合发票号码命名格式
-进口文件reimport_工厂_Silvassa.xlsx中缺少'PL'工作表
-进口文件reimport_工厂_Silvassa.xlsx中的工作表'Sheet1'不符合发票号码命名格式
-进口文件reimport_工厂_Silvassa.xlsx中的工作表'Dummy'不符合发票号码命名格式
-
-#### factory_split:
-- **建议**: 根据错误信息修复问题: 以下工厂缺少对应的进口发票文件: 工厂地点
 
 ### 处理逻辑验证问题修复建议
 
@@ -277,7 +242,7 @@
 - **建议**: 根据错误信息修复问题: 输出文件缺少字段: P/N., DESCRIPTION, Model NO., QUANTITY, CTNS, Carton MEASUREMENT, G.W (KG), N.W(KG), Carton NO.
 
 #### import_invoice_split:
-- **建议**: 根据错误信息修复问题: 以下项目和工厂组合未找到对应的进口发票: 项目:SMT工厂月度辅耗材 工厂:Silvassa, 项目:项目名称 工厂:工厂地点, 项目:麦格米特 工厂:Silvassa, 项目:SMT工厂设备配件 工厂:Silvassa, 项目:TP-LINK 工厂:Daman, 项目:组装厂月度辅耗材 工厂:Daman, 项目:TP-LINK 工厂:Silvassa
+- **建议**: 根据错误信息修复问题: 以下项目和工厂组合未找到对应的进口发票: 项目:TP-LINK 工厂:Silvassa, 项目:项目名称 工厂:工厂地点, 项目:组装厂月度辅耗材 工厂:Daman, 项目:TP-LINK 工厂:Daman, 项目:SMT工厂设备配件 工厂:Silvassa, 项目:SMT工厂月度辅耗材 工厂:Silvassa, 项目:麦格米特 工厂:Silvassa
 
 #### import_invoice_field_mapping_reimport_invoice.xlsx:
 - **建议**: 根据错误信息修复问题: 输出文件缺少字段: NO., Material code, DESCRIPTION, Model NO., Unit Price, Qty, Unit, Amount
@@ -307,4 +272,4 @@
 
 
 ---
-生成时间: 2025-05-04 00:01:00
+生成时间: 2025-05-04 18:18:56

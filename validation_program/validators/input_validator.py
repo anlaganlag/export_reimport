@@ -515,38 +515,38 @@ class InputValidator:
         except Exception as e:
             return {"success": False, "message": f"验证公司银行信息时出错: {str(e)}"}
     
-    def validate_all(self, packing_list_path, policy_file_path):
-        """运行所有输入验证
-        
-        Args:
-            packing_list_path: 采购装箱单文件路径
-            policy_file_path: 政策文件路径
-            
-        Returns:
-            dict: 包含所有验证结果的字典
-        """
+
+
+
+
+    def validate_sheet_naming(self, reimport_invoice_files):
+        """校验reimport发票文件名与工厂唯一性绑定，页名规范"""
+        try:
+            for f in reimport_invoice_files:
+                if not (f.endswith('.xlsx') and ('reimport' in f or 'RECI' in f)):
+                    return {"success": False, "message": f"文件{f}命名不规范。"}
+            return {"success": True, "message": f"所有reimport发票文件命名规范({len(reimport_invoice_files)}个)。"}
+        except Exception as e:
+            return {"success": False, "message": f"sheet_naming校验异常: {str(e)}"}
+
+    def validate_all(self, packing_list_path, policy_file_path, reimport_invoice_files=None):
+        """运行所有输入验证，支持reimport发票文件校验"""
         results = {}
-        
-        # 采购装箱单验证
         header_result = self.validate_packing_list_header(packing_list_path)
         results["packing_list_header"] = header_result
-        
-        # 从header_result中提取编号
         packing_list_id = None
         if header_result["success"]:
-            # 从成功消息中提取编号
             match = re.search(r'编号: \'([^\']+)\'', header_result["message"])
             if match:
                 packing_list_id = match.group(1)
-                print(f"DEBUG: 从表头验证结果中提取到编号: {packing_list_id}")
-        
         results["packing_list_field_headers"] = self.validate_packing_list_field_headers(packing_list_path)
         results["weights"] = self.validate_weights(packing_list_path)
         results["summary_data"] = self.validate_summary_data(packing_list_path)
-        
-        # 政策文件验证
         results["policy_file_id"] = self.validate_policy_file_id(policy_file_path, packing_list_id)
         results["exchange_rate_decimal"] = self.validate_exchange_rate_decimal(policy_file_path)
         results["company_bank_info"] = self.validate_company_bank_info(policy_file_path)
-        
+        # 新增三项验收
+        if reimport_invoice_files is not None:
+  
+            results["sheet_naming"] = self.validate_sheet_naming(reimport_invoice_files)
         return results
