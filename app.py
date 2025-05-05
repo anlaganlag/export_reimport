@@ -15,7 +15,7 @@ st.set_page_config(
 )
 
 # Title and description
-st.title("Export Invoice Generator 出口发票生成器")
+st.title("Export Reimport Invoice Generator 出口进口发票生成器")
 st.markdown("""
 This application helps you generate export invoices from packing lists and policy files.
 此应用程序帮助您从装箱单和政策文件生成出口发票。
@@ -29,6 +29,7 @@ This application helps you generate export invoices from packing lists and polic
 # 文件类型说明
 file_descriptions = {
     "export_invoice.xlsx": "出口发票 - 用于一般贸易出口申报",
+    "reimport_invoice.xlsx": "进口发票 - 用于一般贸易进口申报",
     "cif_original_invoice.xlsx": "CIF原始发票 - 包含运费和保险费的完整发票",
     "reimport_invoice_factory_Daman.xlsx": "大亚湾工厂复进口发票 - 用于大亚湾工厂的复进口申报",
     "reimport_invoice_factory_Silvass.xlsx": "银禧工厂复进口发票 - 用于银禧工厂的复进口申报"
@@ -126,20 +127,42 @@ if st.session_state.files_generated:
         st.markdown("---")
         st.markdown("### Individual Files 单个文件")
         
+        # 对文件进行排序，确保CIF原始发票排在最后
+        sorted_files = sorted(st.session_state.export_files, 
+                             key=lambda x: 1 if x == 'cif_original_invoice.xlsx' else 0)
+        
         # 为每个文件创建下载按钮，并添加对应的描述
-        for file in st.session_state.export_files:
-            with open(os.path.join(st.session_state.output_dir, file), "rb") as f:
-                file_description = file_descriptions.get(file, "导出文件")
-                st.download_button(
-                    label=f"Download {file}",
-                    data=f,
-                    file_name=file,
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    help=file_description,
-                    key=f"download_{file}"
-                )
-                st.markdown(f"**描述**: {file_description}")
-                st.markdown("---")
+        for file in sorted_files:
+            # 跳过CIF原始发票（自动隐藏）
+            if file == 'cif_original_invoice.xlsx':
+                # 添加一个可折叠区域用于显示CIF原始发票（默认折叠）
+                with st.expander("显示CIF原始发票（仅供内部使用）", expanded=False):
+                    with open(os.path.join(st.session_state.output_dir, file), "rb") as f:
+                        file_description = file_descriptions.get(file, "导出文件")
+                        st.download_button(
+                            label=f"Download {file}",
+                            data=f,
+                            file_name=file,
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            help=file_description,
+                            key=f"download_{file}"
+                        )
+                        st.markdown(f"**描述**: {file_description}")
+                    st.markdown("*注意：CIF原始发票仅供内部计算使用，不是最终交付文件*")
+            else:
+                # 正常显示其他文件
+                with open(os.path.join(st.session_state.output_dir, file), "rb") as f:
+                    file_description = file_descriptions.get(file, "导出文件")
+                    st.download_button(
+                        label=f"Download {file}",
+                        data=f,
+                        file_name=file,
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        help=file_description,
+                        key=f"download_{file}"
+                    )
+                    st.markdown(f"**描述**: {file_description}")
+                    st.markdown("---")
 
 # Footer
 st.markdown("---")
