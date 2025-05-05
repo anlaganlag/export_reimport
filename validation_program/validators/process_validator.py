@@ -376,7 +376,7 @@ class ProcessValidator:
             
             # 读取出口发票
             try:
-                export_df = pd.read_excel(export_invoice_path, sheet_name=1, skiprows=6)
+                export_df = pd.read_excel(export_invoice_path, sheet_name=1, skiprows=9)
                 print(f"DEBUG: 成功读取出口发票: {export_invoice_path}")
                 print(f"DEBUG: 出口发票行数: {len(export_df)}")
                 print(f"DEBUG: 出口发票前3行:\n{export_df.head(3)}")
@@ -390,19 +390,19 @@ class ProcessValidator:
             
             # 查找物料编号列
             cif_part_col = find_column_with_pattern(cif_df, ["Material code", "物料编码"])
-            export_part_col = find_column_with_pattern(export_df, ["Material code", "物料编码"])
+            export_part_col = find_column_with_pattern(export_df, ["Part Number", "物料编码"])
             
             # 查找单价列
-            cif_price_col = find_column_with_pattern(cif_df, ["CIF单价", "CIF Unit Price", "Unit Price", "单价"])
-            export_price_col = find_column_with_pattern(export_df, ["Unit Price", "单价"])
+            cif_price_col = find_column_with_pattern(cif_df, ["单价USD数值", "CIF Unit Price"])
+            export_price_col = find_column_with_pattern(export_df, ["Unit Price (CIF, USD)", "单价"])
             
             # 查找数量列
             cif_qty_col = find_column_with_pattern(cif_df, ["Qty", "Quantity", "数量"])
             export_qty_col = find_column_with_pattern(export_df, ["Qty", "Quantity", "数量"])
             
             # 查找总金额列
-            cif_total_col = find_column_with_pattern(cif_df, ["Amount", "Total Amount", "总金额", "金额"])
-            export_total_col = find_column_with_pattern(export_df, ["Amount", "Total Amount", "总金额", "金额"])
+            cif_total_col = find_column_with_pattern(cif_df, ["总价USD数值", "Total Amount", "总金额", "金额"])
+            export_total_col = find_column_with_pattern(export_df, ["Total Amount (CIF, USD)", "Total Amount", "总金额", "金额"])
             
             print(f"DEBUG: CIF物料列: {cif_part_col}, 单价列: {cif_price_col}, 数量列: {cif_qty_col}, 总价列: {cif_total_col}")
             print(f"DEBUG: 出口物料列: {export_part_col}, 单价列: {export_price_col}, 数量列: {export_qty_col}, 总价列: {export_total_col}")
@@ -413,7 +413,7 @@ class ProcessValidator:
             # 对CIF发票数据进行预处理，计算可能缺失的总价
             if cif_total_col is None:
                 print("DEBUG: CIF发票中未找到总价列，使用单价×数量计算")
-                cif_df['计算总价'] = cif_df[cif_price_col] * cif_df[cif_qty_col]
+                cif_df['计算总价'] = round(cif_df[cif_price_col],4) * cif_df[cif_qty_col]
                 cif_total_col = '计算总价'
             
             # 对出口发票数据进行预处理，计算可能缺失的总价

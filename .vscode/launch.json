@@ -1,19 +1,37 @@
 {
     "version": "0.2.0",
     "configurations": [
+        // {
+        //     "name": "Debug process_shipping_list.py",
+        //     "type": "python",
+        //     "request": "launch",
+        //     "program": "${workspaceFolder}/process_shipping_list.py",
+        //     "args": [
+        //         "--packing-list",
+        //         "testfiles/original_packing_list.xlsx",
+        //         "--policy",
+        //         "testfiles/policy.xlsx",
+        //         "--output-dir",
+        //         "outputs",
+        //         "--debug"
+        //     ],
+        //     "console": "integratedTerminal",
+        //     "justMyCode": false,
+        //     "cwd": "${workspaceFolder}",
+        //     "env": {
+        //         "PYTHONPATH": "${workspaceFolder}"
+        //     }
+        // },
         {
-            "name": "Debug process_shipping_list.py",
+            "name": "Debug Validator py",
             "type": "python",
             "request": "launch",
-            "program": "${workspaceFolder}/process_shipping_list.py",
+            "program": "${workspaceFolder}/validation_program/main.py",
             "args": [
                 "--packing-list",
                 "testfiles/original_packing_list.xlsx",
                 "--policy",
                 "testfiles/policy.xlsx",
-                "--output-dir",
-                "outputs",
-                "--debug"
             ],
             "console": "integratedTerminal",
             "justMyCode": false,

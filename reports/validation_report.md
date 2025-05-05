@@ -55,7 +55,7 @@
 
 ### 输入文件验证: 8/8 通过
 
-### 处理逻辑验证: 6/7 通过
+### 处理逻辑验证: 7/7 通过
 
 ### 输出文件验证: 3/12 通过
 
@@ -123,11 +123,6 @@
 
 ### 处理逻辑验证
 
-#### ❌ 失败的测试
-
-##### merge_logic: ❌ 失败
-- 结果: 未找到所有需要的列，无法验证合并逻辑
-
 #### ✅ 通过的测试
 
 ##### cif_price_calculation: ✅ 通过
@@ -142,13 +137,16 @@
 ##### insurance_calculation: ✅ 通过
 - 结果: 保险费计算验证通过
 
+##### merge_logic: ✅ 通过
+- 结果: 物料合并逻辑验证通过
+
 ##### trade_type_identification: ✅ 通过
 - 结果: 贸易类型识别逻辑验证通过
 
 ##### trade_type_split: ✅ 通过
 - 结果: 贸易类型拆分验证通过
 
-**统计**: 6/7 测试通过
+**统计**: 7/7 测试通过
 
 ### 输出文件验证
 
@@ -174,7 +172,7 @@
 进口发票数量明细: 
 
 ##### import_invoice_split: ❌ 失败
-- 结果: 以下项目和工厂组合未找到对应的进口发票: 项目:麦格米特 工厂:Silvassa, 项目:SMT工厂设备配件 工厂:Silvassa, 项目:SMT工厂月度辅耗材 工厂:Silvassa, 项目:组装厂月度辅耗材 工厂:Daman, 项目:项目名称 工厂:工厂地点, 项目:TP-LINK 工厂:Daman, 项目:TP-LINK 工厂:Silvassa
+- 结果: 以下项目和工厂组合未找到对应的进口发票: 项目:SMT工厂设备配件 工厂:Silvassa, 项目:项目名称 工厂:工厂地点, 项目:SMT工厂月度辅耗材 工厂:Silvassa, 项目:组装厂月度辅耗材 工厂:Daman, 项目:TP-LINK 工厂:Silvassa, 项目:麦格米特 工厂:Silvassa, 项目:TP-LINK 工厂:Daman
 
 ##### import_packing_list_field_mapping_reimport_invoice.xlsx: ❌ 失败
 - 结果: 输出文件缺少字段: P/N., DESCRIPTION, Model NO., QUANTITY, CTNS, Carton MEASUREMENT, G.W (KG), N.W(KG), Carton NO.
@@ -197,11 +195,6 @@
 
 ## 解决方案建议
 
-### 处理逻辑验证问题修复建议
-
-#### merge_logic:
-- **建议**: 根据错误信息修复问题: 未找到所有需要的列，无法验证合并逻辑
-
 ### 输出文件验证问题修复建议
 
 #### export_invoice_field_mapping:
@@ -217,7 +210,7 @@
 - **建议**: 根据错误信息修复问题: 输出文件缺少字段: P/N., DESCRIPTION, Model NO., QUANTITY, CTNS, Carton MEASUREMENT, G.W (KG), N.W(KG), Carton NO.
 
 #### import_invoice_split:
-- **建议**: 根据错误信息修复问题: 以下项目和工厂组合未找到对应的进口发票: 项目:麦格米特 工厂:Silvassa, 项目:SMT工厂设备配件 工厂:Silvassa, 项目:SMT工厂月度辅耗材 工厂:Silvassa, 项目:组装厂月度辅耗材 工厂:Daman, 项目:项目名称 工厂:工厂地点, 项目:TP-LINK 工厂:Daman, 项目:TP-LINK 工厂:Silvassa
+- **建议**: 根据错误信息修复问题: 以下项目和工厂组合未找到对应的进口发票: 项目:SMT工厂设备配件 工厂:Silvassa, 项目:项目名称 工厂:工厂地点, 项目:SMT工厂月度辅耗材 工厂:Silvassa, 项目:组装厂月度辅耗材 工厂:Daman, 项目:TP-LINK 工厂:Silvassa, 项目:麦格米特 工厂:Silvassa, 项目:TP-LINK 工厂:Daman
 
 #### import_invoice_field_mapping_reimport_invoice.xlsx:
 - **建议**: 根据错误信息修复问题: 输出文件缺少字段: NO., Material code, DESCRIPTION, Model NO., Unit Price, Qty, Unit, Amount
@@ -235,4 +228,4 @@
 
 
 ---
-生成时间: 2025-05-04 23:46:02
+生成时间: 2025-05-05 10:46:33
