@@ -276,53 +276,86 @@ class InputValidator:
             if carton_number_col is None:
                 return {"success": False, "message": "未找到箱号列。验收标准: 装箱单必须包含箱号列。"}
 
-            # 优化的安全转换函数，记录被容错的异常值
+            # 改进的安全转换函数，更好地处理非数值和通配符
             def safe_convert_to_float(val, row_idx, col_name, error_log):
+                # 处理空值
                 if val is None or pd.isna(val) or val == "":
                     return 0.0
+                
+                # 如果已经是数值类型，直接返回
                 if isinstance(val, (int, float)):
                     return float(val)
+                
+                # 转换为字符串并清理
                 val_str = str(val).strip()
                 if not val_str:
                     return 0.0
-                # 检查是否为通配符字符串
-                if any(x in val_str for x in ['*', '?']):
-                    error_log.append(f"第{row_idx+1}行{col_name}为通配符'{val_str}'，自动按0处理")
+                
+                # 检查是否包含通配符
+                if any(x in val_str for x in ['*', '?', 'N/A', 'n/a', 'TBD', 'tbd']):
+                    error_log.append(f"第{row_idx+1}行{col_name}包含通配符或占位符'{val_str}'，自动按0处理")
                     return 0.0
+                
+                # 尝试直接转换为浮点数
                 try:
                     return float(val_str)
                 except (ValueError, TypeError):
+                    # 尝试清理字符串后转换
                     try:
+                        # 只保留数字、小数点和负号
                         clean_str = ''.join(c for c in val_str if c.isdigit() or c in '.-')
-                        if clean_str and not clean_str.count('.') > 1:
-                            return float(clean_str)
-                        error_log.append(f"第{row_idx+1}行{col_name}值'{val_str}'无法解析，自动按0处理")
+                        
+                        # 确保只有一个小数点
+                        if clean_str and clean_str.count('.') <= 1:
+                            # 如果以小数点开头，添加0
+                            if clean_str.startswith('.'):
+                                clean_str = '0' + clean_str
+                            # 如果以小数点结尾，添加0
+                            if clean_str.endswith('.'):
+                                clean_str = clean_str + '0'
+                                
+                            if clean_str:
+                                return float(clean_str)
+                        
+                        error_log.append(f"第{row_idx+1}行{col_name}值'{val_str}'无法解析为数值，自动按0处理")
                         return 0.0
                     except Exception:
-                        error_log.append(f"第{row_idx+1}行{col_name}值'{val_str}'无法解析，自动按0处理")
+                        error_log.append(f"第{row_idx+1}行{col_name}值'{val_str}'无法解析为数值，自动按0处理")
                         return 0.0
 
             carton_net_weights = {}
             carton_gross_weights = {}
             carton_rows = {}
-            error_log = []  # 新增：记录被容错的异常值
+            error_log = []  # 记录被容错的异常值
+            
+            # 处理每一行数据
             for idx, row in df.iterrows():
                 try:
+                    # 只处理有箱号的行
                     if pd.notna(row[carton_number_col]):
                         current_carton = str(row[carton_number_col])
+                        
+                        # 初始化该箱号的数据
                         if current_carton not in carton_rows:
                             carton_rows[current_carton] = []
                             carton_net_weights[current_carton] = 0.0
                             carton_gross_weights[current_carton] = 0.0
+                        
+                        # 记录行号（Excel中的实际行号）
                         carton_rows[current_carton].append(idx + self.skiprows + 3)
+                        
+                        # 安全获取净重和毛重值
                         try:
                             net_weight_raw = row[net_weight_col] if net_weight_col < len(row) else None
                         except:
                             net_weight_raw = None
+                            
                         try:
                             gross_weight_raw = row[gross_weight_col] if gross_weight_col < len(row) else None
                         except:
                             gross_weight_raw = None
+                        
+                        # 转换为浮点数并累加
                         net_weight_value = safe_convert_to_float(net_weight_raw, idx, "净重", error_log)
                         gross_weight_value = safe_convert_to_float(gross_weight_raw, idx, "毛重", error_log)
                         carton_net_weights[current_carton] += net_weight_value
@@ -330,19 +363,28 @@ class InputValidator:
                 except Exception as e:
                     error_log.append(f"处理第{idx+1}行时出错: {str(e)}，自动跳过")
                     continue
+            
+            # 验证每个箱号的净重是否小于毛重
             invalid_cartons = []
             for carton, total_net_weight in carton_net_weights.items():
                 gross_weight = carton_gross_weights.get(carton, 0.0)
+                
+                # 跳过净重或毛重为0的箱号
                 if total_net_weight <= 0 or gross_weight <= 0:
-                    error_log.append(f"箱号 {carton} 的净重({total_net_weight})或毛重({gross_weight})为0或无效，自动跳过")
+                    error_log.append(f"箱号 {carton} 的净重({total_net_weight:.2f})或毛重({gross_weight:.2f})为0或无效，自动跳过")
                     continue
-                if total_net_weight > gross_weight:
+                
+                # 检查净重是否大于毛重（考虑小误差）
+                tolerance = 0.01  # 1%的容差
+                if total_net_weight > gross_weight * (1 + tolerance):
                     invalid_cartons.append({
                         "carton": carton,
                         "rows": carton_rows.get(carton, []),
                         "net_weight": total_net_weight,
                         "gross_weight": gross_weight
                     })
+            
+            # 生成验证结果
             if invalid_cartons:
                 error_messages = []
                 for item in invalid_cartons:
@@ -354,6 +396,7 @@ class InputValidator:
                 if error_log:
                     msg += "\n\n【自动容错提示】:\n" + "\n".join(error_log)
                 return {"success": False, "message": msg}
+            
             msg = "净重毛重验证通过，所有箱号的总净重均小于总毛重"
             if error_log:
                 msg += "\n\n【自动容错提示】:\n" + "\n".join(error_log)

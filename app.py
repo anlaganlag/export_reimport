@@ -6,6 +6,7 @@ import zipfile
 import io
 from process_shipping_list import process_shipping_list, read_policy_file
 from pathlib import Path
+from validation_program.validators.input_validator import InputValidator
 
 # Set page config
 st.set_page_config(
@@ -68,34 +69,83 @@ with col2:
 if 'files_generated' not in st.session_state:
     st.session_state.files_generated = False
 
+# 验证输入文件函数
+def validate_input_files(packing_list_path, policy_file_path):
+    """验证输入文件的有效性
+    
+    Args:
+        packing_list_path: 装箱单文件路径
+        policy_file_path: 政策文件路径
+        
+    Returns:
+        tuple: (验证是否通过, 错误信息)
+    """
+    validator = InputValidator()
+    validation_results = validator.validate_all(packing_list_path, policy_file_path)
+    
+    # 检查所有验证结果
+    all_passed = True
+    error_messages = []
+    
+    for check_name, result in validation_results.items():
+        if not result["success"]:
+            all_passed = False
+            error_messages.append(f"**{check_name}**: {result['message']}")
+    
+    return all_passed, error_messages
+
 # Process button
 if st.button("Generate Invoice 生成发票", type="primary"):
     if not packing_list_file or not policy_file:
         st.error("Please upload both packing list and policy files first! 请先上传装箱单和政策文件！")
     else:
         try:
-            with st.spinner("Processing files... 正在处理文件..."):
-                # Save uploaded files to temp directory
-                packing_list_path = os.path.join(st.session_state.temp_dir, "packing_list.xlsx")
-                policy_file_path = os.path.join(st.session_state.temp_dir, "policy.xlsx")
+            # Save uploaded files to temp directory
+            packing_list_path = os.path.join(st.session_state.temp_dir, "packing_list.xlsx")
+            policy_file_path = os.path.join(st.session_state.temp_dir, "policy.xlsx")
+            
+            with open(packing_list_path, "wb") as f:
+                f.write(packing_list_file.getvalue())
+            with open(policy_file_path, "wb") as f:
+                f.write(policy_file.getvalue())
+            
+            # 验证输入文件
+            with st.spinner("Validating files... 正在验证文件..."):
+                validation_passed, error_messages = validate_input_files(packing_list_path, policy_file_path)
+            
+            if not validation_passed:
+                st.error("文件验证失败，请修正以下问题：")
                 
-                with open(packing_list_path, "wb") as f:
-                    f.write(packing_list_file.getvalue())
-                with open(policy_file_path, "wb") as f:
-                    f.write(policy_file.getvalue())
-
-                # Process the files
-                process_shipping_list(packing_list_path, policy_file_path, st.session_state.output_dir)
-
-                # Check for generated files
-                export_files = [f for f in os.listdir(st.session_state.output_dir) if f.endswith('.xlsx')]
+                # 创建一个错误展示区域
+                error_container = st.container()
+                with error_container:
+                    for error in error_messages:
+                        # 检查是否是weights验证错误
+                        if "weights" in error.lower() or "净重" in error or "毛重" in error or "Value must be" in error:
+                            # 使用警告框突出显示weights相关错误
+                            st.warning(error)
+                            # 添加帮助提示
+                            st.info("提示：净重和毛重字段必须为数值，且净重应小于毛重。请检查Excel文件中是否有非数值或通配符（如*、?、N/A等）。")
+                        else:
+                            # 其他错误使用普通错误框显示
+                            st.error(error)
                 
-                if export_files:
-                    st.session_state.files_generated = True
-                    st.session_state.export_files = export_files
-                    st.success("Files generated successfully! 文件生成成功！")
-                else:
-                    st.warning("No export files were generated. Please check your input files. 没有生成导出文件，请检查输入文件。")
+                st.warning("请修正上述问题后重新上传文件。")
+            else:
+                st.success("文件验证通过！正在处理...")
+                # 处理文件
+                with st.spinner("Processing files... 正在处理文件..."):
+                    process_shipping_list(packing_list_path, policy_file_path, st.session_state.output_dir)
+
+                    # Check for generated files
+                    export_files = [f for f in os.listdir(st.session_state.output_dir) if f.endswith('.xlsx')]
+                    
+                    if export_files:
+                        st.session_state.files_generated = True
+                        st.session_state.export_files = export_files
+                        st.success("Files generated successfully! 文件生成成功！")
+                    else:
+                        st.warning("No export files were generated. Please check your input files. 没有生成导出文件，请检查输入文件。")
 
         except Exception as e:
             st.error(f"An error occurred: {str(e)} 发生错误：{str(e)}")
