@@ -150,6 +150,29 @@ def read_excel_file(file_path, skip=0):
                       else col for col in df.columns]
 
         print(f"Simplified column names: {df.columns.tolist()[:5]}...")
+
+        # Filter out the Chinese header translation row if it appears as the first data row
+        if len(df) > 0:
+            # Check if the first row contains Chinese header translations
+            first_row = df.iloc[0]
+
+            # Check for common Chinese header terms in the first row
+            chinese_header_terms = ['料号', '进口清关货描', '型号', '总件数', '总体积', '箱号']
+            matching_terms = 0
+
+            for _, value in first_row.items():
+                if isinstance(value, str):
+                    for term in chinese_header_terms:
+                        if term in value:
+                            matching_terms += 1
+                            break
+
+            # If we found multiple Chinese header terms in the first row, it's likely a header translation row
+            if matching_terms >= 2:
+                print(f"Detected Chinese header translation row as first data row in read_excel_file. Removing this row.")
+                df = df.iloc[1:].reset_index(drop=True)
+                print(f"After removing header translation row, data now has {len(df)} rows")
+
         return df
 
     except Exception as e:
@@ -516,6 +539,30 @@ def merge_india_invoice_rows(df):
     print(f"原始数据列名: {result_df.columns.tolist()}")
     print(f"原始数据前3行: {result_df.head(3)}")
 
+    # Filter out the Chinese header translation row that appears as the first data row
+    # This row typically contains translations of column headers and should not be treated as data
+    if len(result_df) > 0:
+        # Check if the first row contains Chinese header translations
+        first_row = result_df.iloc[0]
+        is_header_translation = False
+
+        # Check for common Chinese header terms in the first row
+        chinese_header_terms = ['料号', '进口清关货描', '型号', '总件数', '总体积', '箱号']
+        matching_terms = 0
+
+        for _, value in first_row.items():
+            if isinstance(value, str):
+                for term in chinese_header_terms:
+                    if term in value:
+                        matching_terms += 1
+                        break
+
+        # If we found multiple Chinese header terms in the first row, it's likely a header translation row
+        if matching_terms >= 2:
+            print(f"Detected Chinese header translation row as first data row. Removing this row.")
+            result_df = result_df.iloc[1:].reset_index(drop=True)
+            print(f"After removing header translation row, data now has {len(result_df)} rows")
+
     # Convert numeric columns to appropriate types
     numeric_cols = ['Quantity', 'Unit Price (CIF, USD)', 'Total Amount (CIF, USD)', 'Total Net Weight (kg)']
     for col in numeric_cols:
@@ -727,6 +774,25 @@ def split_by_project_and_factory(df):
         if is_header_row:
             print("检测到第一行是表头行，将其过滤掉")
             df = df.iloc[1:].reset_index(drop=True)
+
+        # 检查是否有中文表头翻译行（通常包含多个中文表头术语）
+        first_row = df.iloc[0] if len(df) > 0 else None
+        if first_row is not None:
+            chinese_header_terms = ['料号', '进口清关货描', '型号', '总件数', '总体积', '箱号']
+            matching_terms = 0
+
+            for _, value in first_row.items():
+                if isinstance(value, str):
+                    for term in chinese_header_terms:
+                        if term in value:
+                            matching_terms += 1
+                            break
+
+            # 如果找到多个中文表头术语，这可能是一个表头翻译行
+            if matching_terms >= 2:
+                print(f"在split_by_project_and_factory中检测到中文表头翻译行，将其过滤掉")
+                df = df.iloc[1:].reset_index(drop=True)
+                print(f"过滤后数据行数: {len(df)}")
 
     # 确保必要的列存在
     if 'project' not in df.columns:
@@ -2009,6 +2075,42 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
                         if col not in row:
                             row[col] = None
 
+                # 检查是否有中文表头翻译行 - 通常是第一行数据，包含多个中文表头术语
+                if len(packing_df) > 0:
+                    first_row = packing_df.iloc[0]
+                    chinese_header_terms = ['料号', '进口清关货描', '型号', '总件数', '总体积', '箱号']
+                    matching_terms = 0
+
+                    for col, value in first_row.items():
+                        if isinstance(value, str):
+                            for term in chinese_header_terms:
+                                if term in value:
+                                    matching_terms += 1
+                                    break
+
+                    # 如果找到多个中文表头术语，这可能是一个表头翻译行
+                    if matching_terms >= 2:
+                        print(f"在导出发票中检测到中文表头翻译行，将其过滤掉")
+                        packing_df = packing_df.iloc[1:].reset_index(drop=True)
+                        # 重新编号S/N列
+                        if 'S/N' in packing_df.columns:
+                            # 识别页脚行和Total行
+                            footer_mask = packing_df['S/N'].astype(str).str.contains('PACKED IN|NET WEIGHT|GROSS WEIGHT|TOTAL MEASUREMENT|COUNTRY OF ORIGIN', na=False, regex=True)
+                            total_mask = packing_df['名称'] == 'Total' if '名称' in packing_df.columns else pd.Series(False, index=packing_df.index)
+
+                            # 提取数据行
+                            data_rows = packing_df[~(footer_mask | total_mask)].copy()
+
+                            if not data_rows.empty:
+                                # 重新编号数据行，从1开始
+                                data_rows['S/N'] = range(1, len(data_rows) + 1)
+
+                                # 重新组合数据
+                                total_rows = packing_df[total_mask].copy()
+                                footer_rows = packing_df[footer_mask].copy()
+                                packing_df = pd.concat([data_rows, total_rows, footer_rows], ignore_index=True)
+                                print("Reset export packing list S/N to start from 1")
+
                 # 将页脚行添加到数据框
                 footer_df = pd.DataFrame(footer_rows)
                 packing_df = pd.concat([packing_df, footer_df], ignore_index=True)
@@ -2468,8 +2570,27 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
             # 识别Total行
             total_mask = complete_pl_df['名称'] == 'Total'
 
-            # 提取数据行、Total行和页脚行
-            data_rows = complete_pl_df[~(footer_mask | total_mask)].copy()
+            # 识别中文表头翻译行 - 通常是第一行数据，包含多个中文表头术语
+            chinese_header_mask = False
+            if len(complete_pl_df) > 0:
+                first_row = complete_pl_df.iloc[0]
+                chinese_header_terms = ['料号', '进口清关货描', '型号', '总件数', '总体积', '箱号']
+                matching_terms = 0
+
+                for col, value in first_row.items():
+                    if isinstance(value, str):
+                        for term in chinese_header_terms:
+                            if term in value:
+                                matching_terms += 1
+                                break
+
+                # 如果找到多个中文表头术语，这可能是一个表头翻译行
+                if matching_terms >= 2:
+                    print(f"在最终输出前检测到中文表头翻译行，将其过滤掉")
+                    chinese_header_mask = complete_pl_df.index == 0
+
+            # 提取数据行、Total行和页脚行，排除中文表头翻译行
+            data_rows = complete_pl_df[~(footer_mask | total_mask | chinese_header_mask)].copy()
             total_rows = complete_pl_df[total_mask].copy()
             footer_rows = complete_pl_df[footer_mask].copy()
 
@@ -2575,7 +2696,7 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
                 invoice_df = invoice_df[reimport_columns]
 
                 # 保证Unit Price (CIF, USD)为美元价 - 人民币单价除以汇率转换为美元单价
-                invoice_df['Unit Price (CIF, USD)'] = round(invoice_df['Unit Price (CIF, USD)'] / exchange_rate, 4)
+                invoice_df['Unit Price (CIF, USD)'] = round(invoice_df['Unit Price (CIF, USD)'] * exchange_rate, 4)
                 invoice_df['Total Amount (CIF, USD)'] = invoice_df['Unit Price (CIF, USD)'] * invoice_df['Quantity']
                 print(f"Converting prices from RMB to USD using exchange rate: {exchange_rate}")
 
