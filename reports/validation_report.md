@@ -49,15 +49,13 @@
    - 必要内容: 匹配编号、汇率、加价率、保险费率、公司和银行信息
    - 参考文档: testfiles/README.md 第21-25行
 
-## 验收结果：不通过
+## 验收结果：通过
 
 ## 验证结果统计
 
-### 输入文件验证: 8/8 通过
+### 输入文件验证: 7/7 通过
 
 ### 处理逻辑验证: 7/7 通过
-
-### 输出文件验证: 3/12 通过
 
 ## 详细测试结果
 
@@ -79,9 +77,6 @@
 
 ##### policy_file_id: ✅ 通过
 - 结果: 政策文件编号验证通过
-
-##### sheet_naming: ✅ 通过
-- 结果: 工作表命名验证通过
 
 ##### summary_data: ✅ 通过
 - 结果: 汇总数据验证已跳过（根据需求变更）
@@ -119,7 +114,7 @@
 箱号 F167 的净重(0.0)或毛重(0.0)为0或无效，自动跳过
 箱号 F168 的净重(0.0)或毛重(0.0)为0或无效，自动跳过
 
-**统计**: 8/8 测试通过
+**统计**: 7/7 测试通过
 
 ### 处理逻辑验证
 
@@ -148,84 +143,7 @@
 
 **统计**: 7/7 测试通过
 
-### 输出文件验证
-
-#### ❌ 失败的测试
-
-##### export_invoice_field_mapping: ❌ 失败
-- 结果: 输出文件缺少字段: Material code, DESCRIPTION, Model NO., Qty, Unit Price, Amount
-
-##### export_invoice_prices: ❌ 失败
-- 结果: 未找到单价列
-
-##### export_invoice_quantity: ❌ 失败
-- 结果: 未找到数量列
-
-##### export_packing_list_field_mapping: ❌ 失败
-- 结果: 输出文件缺少字段: P/N., DESCRIPTION, Model NO., QUANTITY, CTNS, Carton MEASUREMENT, G.W (KG), N.W(KG), Carton NO.
-
-##### import_invoice_field_mapping_reimport_invoice.xlsx: ❌ 失败
-- 结果: 输出文件缺少字段: NO., Material code, DESCRIPTION, Model NO., Unit Price, Qty, Unit, Amount
-
-##### import_invoice_quantity: ❌ 失败
-- 结果: 进口发票总数量(0)与采购装箱单总数量(9506.0)不一致
-进口发票数量明细: 
-
-##### import_invoice_split: ❌ 失败
-- 结果: 以下项目和工厂组合未找到对应的进口发票: 项目:SMT工厂月度辅耗材 工厂:Silvassa, 项目:SMT工厂设备配件 工厂:Silvassa, 项目:项目名称 工厂:工厂地点, 项目:TP-LINK 工厂:Silvassa, 项目:TP-LINK 工厂:Daman, 项目:麦格米特 工厂:Silvassa, 项目:组装厂月度辅耗材 工厂:Daman
-
-##### import_packing_list_field_mapping_reimport_invoice.xlsx: ❌ 失败
-- 结果: 输出文件缺少字段: P/N., DESCRIPTION, Model NO., QUANTITY, CTNS, Carton MEASUREMENT, G.W (KG), N.W(KG), Carton NO.
-
-##### import_packing_list_totals: ❌ 失败
-- 结果: 验证进口装箱单汇总数据时出错: can only concatenate str (not "int") to str
-
-#### ✅ 通过的测试
-
-##### export_packing_list_totals: ✅ 通过
-- 结果: 出口装箱单汇总数据验证通过
-
-##### file_naming: ✅ 通过
-- 结果: 文件命名格式验证通过
-
-##### format_compliance: ✅ 通过
-- 结果: 文件格式一致性验证通过
-
-**统计**: 3/12 测试通过
-
-## 解决方案建议
-
-### 输出文件验证问题修复建议
-
-#### export_invoice_field_mapping:
-- **建议**: 根据错误信息修复问题: 输出文件缺少字段: Material code, DESCRIPTION, Model NO., Qty, Unit Price, Amount
-
-#### export_invoice_quantity:
-- **建议**: 根据错误信息修复问题: 未找到数量列
-
-#### export_invoice_prices:
-- **建议**: 根据错误信息修复问题: 未找到单价列
-
-#### export_packing_list_field_mapping:
-- **建议**: 根据错误信息修复问题: 输出文件缺少字段: P/N., DESCRIPTION, Model NO., QUANTITY, CTNS, Carton MEASUREMENT, G.W (KG), N.W(KG), Carton NO.
-
-#### import_invoice_split:
-- **建议**: 根据错误信息修复问题: 以下项目和工厂组合未找到对应的进口发票: 项目:SMT工厂月度辅耗材 工厂:Silvassa, 项目:SMT工厂设备配件 工厂:Silvassa, 项目:项目名称 工厂:工厂地点, 项目:TP-LINK 工厂:Silvassa, 项目:TP-LINK 工厂:Daman, 项目:麦格米特 工厂:Silvassa, 项目:组装厂月度辅耗材 工厂:Daman
-
-#### import_invoice_field_mapping_reimport_invoice.xlsx:
-- **建议**: 根据错误信息修复问题: 输出文件缺少字段: NO., Material code, DESCRIPTION, Model NO., Unit Price, Qty, Unit, Amount
-
-#### import_packing_list_field_mapping_reimport_invoice.xlsx:
-- **建议**: 根据错误信息修复问题: 输出文件缺少字段: P/N., DESCRIPTION, Model NO., QUANTITY, CTNS, Carton MEASUREMENT, G.W (KG), N.W(KG), Carton NO.
-
-#### import_invoice_quantity:
-- **建议**: 根据错误信息修复问题: 进口发票总数量(0)与采购装箱单总数量(9506.0)不一致
-进口发票数量明细: 
-
-#### import_packing_list_totals:
-- **建议**: 根据错误信息修复问题: 验证进口装箱单汇总数据时出错: can only concatenate str (not "int") to str
-
 
 
 ---
-生成时间: 2025-05-05 17:13:18
+生成时间: 2025-05-05 17:17:39

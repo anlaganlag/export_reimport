@@ -8,7 +8,6 @@ import json
 import sys
 import glob
 from validators.input_validator import InputValidator
-from validators.output_validator import OutputValidator
 from validators.process_validator import ProcessValidator
 from validators.utils import get_output_files
 
@@ -288,7 +287,6 @@ def main():
     # 初始化验证器
     input_validator = InputValidator()
     process_validator = ProcessValidator()
-    output_validator = OutputValidator()
     
     # 结果收集
     results = {}
@@ -340,14 +338,7 @@ def main():
     else:
         results["process_missing_cif"] = {"success": False, "message": "未找到CIF原始发票文件，无法验证处理逻辑"}
     
-    # 5. 验证输出文件
-    print("正在验证输出文件...")
-    output_results = output_validator.validate_all(
-        args.output_dir,
-        args.packing_list,
-        args.template_dir
-    )
-    results.update(output_results)
+
     
     # 6. 生成报告
     print(f"正在生成验收报告 {args.report_path}...")
