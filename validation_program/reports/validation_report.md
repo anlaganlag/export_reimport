@@ -19,7 +19,7 @@
 ### 输出目录
 - 输出路径: `D:\project\export_reimport\outputs`
 - 模板目录: `D:\project\export_reimport\Template`
-- 报告路径: `D:\project\export_reimport\reports\validation_report.md`
+- 报告路径: `D:\project\export_reimport\validation_program\reports\validation_report.md`
 
 ### 处理参数
 - 跳过文件处理: 否
@@ -172,4 +172,4 @@
 
 
 ---
-生成时间: 2025-05-05 20:54:24
+生成时间: 2025-05-05 20:51:00
