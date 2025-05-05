@@ -35,14 +35,45 @@ class OutputValidator:
             with open(field_mappings_path, "r", encoding="utf-8") as f:
                 self.field_mappings = json.load(f)
         else:
+            # 使用截图中显示的实际字段名
             self.field_mappings = {
                 "export_invoice_mapping": {
-                    "Material code": "料号",
-                    "DESCRIPTION": "供应商开票名称",
-                    "Model NO.":"型号",
-                    "Unit Price":"采购单价",
-                    "Qty": "每箱数量",
-                    "Unit":"单位",
+                    "S/N": "序号",
+                    "Part Number": "料号",
+                    "名称": "供应商开票名称",
+                    "Model Number": "型号",
+                    "Unit Price (CIF, USD)": "采购单价",
+                    "Quantity": "数量",
+                    "Unit": "单位",
+                    "Total Amount (CIF, USD)": "总金额",
+                    "Total Net Weight (kg)": "总净重"
+                },
+                "export_packing_list_mapping": {
+                    "Part Number": "料号",
+                    "名称": "供应商开票名称",
+                    "Model Number": "型号",
+                    "Quantity": "数量",
+                    "Total Carton Quantity": "总件数",
+                    "Total Volume (CBM)": "总体积",
+                    "Total Gross Weight (kg)": "总毛重",
+                    "Total Net Weight (kg)": "总净重",
+                    "Carton Number": "箱号"
+                },
+                "import_invoice_mapping": {
+                    "Part Number": "料号",
+                    "Commodity Description (Customs)": "进口清关货描",
+                    "Quantity": "数量",
+                    "Unit": "单位"
+                },
+                "import_packing_list_mapping": {
+                    "Part Number": "料号",
+                    "Commodity Description (Customs)": "进口清关货描",
+                    "Quantity": "数量",
+                    "Total Carton Quantity": "总件数",
+                    "Total Volume (CBM)": "总体积",
+                    "Total Gross Weight (kg)": "总毛重",
+                    "Total Net Weight (kg)": "总净重",
+                    "Carton Number": "箱号"
                 }
             }
             
@@ -66,7 +97,37 @@ class OutputValidator:
                     skiprows = 15
                 if mapping_type == 'import_invoice_mapping':
                     skiprows = 0
-
+                if mapping_type == 'export_invoice_mapping':
+                    # 试着找出包含标题行的行号
+                    try:
+                        # 先不跳过行读取文件以识别标题行
+                        temp_df = pd.read_excel(output_file, sheet_name=sheet_name, nrows=20)
+                        print(f"DEBUG: 尝试识别标题行")
+                        
+                        # 尝试识别包含 "S/N" 和 "Unit Price" 的行
+                        header_row = None
+                        for i in range(min(20, len(temp_df))):
+                            row_values = [str(val).strip() if pd.notna(val) else "" for val in temp_df.iloc[i].values]
+                            row_text = " ".join(row_values).lower()
+                            print(f"DEBUG: 行 {i}: {row_text}")
+                            
+                            # 检查是否包含关键词
+                            if "s/n" in row_text.lower() and ("unit price" in row_text.lower() or "quantity" in row_text.lower()):
+                                header_row = i
+                                print(f"DEBUG: 在第 {i} 行找到标题行: {row_text}")
+                                break
+                        
+                        if header_row is not None:
+                            skiprows = header_row
+                        else:
+                            # 如果没有找到，使用默认值
+                            skiprows = 14  # 根据截图，表头在第14行左右
+                            print(f"DEBUG: 未找到标题行，使用默认值 skiprows={skiprows}")
+                    except Exception as e:
+                        print(f"DEBUG: 识别标题行过程中出错: {str(e)}")
+                        skiprows = 14  # 根据截图，表头在第14行左右
+                
+                print(f"DEBUG: 使用 skiprows={skiprows} 读取文件")
                 output_df = pd.read_excel(output_file, sheet_name=sheet_name, skiprows=skiprows)
                 print(f"DEBUG: 成功读取{output_file}的{sheet_name}工作表，跳过前{skiprows}行")
                 print(f"DEBUG: 读取到的列名: {output_df.columns.tolist()}")
@@ -90,12 +151,57 @@ class OutputValidator:
             
             # 获取映射规则
             mappings = self.field_mappings.get(mapping_type, {})
+            print(f"DEBUG: 使用的映射规则: {mappings}")
+            
+            # 针对出口发票的字段名映射表
+            export_invoice_field_aliases = {
+                "NO.": ["S/N", "序号", "NO.", "No", "S/N"],
+                "Material code": ["Part Number", "料号", "Material code", "Part No", "PartNumber"],
+                "DESCRIPTION": ["名称", "DESCRIPTION", "供应商开票名称", "Description", "名称"],
+                "Model NO.": ["Model Number", "型号", "Model NO.", "Model No"],
+                "Qty": ["Quantity", "数量", "Qty", "PCS", "Quantity"],
+                "Unit Price": ["Unit Price (CIF, USD)", "Unit Price", "单价", "采购单价", "Unit Price", "Price"],
+                "Amount": ["Total Amount (CIF, USD)", "Total Amount", "Amount", "金额", "总金额", "Total"]
+            }
             
             # 检查每个映射字段
             missing_fields = []
-            for output_field, original_field in mappings.items():
-                if output_field not in output_df.columns:
-                    missing_fields.append(output_field)
+            
+            # 特殊处理 export_invoice_mapping
+            if mapping_type == 'export_invoice_mapping':
+                # 检查每个所需字段是否以某种形式存在
+                output_columns = output_df.columns.tolist()
+                print(f"DEBUG: 开始检查出口发票字段映射")
+                
+                # 清理列名，去除前后空格
+                clean_columns = [col.strip() if isinstance(col, str) else col for col in output_columns]
+                print(f"DEBUG: 清理后的列名: {clean_columns}")
+                
+                for expected_field, aliases in export_invoice_field_aliases.items():
+                    field_found = False
+                    for alias in aliases:
+                        # 检查完全匹配
+                        if alias in clean_columns:
+                            field_found = True
+                            print(f"DEBUG: 字段 {expected_field} 通过别名 {alias} 完全匹配成功")
+                            break
+                        # 检查部分匹配
+                        for col in clean_columns:
+                            if isinstance(col, str) and isinstance(alias, str):
+                                if alias.lower() in col.lower() or col.lower() in alias.lower():
+                                    field_found = True
+                                    print(f"DEBUG: 字段 {expected_field} 通过别名 {alias} 部分匹配成功 (匹配到: {col})")
+                                    break
+                    
+                    if not field_found:
+                        missing_fields.append(expected_field)
+                        print(f"DEBUG: 未找到字段 {expected_field} 或其任何别名 {aliases}")
+            else:
+                # 其他类型的映射使用原来的逻辑
+                for output_field, original_field in mappings.items():
+                    if output_field not in output_df.columns:
+                        missing_fields.append(output_field)
+                        print(f"DEBUG: 未找到字段 {output_field}")
             
             if missing_fields:
                 return {
@@ -105,7 +211,9 @@ class OutputValidator:
                 
             return {"success": True, "message": "字段映射验证通过"}
         except Exception as e:
-            print(f"ERROR: 验证字段映射时出错: {str(e)}")
+            import traceback
+            error_details = traceback.format_exc()
+            print(f"ERROR: 验证字段映射时出错: {str(e)}\n{error_details}")
             return {"success": False, "message": f"验证字段映射时出错: {str(e)}"}
             
     def validate_quantity_match(self, export_invoice_path, original_packing_list_path, sheet_name=1, skiprows=6):
@@ -121,32 +229,148 @@ class OutputValidator:
             dict: 含success和message的验证结果
         """
         try:
-            # 读取出口发票
+            # 读取出口发票，首先尝试找到正确的标题行
             try:
+                # 先不跳过行读取文件以识别标题行
+                temp_df = pd.read_excel(export_invoice_path, sheet_name=sheet_name, nrows=20)
+                print(f"DEBUG: 尝试识别{export_invoice_path}的标题行")
+                
+                # 尝试识别包含 "S/N" 和 "Unit Price" 的行
+                header_row = None
+                for i in range(min(20, len(temp_df))):
+                    row_values = [str(val).strip() if pd.notna(val) else "" for val in temp_df.iloc[i].values]
+                    row_text = " ".join(row_values).lower()
+                    
+                    # 检查是否包含关键词
+                    if "s/n" in row_text.lower() and ("unit price" in row_text.lower() or "quantity" in row_text.lower()):
+                        header_row = i
+                        print(f"DEBUG: 在第 {i} 行找到标题行: {row_text}")
+                        break
+                
+                if header_row is not None:
+                    skiprows = header_row
+                else:
+                    # 如果没有找到，使用默认值
+                    skiprows = 14  # 根据截图，表头在第14行左右
+                    print(f"DEBUG: 未找到标题行，使用默认值 skiprows={skiprows}")
+                
+                print(f"DEBUG: 使用 skiprows={skiprows} 读取出口发票文件")
                 export_df = pd.read_excel(export_invoice_path, sheet_name=sheet_name, skiprows=skiprows)
                 print(f"DEBUG: 成功读取{export_invoice_path}的{sheet_name}工作表，跳过前{skiprows}行")
+                print(f"DEBUG: 出口发票列名: {export_df.columns.tolist()}")
             except Exception as e:
                 print(f"ERROR: 读取{export_invoice_path}时出错: {str(e)}")
-                # 尝试不使用skiprows参数
-            export_df = pd.read_excel(export_invoice_path, sheet_name=sheet_name,skiprows=6)
+                # 如果发生错误，使用默认方法
+                export_df = pd.read_excel(export_invoice_path, sheet_name=sheet_name, skiprows=14)
             
             # 读取原始采购装箱单
             original_df = pd.read_excel(original_packing_list_path, skiprows=2)
+            print(f"DEBUG: 原始文件列名: {original_df.columns.tolist()}")
+            
+            # 针对导出发票的字段名映射表
+            field_patterns = {
+                "quantity": ["Quantity", "数量", "Qty", "PCS"],
+                "sn": ["S/N", "序号", "NO.", "No", "序号", "S/N"],
+                "material": ["Part Number", "Material code", "物料编码", "料号", "Part No", "PartNumber"]
+            }
             
             # 查找数量列
-            export_qty_col = find_column_with_pattern(export_df, ["Quantity", "数量", "Qty"])
-            original_qty_col = find_column_with_pattern(original_df, ["Quantity", "数量", "Qty"])
+            export_qty_col = None
+            for pattern in field_patterns["quantity"]:
+                for col in export_df.columns:
+                    # 清理列名
+                    col_clean = col.strip() if isinstance(col, str) else col
+                    pattern_clean = pattern.strip() if isinstance(pattern, str) else pattern
+                    
+                    if isinstance(col_clean, str) and isinstance(pattern_clean, str):
+                        if pattern_clean.lower() in col_clean.lower() or col_clean.lower() in pattern_clean.lower():
+                            export_qty_col = col
+                            print(f"DEBUG: 在出口发票中找到数量列: {col}")
+                            break
+                if export_qty_col:
+                    break
+                    
+            original_qty_col = None
+            for pattern in field_patterns["quantity"]:
+                for col in original_df.columns:
+                    # 清理列名
+                    col_clean = col.strip() if isinstance(col, str) else col
+                    pattern_clean = pattern.strip() if isinstance(pattern, str) else pattern
+                    
+                    if isinstance(col_clean, str) and isinstance(pattern_clean, str):
+                        if pattern_clean.lower() in col_clean.lower() or col_clean.lower() in pattern_clean.lower():
+                            original_qty_col = col
+                            print(f"DEBUG: 在原始文件中找到数量列: {col}")
+                            break
+                if original_qty_col:
+                    break
             
             # 查找NO.列
-            original_no_col = find_column_with_pattern(original_df, ["NO.", "序号", "No"])
-            export_no_col = find_column_with_pattern(export_df, ["NO.", "序号", "No"])
+            original_no_col = None
+            for pattern in field_patterns["sn"]:
+                for col in original_df.columns:
+                    # 清理列名
+                    col_clean = col.strip() if isinstance(col, str) else col
+                    pattern_clean = pattern.strip() if isinstance(pattern, str) else pattern
+                    
+                    if isinstance(col_clean, str) and isinstance(pattern_clean, str):
+                        if pattern_clean.lower() in col_clean.lower() or col_clean.lower() in pattern_clean.lower():
+                            original_no_col = col
+                            print(f"DEBUG: 在原始文件中找到序号列: {col}")
+                            break
+                if original_no_col:
+                    break
+                    
+            export_no_col = None
+            for pattern in field_patterns["sn"]:
+                for col in export_df.columns:
+                    # 清理列名
+                    col_clean = col.strip() if isinstance(col, str) else col
+                    pattern_clean = pattern.strip() if isinstance(pattern, str) else pattern
+                    
+                    if isinstance(col_clean, str) and isinstance(pattern_clean, str):
+                        if pattern_clean.lower() in col_clean.lower() or col_clean.lower() in pattern_clean.lower():
+                            export_no_col = col
+                            print(f"DEBUG: 在出口发票中找到序号列: {col}")
+                            break
+                if export_no_col:
+                    break
             
             if export_qty_col is None or original_qty_col is None:
+                print(f"DEBUG: 出口发票列: {export_df.columns.tolist()}")
+                print(f"DEBUG: 原始文件列: {original_df.columns.tolist()}")
                 return {"success": False, "message": "未找到数量列"}
             
             # 查找物料编码列，以便进行详细比较
-            export_material_col = find_column_with_pattern(export_df, ["Material code", "物料编码", "料号"])
-            original_material_col = find_column_with_pattern(original_df, ["Material code", "物料编码", "料号"])
+            export_material_col = None
+            for pattern in field_patterns["material"]:
+                for col in export_df.columns:
+                    # 清理列名
+                    col_clean = col.strip() if isinstance(col, str) else col
+                    pattern_clean = pattern.strip() if isinstance(pattern, str) else pattern
+                    
+                    if isinstance(col_clean, str) and isinstance(pattern_clean, str):
+                        if pattern_clean.lower() in col_clean.lower() or col_clean.lower() in pattern_clean.lower():
+                            export_material_col = col
+                            print(f"DEBUG: 在出口发票中找到物料编码列: {col}")
+                            break
+                if export_material_col:
+                    break
+                    
+            original_material_col = None
+            for pattern in field_patterns["material"]:
+                for col in original_df.columns:
+                    # 清理列名
+                    col_clean = col.strip() if isinstance(col, str) else col
+                    pattern_clean = pattern.strip() if isinstance(pattern, str) else pattern
+                    
+                    if isinstance(col_clean, str) and isinstance(pattern_clean, str):
+                        if pattern_clean.lower() in col_clean.lower() or col_clean.lower() in pattern_clean.lower():
+                            original_material_col = col
+                            print(f"DEBUG: 在原始文件中找到物料编码列: {col}")
+                            break
+                if original_material_col:
+                    break
             
             # 计算出口发票总数量，排除汇总行
             export_qty_total = 0
@@ -284,36 +508,154 @@ class OutputValidator:
             dict: 含success和message的验证结果
         """
         try:
-            # 读取出口发票
+            # 读取出口发票，首先尝试找到正确的标题行
             try:
+                # 先不跳过行读取文件以识别标题行
+                temp_df = pd.read_excel(export_invoice_path, sheet_name=sheet_name, nrows=20)
+                print(f"DEBUG: 尝试识别{export_invoice_path}的标题行")
+                
+                # 尝试识别包含 "S/N" 和 "Unit Price" 的行
+                header_row = None
+                for i in range(min(20, len(temp_df))):
+                    row_values = [str(val).strip() if pd.notna(val) else "" for val in temp_df.iloc[i].values]
+                    row_text = " ".join(row_values).lower()
+                    
+                    # 检查是否包含关键词
+                    if "s/n" in row_text.lower() and ("unit price" in row_text.lower() or "quantity" in row_text.lower()):
+                        header_row = i
+                        print(f"DEBUG: 在第 {i} 行找到标题行: {row_text}")
+                        break
+                
+                if header_row is not None:
+                    skiprows = header_row
+                else:
+                    # 如果没有找到，使用默认值
+                    skiprows = 14  # 根据截图，表头在第14行左右
+                    print(f"DEBUG: 未找到标题行，使用默认值 skiprows={skiprows}")
+                
+                print(f"DEBUG: 使用 skiprows={skiprows} 读取出口发票文件")
                 export_df = pd.read_excel(export_invoice_path, sheet_name=sheet_name, skiprows=skiprows)
                 print(f"DEBUG: 成功读取{export_invoice_path}的{sheet_name}工作表，跳过前{skiprows}行")
+                print(f"DEBUG: 出口发票列名: {export_df.columns.tolist()}")
             except Exception as e:
                 print(f"ERROR: 读取{export_invoice_path}时出错: {str(e)}")
-                # 尝试不使用skiprows参数
-            export_df = pd.read_excel(export_invoice_path, sheet_name=sheet_name,skiprows=6)
+                # 如果发生错误，使用默认方法
+                export_df = pd.read_excel(export_invoice_path, sheet_name=sheet_name, skiprows=14)
             
             # 读取原始采购装箱单 - 修正使用skiprows=2
             original_df = pd.read_excel(original_packing_list_path, skiprows=2)
             print(f"DEBUG: 成功读取原始装箱单，使用skiprows=2")
+            print(f"DEBUG: 原始文件列名: {original_df.columns.tolist()}")
+            
+            # 定义字段名映射表
+            field_patterns = {
+                "unit_price": ["Unit Price (CIF, USD)", "Unit Price", "单价", "采购单价", "Price"],
+                "quantity": ["Quantity", "Qty", "数量", "PCS"],
+                "amount": ["Total Amount (CIF, USD)", "Total Amount", "Amount", "金额", "总金额", "Total"]
+            }
             
             # 查找单价列
-            export_unit_price_col = find_column_with_pattern(export_df, ["Unit Price", "单价"])
-            original_unit_price_col = find_column_with_pattern(original_df, ["Unit Price", "单价", "采购单价"])
+            export_unit_price_col = None
+            for pattern in field_patterns["unit_price"]:
+                for col in export_df.columns:
+                    # 清理列名
+                    col_clean = col.strip() if isinstance(col, str) else col
+                    pattern_clean = pattern.strip() if isinstance(pattern, str) else pattern
+                    
+                    if isinstance(col_clean, str) and isinstance(pattern_clean, str):
+                        if pattern_clean.lower() in col_clean.lower() or col_clean.lower() in pattern_clean.lower():
+                            export_unit_price_col = col
+                            print(f"DEBUG: 在出口发票中找到单价列: {col}")
+                            break
+                if export_unit_price_col:
+                    break
+                    
+            original_unit_price_col = None
+            for pattern in field_patterns["unit_price"]:
+                for col in original_df.columns:
+                    # 清理列名
+                    col_clean = col.strip() if isinstance(col, str) else col
+                    pattern_clean = pattern.strip() if isinstance(pattern, str) else pattern
+                    
+                    if isinstance(col_clean, str) and isinstance(pattern_clean, str):
+                        if pattern_clean.lower() in col_clean.lower() or col_clean.lower() in pattern_clean.lower():
+                            original_unit_price_col = col
+                            print(f"DEBUG: 在原始文件中找到单价列: {col}")
+                            break
+                if original_unit_price_col:
+                    break
             
             # 查找数量列
-            export_qty_col = find_column_with_pattern(export_df, ["Qty", "Quantity", "数量"])
-            original_qty_col = find_column_with_pattern(original_df, ["Qty", "Quantity", "数量"])
+            export_qty_col = None
+            for pattern in field_patterns["quantity"]:
+                for col in export_df.columns:
+                    # 清理列名
+                    col_clean = col.strip() if isinstance(col, str) else col
+                    pattern_clean = pattern.strip() if isinstance(pattern, str) else pattern
+                    
+                    if isinstance(col_clean, str) and isinstance(pattern_clean, str):
+                        if pattern_clean.lower() in col_clean.lower() or col_clean.lower() in pattern_clean.lower():
+                            export_qty_col = col
+                            print(f"DEBUG: 在出口发票中找到数量列: {col}")
+                            break
+                if export_qty_col:
+                    break
+                    
+            original_qty_col = None
+            for pattern in field_patterns["quantity"]:
+                for col in original_df.columns:
+                    # 清理列名
+                    col_clean = col.strip() if isinstance(col, str) else col
+                    pattern_clean = pattern.strip() if isinstance(pattern, str) else pattern
+                    
+                    if isinstance(col_clean, str) and isinstance(pattern_clean, str):
+                        if pattern_clean.lower() in col_clean.lower() or col_clean.lower() in pattern_clean.lower():
+                            original_qty_col = col
+                            print(f"DEBUG: 在原始文件中找到数量列: {col}")
+                            break
+                if original_qty_col:
+                    break
             
             # 查找总金额列
-            export_amount_col = find_column_with_pattern(export_df, ["Amount", "Total Amount", "金额", "总金额"])
-            original_amount_col = find_column_with_pattern(original_df, ["Amount", "Total Amount", "金额", "总金额"])
+            export_amount_col = None
+            for pattern in field_patterns["amount"]:
+                for col in export_df.columns:
+                    # 清理列名
+                    col_clean = col.strip() if isinstance(col, str) else col
+                    pattern_clean = pattern.strip() if isinstance(pattern, str) else pattern
+                    
+                    if isinstance(col_clean, str) and isinstance(pattern_clean, str):
+                        if pattern_clean.lower() in col_clean.lower() or col_clean.lower() in pattern_clean.lower():
+                            export_amount_col = col
+                            print(f"DEBUG: 在出口发票中找到总金额列: {col}")
+                            break
+                if export_amount_col:
+                    break
+                    
+            original_amount_col = None
+            for pattern in field_patterns["amount"]:
+                for col in original_df.columns:
+                    # 清理列名
+                    col_clean = col.strip() if isinstance(col, str) else col
+                    pattern_clean = pattern.strip() if isinstance(pattern, str) else pattern
+                    
+                    if isinstance(col_clean, str) and isinstance(pattern_clean, str):
+                        if pattern_clean.lower() in col_clean.lower() or col_clean.lower() in pattern_clean.lower():
+                            original_amount_col = col
+                            print(f"DEBUG: 在原始文件中找到总金额列: {col}")
+                            break
+                if original_amount_col:
+                    break
             
             # 如果找不到单价或数量列，返回错误
             if export_unit_price_col is None or original_unit_price_col is None:
+                print(f"DEBUG: 出口发票列: {export_df.columns.tolist()}")
+                print(f"DEBUG: 原始文件列: {original_df.columns.tolist()}")
                 return {"success": False, "message": "未找到单价列"}
                 
             if export_qty_col is None or original_qty_col is None:
+                print(f"DEBUG: 出口发票列: {export_df.columns.tolist()}")
+                print(f"DEBUG: 原始文件列: {original_df.columns.tolist()}")
                 return {"success": False, "message": "未找到数量列"}
             
             # 如果找不到总金额列，通过单价*数量计算
@@ -330,12 +672,6 @@ class OutputValidator:
             original_total_amount = 0
             # 初始化summary_row变量，确保在所有条件分支中都有定义
             summary_row = None
-            
-            # 查找原始文件中的单价和数量列
-            original_unit_price_col = find_column_with_pattern(original_df, ["Unit Price", "单价", "采购单价"])
-            original_qty_col = find_column_with_pattern(original_df, ["Qty", "Quantity", "数量", "PCS"])
-            
-            print(f"DEBUG: 原始文件单价列: {original_unit_price_col}, 数量列: {original_qty_col}")
             
             if original_unit_price_col is not None and original_qty_col is not None:
                 # 通过单价*数量计算总金额

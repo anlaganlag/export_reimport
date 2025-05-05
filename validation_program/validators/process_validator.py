@@ -167,7 +167,20 @@ class ProcessValidator:
             # 读取CIF发票
             cif_df = pd.read_excel(cif_invoice_path)
             # 找到原始采购单价列
-            original_price_col = find_column_with_pattern(original_df, ["Unit Price", "单价", "采购单价"])
+            original_price_col = None
+            price_patterns = ["Unit Price", "单价", "采购单价"]
+            
+            # 先尝试直接查找列
+            for col in original_df.columns:
+                col_str = str(col).lower() if not isinstance(col, tuple) else ' '.join([str(c).lower() for c in col])
+                if any(pattern.lower() in col_str for pattern in price_patterns):
+                    original_price_col = col
+                    break
+            
+            # 如果没有找到，使用辅助函数
+            if original_price_col is None:
+                original_price_col = find_column_with_pattern(original_df, price_patterns)
+            
             # 优先通过字段名查找加价
             markup_percentage = find_value_by_fieldname(policy_df, ["加价", "加价率", "markup", "Markup"])
             # 找不到再用原有列查找逻辑
@@ -271,16 +284,27 @@ class ProcessValidator:
                     "Net Weight (kg)", "Total N.W.", "Net Weight (KGS)", "N.W(KG)"
                 ]
                 print(f"DEBUG: 查找净重列，当前列名: {original_df.columns.tolist()}")
-                net_weight_col = find_column_with_pattern(original_df, net_weight_patterns)
-                if net_weight_col is None:
-                    for col in original_df.columns:
+                
+                # 手动查找净重列
+                net_weight_col = None
+                for col in original_df.columns:
+                    # 处理元组列名
+                    if isinstance(col, tuple):
+                        col_str = ' '.join([str(part).lower() for part in col])
+                    else:
                         col_str = str(col).lower()
-                        if isinstance(col, tuple):
-                            col_str = ' '.join([str(c).lower() for c in col])
-                        if ('net' in col_str and 'weight' in col_str) or 'n.w' in col_str or '净重' in col_str:
-                            net_weight_col = col
-                            print(f"DEBUG: 找到净重列: {col}")
-                            break
+                    
+                    # 检查是否匹配任何一个模式
+                    if any(pattern.lower() in col_str for pattern in net_weight_patterns) or \
+                       ('net' in col_str and 'weight' in col_str) or 'n.w' in col_str or '净重' in col_str:
+                        net_weight_col = col
+                        print(f"DEBUG: 找到净重列: {col}")
+                        break
+                
+                # 如果手动查找失败，再尝试辅助函数
+                if net_weight_col is None:
+                    net_weight_col = find_column_with_pattern(original_df, net_weight_patterns)
+                
                 if net_weight_col is None:
                     column_names = list(original_df.columns)
                     return {"success": False, "message": f"未找到净重列。可用列: {column_names}"}
@@ -458,7 +482,7 @@ class ProcessValidator:
                 cif_part = cif_row[cif_part_col]
                 cif_price = cif_row[cif_price_col]
                 cif_qty = cif_row[cif_qty_col]
-                cif_total = cif_row[cif_total_col]
+                cif_total = round(cif_price,4)*cif_qty
                 
                 # 在出口分组中查找对应的物料和价格
                 matching_export_rows = export_grouped[

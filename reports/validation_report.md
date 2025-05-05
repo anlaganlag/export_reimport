@@ -153,7 +153,7 @@
 #### ❌ 失败的测试
 
 ##### export_invoice_field_mapping: ❌ 失败
-- 结果: 输出文件缺少字段: NO., Material code, DESCRIPTION, Model NO., Unit Price, Qty, Unit, Amount
+- 结果: 输出文件缺少字段: Material code, DESCRIPTION, Model NO., Qty, Unit Price, Amount
 
 ##### export_invoice_prices: ❌ 失败
 - 结果: 未找到单价列
@@ -172,7 +172,7 @@
 进口发票数量明细: 
 
 ##### import_invoice_split: ❌ 失败
-- 结果: 以下项目和工厂组合未找到对应的进口发票: 项目:SMT工厂设备配件 工厂:Silvassa, 项目:项目名称 工厂:工厂地点, 项目:SMT工厂月度辅耗材 工厂:Silvassa, 项目:组装厂月度辅耗材 工厂:Daman, 项目:TP-LINK 工厂:Silvassa, 项目:麦格米特 工厂:Silvassa, 项目:TP-LINK 工厂:Daman
+- 结果: 以下项目和工厂组合未找到对应的进口发票: 项目:SMT工厂月度辅耗材 工厂:Silvassa, 项目:SMT工厂设备配件 工厂:Silvassa, 项目:项目名称 工厂:工厂地点, 项目:TP-LINK 工厂:Silvassa, 项目:TP-LINK 工厂:Daman, 项目:麦格米特 工厂:Silvassa, 项目:组装厂月度辅耗材 工厂:Daman
 
 ##### import_packing_list_field_mapping_reimport_invoice.xlsx: ❌ 失败
 - 结果: 输出文件缺少字段: P/N., DESCRIPTION, Model NO., QUANTITY, CTNS, Carton MEASUREMENT, G.W (KG), N.W(KG), Carton NO.
@@ -198,7 +198,7 @@
 ### 输出文件验证问题修复建议
 
 #### export_invoice_field_mapping:
-- **建议**: 根据错误信息修复问题: 输出文件缺少字段: NO., Material code, DESCRIPTION, Model NO., Unit Price, Qty, Unit, Amount
+- **建议**: 根据错误信息修复问题: 输出文件缺少字段: Material code, DESCRIPTION, Model NO., Qty, Unit Price, Amount
 
 #### export_invoice_quantity:
 - **建议**: 根据错误信息修复问题: 未找到数量列
@@ -210,7 +210,7 @@
 - **建议**: 根据错误信息修复问题: 输出文件缺少字段: P/N., DESCRIPTION, Model NO., QUANTITY, CTNS, Carton MEASUREMENT, G.W (KG), N.W(KG), Carton NO.
 
 #### import_invoice_split:
-- **建议**: 根据错误信息修复问题: 以下项目和工厂组合未找到对应的进口发票: 项目:SMT工厂设备配件 工厂:Silvassa, 项目:项目名称 工厂:工厂地点, 项目:SMT工厂月度辅耗材 工厂:Silvassa, 项目:组装厂月度辅耗材 工厂:Daman, 项目:TP-LINK 工厂:Silvassa, 项目:麦格米特 工厂:Silvassa, 项目:TP-LINK 工厂:Daman
+- **建议**: 根据错误信息修复问题: 以下项目和工厂组合未找到对应的进口发票: 项目:SMT工厂月度辅耗材 工厂:Silvassa, 项目:SMT工厂设备配件 工厂:Silvassa, 项目:项目名称 工厂:工厂地点, 项目:TP-LINK 工厂:Silvassa, 项目:TP-LINK 工厂:Daman, 项目:麦格米特 工厂:Silvassa, 项目:组装厂月度辅耗材 工厂:Daman
 
 #### import_invoice_field_mapping_reimport_invoice.xlsx:
 - **建议**: 根据错误信息修复问题: 输出文件缺少字段: NO., Material code, DESCRIPTION, Model NO., Unit Price, Qty, Unit, Amount
@@ -228,4 +228,4 @@
 
 
 ---
-生成时间: 2025-05-05 10:46:33
+生成时间: 2025-05-05 17:13:18
