@@ -278,50 +278,61 @@ class InputValidator:
 
             # 改进的安全转换函数，更好地处理非数值和通配符
             def safe_convert_to_float(val, row_idx, col_name, error_log):
-                # 处理空值
-                if val is None or pd.isna(val) or val == "":
-                    return 0.0
-                
-                # 如果已经是数值类型，直接返回
-                if isinstance(val, (int, float)):
-                    return float(val)
-                
-                # 转换为字符串并清理
-                val_str = str(val).strip()
-                if not val_str:
-                    return 0.0
-                
-                # 检查是否包含通配符
-                if any(x in val_str for x in ['*', '?', 'N/A', 'n/a', 'TBD', 'tbd']):
-                    error_log.append(f"第{row_idx+1}行{col_name}包含通配符或占位符'{val_str}'，自动按0处理")
-                    return 0.0
-                
-                # 尝试直接转换为浮点数
                 try:
-                    return float(val_str)
-                except (ValueError, TypeError):
-                    # 尝试清理字符串后转换
+                    # 处理空值
+                    if val is None or pd.isna(val) or val == "":
+                        error_log.append(f"第{row_idx+1}行{col_name}为空值，自动按0处理")
+                        return 0.0
+                    
+                    # 如果已经是数值类型，直接返回
+                    if isinstance(val, (int, float)):
+                        return float(val)
+                    
+                    # 转换为字符串并清理
+                    val_str = str(val).strip().replace(',', '')
+                    if not val_str:
+                        error_log.append(f"第{row_idx+1}行{col_name}为空字符串，自动按0处理")
+                        return 0.0
+                    
+                    # 检查是否包含通配符或特殊字符
+                    wildcards = ['*', '?', 'N/A', 'n/a', 'TBD', 'tbd', '-', '/', '\\']
+                    if any(x in val_str.lower() for x in wildcards):
+                        error_log.append(f"第{row_idx+1}行{col_name}包含通配符或特殊字符'{val_str}'，自动按0处理")
+                        return 0.0
+                    
+                    # 尝试直接转换为浮点数
                     try:
-                        # 只保留数字、小数点和负号
-                        clean_str = ''.join(c for c in val_str if c.isdigit() or c in '.-')
+                        result = float(val_str)
+                        if result < 0:
+                            error_log.append(f"第{row_idx+1}行{col_name}为负值'{val_str}'，自动按0处理")
+                            return 0.0
+                        return result
+                    except (ValueError, TypeError):
+                        # 尝试清理字符串后转换
+                        clean_str = ''.join(c for c in val_str if c.isdigit() or c == '.')
                         
                         # 确保只有一个小数点
                         if clean_str and clean_str.count('.') <= 1:
-                            # 如果以小数点开头，添加0
                             if clean_str.startswith('.'):
                                 clean_str = '0' + clean_str
-                            # 如果以小数点结尾，添加0
                             if clean_str.endswith('.'):
                                 clean_str = clean_str + '0'
-                                
+                            
                             if clean_str:
-                                return float(clean_str)
+                                try:
+                                    result = float(clean_str)
+                                    if result < 0:
+                                        error_log.append(f"第{row_idx+1}行{col_name}清理后为负值'{clean_str}'，自动按0处理")
+                                        return 0.0
+                                    return result
+                                except:
+                                    pass
                         
                         error_log.append(f"第{row_idx+1}行{col_name}值'{val_str}'无法解析为数值，自动按0处理")
                         return 0.0
-                    except Exception:
-                        error_log.append(f"第{row_idx+1}行{col_name}值'{val_str}'无法解析为数值，自动按0处理")
-                        return 0.0
+                except Exception as e:
+                    error_log.append(f"第{row_idx+1}行{col_name}处理时出错: {str(e)}，自动按0处理")
+                    return 0.0
 
             carton_net_weights = {}
             carton_gross_weights = {}
