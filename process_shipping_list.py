@@ -767,7 +767,7 @@ def split_by_project_and_factory(df):
 
         # 检查第一行是否是表头行（包含列名或中文字段名）
         for col, val in first_row.items():
-            if isinstance(val, str) and (val in df.columns or '工厂' in val or '序号' in val or '料号' in val):
+            if isinstance(val, str) and (val in df.columns or '工厂地点' in val or '序号' in val or '料号' in val):
                 is_header_row = True
                 break
 
