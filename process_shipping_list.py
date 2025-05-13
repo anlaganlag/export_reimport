@@ -213,7 +213,7 @@ def merge_packing_list_cells(workbook_path):
             'Total Carton Quantity': ['CTNS', 'Total Carton Quantity', '件数'],
             'Total Volume (CBM)': ['Carton MEASUREMENT', 'Total Volume (CBM)', '体积'],
             'Total Gross Weight (kg)': ['G.W (KG)', 'Total Gross Weight (kg)', '毛重'],
-            '名称': ['DESCRIPTION', '名称', '描述']
+            'Commodity Description (Customs)': ['DESCRIPTION', 'Commodity Description (Customs)', '名称', '描述', '进口清关货描']
         }
 
         for col_idx, cell in enumerate(ws[1], 1):
@@ -234,7 +234,7 @@ def merge_packing_list_cells(workbook_path):
                         measurement_idx = col_idx
                     elif target_col == 'Total Gross Weight (kg)':
                         gw_idx = col_idx
-                    elif target_col == '名称':
+                    elif target_col == 'Commodity Description (Customs)':
                         desc_idx = col_idx
 
         if not all([carton_no_idx, ctns_idx, measurement_idx, gw_idx]):
@@ -323,7 +323,7 @@ def apply_pl_footer_styling(workbook_path):
         footer_start_row = None
 
         for row_idx in range(1, ws.max_row + 1):
-            if ws.cell(row=row_idx, column=3).value == 'Total':  # 假设第三列是'名称'/'DESCRIPTION'列
+            if ws.cell(row=row_idx, column=3).value == 'Total':  # 假设第三列是'Commodity Description (Customs)'列
                 total_row = row_idx
             elif ws.cell(row=row_idx, column=1).value and 'PACKED IN' in str(ws.cell(row=row_idx, column=1).value):
                 footer_start_row = row_idx
@@ -1191,7 +1191,8 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
         'Total Net Weight (kg)', 'Carton Number'
     ]
 
-    print("\nPacking List output columns defined:")
+
+    print("\nPacking  List output columns defined:")
     print(pl_output_columns)
 
     # Clean up the column names for better handling
@@ -1490,13 +1491,13 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
     if material_code_col:
         pl_result_df['Part Number'] = packing_list_df[material_code_col]
 
-    # 修改：优先使用进口清关货描作为PL的"名称"列
-    if customs_desc_col:
-        pl_result_df['名称'] = packing_list_df[customs_desc_col]
-        print(f"PL '名称'列已替换为进口清关货描: {customs_desc_col}")
-    elif description_col:
+    # 修改：使用供应商开票名称作为PL的"名称"列
+    if description_col:
         pl_result_df['名称'] = packing_list_df[description_col]
-        print(f"PL '名称'列未找到进口清关货描，使用描述字段: {description_col}")
+        print(f"PL '名称'列已设置为供应商开票名称: {description_col}")
+    elif customs_desc_col:
+        pl_result_df['名称'] = packing_list_df[customs_desc_col]
+        print(f"PL '名称'列未找到供应商开票名称，使用进口清关货描作为备选: {customs_desc_col}")
     else:
         pl_result_df['名称'] = ''
         print("PL '名称'列未找到任何可用字段，填空")
@@ -1794,7 +1795,7 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
 
     cif_output_columns = cif_output_columns + ['G.W (KG)']
 
-    # Define output column sets for export invoice
+    # Define output column sets for export invoice - 出口发票使用 名称
     exportReimport_output_columns = [
         'S/N', 'Part Number', '名称', 'Model Number', 'Unit Price (CIF, USD)', 'Quantity', 'Unit', 'Total Amount (CIF, USD)', 'Total Net Weight (kg)'
     ]
@@ -2205,10 +2206,9 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
                         ws.column_dimensions[get_column_letter(col_idx)].width = 25  # Wider for Unit Price
                     elif col_name == 'Total Amount (CIF, USD)':
                         ws.column_dimensions[get_column_letter(col_idx)].width = 25  # Wider for Amount
+                    # 名称 column
                     elif col_name == '名称':
-                        ws.column_dimensions[get_column_letter(col_idx)].width = 30  # Wider for Description
-                    elif col_name == 'Commodity Description (Customs)':
-                        ws.column_dimensions[get_column_letter(col_idx)].width = 35  # Wider for Customs Description
+                        ws.column_dimensions[get_column_letter(col_idx)].width = 35  # Wider for 名称
                     elif col_name == 'Model Number':
                         ws.column_dimensions[get_column_letter(col_idx)].width = 20  # Wider for Model Number
                     elif col_name == 'Total Net Weight (kg)':
@@ -2518,13 +2518,22 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
     with pd.ExcelWriter(reimport_invoice_path, engine='openpyxl') as writer:
         # First, add the complete Packing List sheet
         complete_pl_df = pl_result_df.copy()
+
+        # For import packing list, rename '名称' to 'Commodity Description (Customs)'
+        if '名称' in complete_pl_df.columns:
+            complete_pl_df['Commodity Description (Customs)'] = complete_pl_df['名称']
+            complete_pl_df = complete_pl_df.drop(columns=['名称'])
+            print("Renamed '名称' to 'Commodity Description (Customs)' for import packing list")
+
         # Remove internal columns before saving
         save_columns = [col for col in pl_output_columns if col != 'project']  # Remove project from output
+        # Replace '名称' with 'Commodity Description (Customs)' in save_columns
+        save_columns = ['Commodity Description (Customs)' if col == '名称' else col for col in save_columns]
         complete_pl_df = complete_pl_df[save_columns]
 
-        # Add summary row to packing list
+        # Add summary row to packing list for import invoice
         summary_cols = ['Quantity', 'Total Gross Weight (kg)', 'Total Net Weight (kg)', 'Total Carton Quantity', 'Total Volume (CBM)']
-        summary_packing = {'名称': 'Total'}
+        summary_packing = {'Commodity Description (Customs)': 'Total'}
         for col in summary_cols:
             if col in complete_pl_df.columns:
                 # Calculate sum without modifying the original column in place
@@ -2568,7 +2577,7 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
             # 识别页脚行 - 通常是包含特定文本的行
             footer_mask = complete_pl_df['S/N'].astype(str).str.contains('PACKED IN|NET WEIGHT|GROSS WEIGHT|TOTAL MEASUREMENT|COUNTRY OF ORIGIN', na=False, regex=True)
             # 识别Total行
-            total_mask = complete_pl_df['名称'] == 'Total'
+            total_mask = complete_pl_df['Commodity Description (Customs)'] == 'Total'
 
             # 识别中文表头翻译行 - 通常是第一行数据，包含多个中文表头术语
             chinese_header_mask = False
@@ -2676,7 +2685,7 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
                     invoice_df['Commodity Description (Customs)'] = invoice_df['DESCRIPTION']
                     print(f"WARNING: No valid customs description found for {reimport_file_name}, using regular description as fallback")
 
-                # 调整列顺序
+                # 调整列顺序 - 进口发票使用 Commodity Description (Customs)
                 reimport_columns = [
                     'S/N', 'Part Number', 'Commodity Description (Customs)', 'Unit Price (CIF, USD)', 'Quantity', 'Unit', 'Total Amount (CIF, USD)', 'Total Net Weight (kg)'
                 ]
@@ -2900,10 +2909,9 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
                     ws.column_dimensions[get_column_letter(col_idx)].width = 25  # Wider for Unit Price
                 elif col_name == 'Total Amount (CIF, USD)':
                     ws.column_dimensions[get_column_letter(col_idx)].width = 25  # Wider for Amount
+                # 名称 column
                 elif col_name == '名称':
-                    ws.column_dimensions[get_column_letter(col_idx)].width = 30  # Wider for Description
-                elif col_name == 'Commodity Description (Customs)':
-                    ws.column_dimensions[get_column_letter(col_idx)].width = 35  # Wider for Customs Description
+                    ws.column_dimensions[get_column_letter(col_idx)].width = 35  # Wider for 名称
                 elif col_name == 'Model Number':
                     ws.column_dimensions[get_column_letter(col_idx)].width = 20  # Wider for Model Number
                 elif col_name == 'Total Net Weight (kg)':
