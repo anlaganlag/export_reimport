@@ -2514,14 +2514,104 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
         except Exception as e:
             print(f"Warning: Could not remove existing file: {e}")
 
-    # Create a new Excel writer for the reimport file
-    with pd.ExcelWriter(reimport_invoice_path, engine='openpyxl') as writer:
+    # Create a new Excel file with at least two sheets to avoid the "At least one sheet must be visible" error
+    wb = Workbook()
+    ws1 = wb.active
+    ws1.title = "PL"
+    ws2 = wb.create_sheet("Dummy")
+    ws2['A1'] = "Dummy Sheet"
+    ws2['A2'] = "This sheet will be replaced with actual data"
+    wb.save(reimport_invoice_path)
+    print(f"Created initial reimport_invoice.xlsx with PL and Dummy sheets")
+
+    # Now open the file for writing with pandas
+    with pd.ExcelWriter(reimport_invoice_path, engine='openpyxl', mode='a') as writer:
         # First, add the complete Packing List sheet
         complete_pl_df = pl_result_df.copy()
 
-        # For import packing list, rename '名称' to 'Commodity Description (Customs)'
+        # For import packing list, ensure 'Commodity Description (Customs)' uses the English values from '进口清关货描'
         if '名称' in complete_pl_df.columns:
-            complete_pl_df['Commodity Description (Customs)'] = complete_pl_df['名称']
+            # 首先，从原始装箱单中获取进口清关货描的映射
+            customs_desc_map = {}
+
+            # 使用result_df中的Commodity Description (Customs)列
+            if 'Material code' in result_df.columns and 'Commodity Description (Customs)' in result_df.columns:
+                print(f"Creating customs description mapping from result_df for import packing list")
+                # 创建从Material code到Commodity Description (Customs)的映射
+                for _, row in result_df.iterrows():
+                    if pd.notna(row['Material code']) and pd.notna(row['Commodity Description (Customs)']):
+                        customs_desc_map[row['Material code']] = row['Commodity Description (Customs)']
+
+                print(f"Created mapping with {len(customs_desc_map)} entries for import packing list")
+                # 打印前几个映射示例
+                count = 0
+                for part_num, desc in customs_desc_map.items():
+                    if count < 5:
+                        print(f"  Mapping: {part_num} -> {desc}")
+                        count += 1
+                    else:
+                        break
+
+            # 应用映射到complete_pl_df
+            if customs_desc_map and 'Part Number' in complete_pl_df.columns:
+                print(f"Applying customs description mapping to import packing list")
+                # 创建一个新列来存储映射的值
+                complete_pl_df['Commodity Description (Customs)'] = complete_pl_df['Part Number'].map(customs_desc_map)
+
+                # 检查映射结果
+                mapped_count = complete_pl_df['Commodity Description (Customs)'].notna().sum()
+                print(f"Successfully mapped {mapped_count} out of {len(complete_pl_df)} rows with English customs descriptions for import packing list")
+
+                # 对于没有映射到的行，使用名称作为替代
+                if mapped_count < len(complete_pl_df):
+                    missing_mask = complete_pl_df['Commodity Description (Customs)'].isna()
+                    complete_pl_df.loc[missing_mask, 'Commodity Description (Customs)'] = complete_pl_df.loc[missing_mask, '名称']
+                    print(f"Used '名称' as fallback for {missing_mask.sum()} rows in import packing list")
+            else:
+                # 如果没有映射或者没有Part Number列，尝试其他方法
+
+                # First check if we have the original '进口清关货描' column in the result_df
+                customs_desc_column = None
+                for col in result_df.columns:
+                    if '进口清关货描' in str(col):
+                        customs_desc_column = col
+                        print(f"Found import customs description column: {customs_desc_column}")
+                        break
+
+                if customs_desc_column and not result_df[customs_desc_column].isna().all():
+                    # If we found the column with English values, use it
+                    print(f"Using English values from '{customs_desc_column}' for 'Commodity Description (Customs)' in import packing list")
+                    # Map the values from result_df to complete_pl_df based on Part Number
+                    if 'Part Number' in complete_pl_df.columns and 'Material code' in result_df.columns:
+                        # Create a mapping from Material code to customs description
+                        result_customs_desc_map = dict(zip(result_df['Material code'], result_df[customs_desc_column]))
+                        # Apply the mapping to complete_pl_df
+                        complete_pl_df['Commodity Description (Customs)'] = complete_pl_df['Part Number'].map(result_customs_desc_map)
+                        print(f"Mapped English customs descriptions to import packing list based on Part Number")
+                    else:
+                        # If we can't map by Part Number, just use the original values
+                        complete_pl_df['Commodity Description (Customs)'] = complete_pl_df['名称']
+                        print(f"WARNING: Could not map by Part Number, using original values for Commodity Description (Customs)")
+                elif 'Commodity Description (Customs)' in result_df.columns:
+                    # If we have the Commodity Description (Customs) column in result_df, use it
+                    print(f"Using 'Commodity Description (Customs)' from result_df for import packing list")
+                    # Map the values from result_df to complete_pl_df based on Part Number
+                    if 'Part Number' in complete_pl_df.columns and 'Material code' in result_df.columns:
+                        # Create a mapping from Material code to customs description
+                        result_customs_desc_map = dict(zip(result_df['Material code'], result_df['Commodity Description (Customs)']))
+                        # Apply the mapping to complete_pl_df
+                        complete_pl_df['Commodity Description (Customs)'] = complete_pl_df['Part Number'].map(result_customs_desc_map)
+                        print(f"Mapped English customs descriptions to import packing list based on Part Number")
+                    else:
+                        # If we can't map by Part Number, just use the original values
+                        complete_pl_df['Commodity Description (Customs)'] = complete_pl_df['名称']
+                        print(f"WARNING: Could not map by Part Number, using original values for Commodity Description (Customs)")
+                else:
+                    # If we don't have the customs description column, use the original values
+                    complete_pl_df['Commodity Description (Customs)'] = complete_pl_df['名称']
+                    print(f"WARNING: No customs description column found, using original values for Commodity Description (Customs)")
+
+            # Drop the original '名称' column
             complete_pl_df = complete_pl_df.drop(columns=['名称'])
             print("Renamed '名称' to 'Commodity Description (Customs)' for import packing list")
 
@@ -2611,7 +2701,14 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
                 complete_pl_df = pd.concat([data_rows, total_rows, footer_rows], ignore_index=True)
                 print("Reset import packing list S/N to start from 1")
 
-        # Save packing list sheet
+        # Save packing list sheet - overwrite the existing PL sheet
+        if 'PL' in writer.book.sheetnames:
+            # Remove the existing PL sheet
+            idx = writer.book.sheetnames.index('PL')
+            writer.book.remove(writer.book.worksheets[idx])
+            print("Removed existing PL sheet before saving new data")
+
+        # Now save the packing list to the PL sheet
         complete_pl_df.to_excel(writer, sheet_name='PL', index=False)
 
         # Process each split for Commercial Invoice sheets only
@@ -2665,25 +2762,151 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
                 # 为进口发票使用进口清关货描 (Customs Description)
                 print(f"Processing import invoice {reimport_file_name}")
 
-                # 检查是否有进口清关货描列
-                customs_desc_column = None
-                for col in df.columns:
-                    if '进口清关货描' in str(col):
-                        customs_desc_column = col
-                        print(f"Found import customs description column: {customs_desc_column}")
-                        break
+                # 首先，从result_df中获取进口清关货描的映射
+                customs_desc_map = {}
 
-                if customs_desc_column and not df[customs_desc_column].isna().all():
-                    # 如果找到进口清关货描列并且不全为空，使用它
-                    print(f"Using import customs description (进口清关货描) for import invoice {reimport_file_name}")
-                    invoice_df['Commodity Description (Customs)'] = df[customs_desc_column]
-                elif 'Commodity Description (Customs)' in invoice_df.columns and not invoice_df['Commodity Description (Customs)'].isna().all():
-                    # 如果已有Commodity Description (Customs)列且不全为空，保留它
-                    print(f"Using existing customs description for import invoice {reimport_file_name}")
+                # 检查是否有中文字符
+                def contains_chinese(text):
+                    if pd.isna(text):
+                        return False
+                    for char in str(text):
+                        if '\u4e00' <= char <= '\u9fff':
+                            return True
+                    return False
+
+                # 首先，从原始装箱单中获取进口清关货描的映射
+                if '料号' in df.columns and '进口清关货描' in df.columns:
+                    print(f"Creating customs description mapping from original packing list")
+                    # 创建从料号到进口清关货描的映射
+                    for _, row in df.iterrows():
+                        if pd.notna(row['料号']) and pd.notna(row['进口清关货描']):
+                            # 检查是否为英文描述
+                            if not contains_chinese(row['进口清关货描']):
+                                customs_desc_map[row['料号']] = row['进口清关货描']
+                                print(f"  Added mapping from original packing list: {row['料号']} -> {row['进口清关货描']}")
+
+                # 如果从原始装箱单中没有获取到足够的映射，再从result_df中获取
+                if len(customs_desc_map) < 6 and 'Material code' in result_df.columns and 'Commodity Description (Customs)' in result_df.columns:
+                    print(f"Creating customs description mapping from result_df")
+                    # 创建从Material code到Commodity Description (Customs)的映射
+                    for _, row in result_df.iterrows():
+                        if pd.notna(row['Material code']) and pd.notna(row['Commodity Description (Customs)']):
+                            # 检查是否为英文描述
+                            if not contains_chinese(row['Commodity Description (Customs)']):
+                                customs_desc_map[row['Material code']] = row['Commodity Description (Customs)']
+                                print(f"  Added mapping from result_df: {row['Material code']} -> {row['Commodity Description (Customs)']}")
+
+                    print(f"Created mapping with {len(customs_desc_map)} entries")
+                    # 打印前几个映射示例
+                    count = 0
+                    for part_num, desc in customs_desc_map.items():
+                        if count < 5:
+                            print(f"  Mapping: {part_num} -> {desc}")
+                            count += 1
+                        else:
+                            break
+
+                # 应用映射到invoice_df
+                if customs_desc_map and 'Part Number' in invoice_df.columns:
+                    print(f"Applying customs description mapping to import invoice {reimport_file_name}")
+                    # 创建一个新列来存储映射的值
+                    invoice_df['Commodity Description (Customs)'] = invoice_df['Part Number'].map(customs_desc_map)
+
+                    # 检查映射结果
+                    mapped_count = invoice_df['Commodity Description (Customs)'].notna().sum()
+                    print(f"Successfully mapped {mapped_count} out of {len(invoice_df)} rows with English customs descriptions")
+
+                    # 对于没有映射到的行，使用DESCRIPTION作为替代
+                    if mapped_count < len(invoice_df):
+                        missing_mask = invoice_df['Commodity Description (Customs)'].isna()
+                        if 'DESCRIPTION' in invoice_df.columns:
+                            invoice_df.loc[missing_mask, 'Commodity Description (Customs)'] = invoice_df.loc[missing_mask, 'DESCRIPTION']
+                            print(f"Used DESCRIPTION as fallback for {missing_mask.sum()} rows")
+                        else:
+                            print(f"WARNING: Could not find fallback for {missing_mask.sum()} rows with missing customs descriptions")
+
+                    # 确保所有行都使用了英文描述
+                    # 检查是否有中文字符
+                    def contains_chinese(text):
+                        if pd.isna(text):
+                            return False
+                        for char in str(text):
+                            if '\u4e00' <= char <= '\u9fff':
+                                return True
+                        return False
+
+                    # 找出包含中文的行
+                    chinese_mask = invoice_df['Commodity Description (Customs)'].apply(contains_chinese)
+                    chinese_count = chinese_mask.sum()
+
+                    if chinese_count > 0:
+                        print(f"WARNING: Found {chinese_count} rows with Chinese characters in Commodity Description (Customs)")
+
+                        # 尝试从result_df中找到对应的英文描述
+                        if 'Material code' in result_df.columns and 'Commodity Description (Customs)' in result_df.columns:
+                            # 创建从Material code到Commodity Description (Customs)的映射
+                            result_customs_desc_map = {}
+                            for _, row in result_df.iterrows():
+                                if pd.notna(row['Material code']) and pd.notna(row['Commodity Description (Customs)']):
+                                    # 检查是否为英文描述
+                                    if not contains_chinese(row['Commodity Description (Customs)']):
+                                        result_customs_desc_map[row['Material code']] = row['Commodity Description (Customs)']
+
+                            # 应用映射到包含中文的行
+                            for idx in invoice_df[chinese_mask].index:
+                                part_num = invoice_df.loc[idx, 'Part Number']
+                                if part_num in result_customs_desc_map:
+                                    invoice_df.loc[idx, 'Commodity Description (Customs)'] = result_customs_desc_map[part_num]
+                                    print(f"  Replaced Chinese description for {part_num} with English: {result_customs_desc_map[part_num]}")
+
+                        # 再次检查是否还有中文字符
+                        chinese_mask = invoice_df['Commodity Description (Customs)'].apply(contains_chinese)
+                        chinese_count = chinese_mask.sum()
+
+                        if chinese_count > 0:
+                            print(f"WARNING: Still have {chinese_count} rows with Chinese characters after attempted fix")
                 else:
-                    # 如果没有清关货描或者全为空，使用普通描述作为替代
-                    invoice_df['Commodity Description (Customs)'] = invoice_df['DESCRIPTION']
-                    print(f"WARNING: No valid customs description found for {reimport_file_name}, using regular description as fallback")
+                    # 如果没有映射或者没有Part Number列，尝试其他方法
+
+                    # 检查是否有进口清关货描列
+                    customs_desc_column = None
+                    for col in df.columns:
+                        if '进口清关货描' in str(col):
+                            customs_desc_column = col
+                            print(f"Found import customs description column: {customs_desc_column}")
+                            break
+
+                    if customs_desc_column and not df[customs_desc_column].isna().all():
+                        # 如果找到进口清关货描列并且不全为空，使用它
+                        print(f"Using import customs description (进口清关货描) for import invoice {reimport_file_name}")
+                        invoice_df['Commodity Description (Customs)'] = df[customs_desc_column]
+                    elif 'Commodity Description (Customs)' in result_df.columns:
+                        # 如果在原始result_df中有Commodity Description (Customs)列，尝试映射到当前invoice_df
+                        print(f"Trying to map Commodity Description (Customs) from result_df for import invoice {reimport_file_name}")
+
+                        # 创建从Material code到Commodity Description (Customs)的映射
+                        if 'Material code' in result_df.columns:
+                            result_customs_desc_map = dict(zip(result_df['Material code'], result_df['Commodity Description (Customs)']))
+
+                            # 应用映射到invoice_df
+                            if 'Part Number' in invoice_df.columns:
+                                invoice_df['Commodity Description (Customs)'] = invoice_df['Part Number'].map(result_customs_desc_map)
+                                print(f"Successfully mapped English customs descriptions to import invoice based on Part Number")
+                            else:
+                                # 如果没有Part Number列，使用DESCRIPTION作为替代
+                                invoice_df['Commodity Description (Customs)'] = invoice_df['DESCRIPTION']
+                                print(f"WARNING: No Part Number column found, using DESCRIPTION as fallback")
+                        else:
+                            # 如果没有Material code列，使用DESCRIPTION作为替代
+                            invoice_df['Commodity Description (Customs)'] = invoice_df['DESCRIPTION']
+                            print(f"WARNING: No Material code column found in result_df, using DESCRIPTION as fallback")
+                    elif 'Commodity Description (Customs)' in invoice_df.columns and not invoice_df['Commodity Description (Customs)'].isna().all():
+                        # 如果已有Commodity Description (Customs)列且不全为空，保留它
+                        print(f"Using existing customs description for import invoice {reimport_file_name}")
+                    else:
+                        # 如果没有清关货描或者全为空，使用普通描述作为替代
+                        invoice_df['Commodity Description (Customs)'] = invoice_df['DESCRIPTION']
+                        print(f"WARNING: No valid customs description found for {reimport_file_name}, using regular description as fallback")
 
                 # 调整列顺序 - 进口发票使用 Commodity Description (Customs)
                 reimport_columns = [
@@ -2703,6 +2926,50 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
 
                 # 选择需要的列
                 invoice_df = invoice_df[reimport_columns]
+
+                # 检查是否有中文字符
+                def contains_chinese(text):
+                    if pd.isna(text):
+                        return False
+                    for char in str(text):
+                        if '\u4e00' <= char <= '\u9fff':
+                            return True
+                    return False
+
+                # 检查Commodity Description (Customs)列是否包含中文
+                if 'Commodity Description (Customs)' in invoice_df.columns:
+                    chinese_mask = invoice_df['Commodity Description (Customs)'].apply(contains_chinese)
+                    chinese_count = chinese_mask.sum()
+
+                    if chinese_count > 0:
+                        print(f"WARNING: Found {chinese_count} rows with Chinese characters in Commodity Description (Customs)")
+
+                        # 尝试从customs_desc_map中找到对应的英文描述
+                        for idx in invoice_df[chinese_mask].index:
+                            part_num = invoice_df.loc[idx, 'Part Number']
+                            if part_num in customs_desc_map:
+                                invoice_df.loc[idx, 'Commodity Description (Customs)'] = customs_desc_map[part_num]
+                                print(f"  Replaced Chinese description for {part_num} with English: {customs_desc_map[part_num]}")
+
+                        # 再次检查是否还有中文字符
+                        chinese_mask = invoice_df['Commodity Description (Customs)'].apply(contains_chinese)
+                        chinese_count = chinese_mask.sum()
+
+                        if chinese_count > 0:
+                            print(f"WARNING: Still have {chinese_count} rows with Chinese characters after attempted fix")
+
+                            # 尝试从result_df中找到对应的英文描述
+                            if 'Material code' in result_df.columns and 'Commodity Description (Customs)' in result_df.columns:
+                                for idx in invoice_df[chinese_mask].index:
+                                    part_num = invoice_df.loc[idx, 'Part Number']
+                                    # 在result_df中查找对应的Material code
+                                    matching_rows = result_df[result_df['Material code'] == part_num]
+                                    if not matching_rows.empty and pd.notna(matching_rows.iloc[0]['Commodity Description (Customs)']):
+                                        # 检查是否为英文描述
+                                        desc = matching_rows.iloc[0]['Commodity Description (Customs)']
+                                        if not contains_chinese(desc):
+                                            invoice_df.loc[idx, 'Commodity Description (Customs)'] = desc
+                                            print(f"  Replaced Chinese description for {part_num} with English from result_df: {desc}")
 
                 # 保证Unit Price (CIF, USD)为美元价 - 人民币单价除以汇率转换为美元单价
                 invoice_df['Unit Price (CIF, USD)'] = round(invoice_df['Unit Price (CIF, USD)'] * exchange_rate, 4)
@@ -2755,14 +3022,44 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
                         # Get the current sheet name
                         current_sheet_name = temp_wb.sheetnames[0]
 
-                        # Create a dummy second sheet
-                        temp_wb.create_sheet("Dummy")
+                        # Create a dummy second sheet with content
+                        dummy_sheet = temp_wb.create_sheet("Dummy")
+
+                        # Add some content to the dummy sheet to ensure it's not empty
+                        dummy_sheet['A1'] = "Dummy Sheet"
+                        dummy_sheet['A2'] = "This sheet is required for merge.py compatibility"
+
+                        # Make sure the sheet is visible
+                        dummy_sheet.sheet_state = 'visible'
 
                         # Save the modified workbook
                         temp_wb.save(temp_reimport_file)
                         print(f"Added dummy second sheet to {temp_reimport_file} for merge.py compatibility")
                 except Exception as e:
                     print(f"Warning: Could not add second sheet to temporary file: {e}")
+                    # If adding a sheet fails, try recreating the file with two sheets
+                    try:
+                        # Create a new workbook with two sheets
+                        new_wb = Workbook()
+                        # Rename the default sheet
+                        ws1 = new_wb.active
+                        ws1.title = "Sheet1"
+
+                        # Add the invoice data to the first sheet
+                        for r_idx, row in enumerate(dataframe_to_rows(invoice_df, index=False), 1):
+                            for c_idx, value in enumerate(row, 1):
+                                ws1.cell(row=r_idx, column=c_idx, value=value)
+
+                        # Create a second sheet with content
+                        ws2 = new_wb.create_sheet("Dummy")
+                        ws2['A1'] = "Dummy Sheet"
+                        ws2['A2'] = "This sheet is required for merge.py compatibility"
+
+                        # Save the new workbook
+                        new_wb.save(temp_reimport_file)
+                        print(f"Recreated {temp_reimport_file} with both data and dummy sheet")
+                    except Exception as e2:
+                        print(f"Error recreating file with two sheets: {e2}")
 
                 # Now use merge.py to merge with header and footer templates
                 # Find merge.py using the find_file function defined elsewhere
