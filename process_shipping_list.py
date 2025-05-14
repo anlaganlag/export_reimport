@@ -3175,6 +3175,27 @@ def process_shipping_list(packing_list_file, policy_file, output_dir='outputs'):
     try:
         verification_xls = pd.ExcelFile(reimport_invoice_path)
         print(f"VERIFICATION - Sheets in saved reimport_invoice.xlsx: {verification_xls.sheet_names}")
+
+        # Remove the Dummy sheet if it exists
+        try:
+            wb = load_workbook(reimport_invoice_path)
+            if "Dummy" in wb.sheetnames:
+                print("Removing Dummy sheet from final file")
+                # Make sure we have at least one other sheet before removing Dummy
+                if len(wb.sheetnames) > 1:
+                    # Get the index of the Dummy sheet
+                    idx = wb.sheetnames.index("Dummy")
+                    # Remove the Dummy sheet
+                    wb.remove(wb.worksheets[idx])
+                    # Save the workbook
+                    wb.save(reimport_invoice_path)
+                    print("Successfully removed Dummy sheet")
+                else:
+                    print("Cannot remove Dummy sheet as it's the only sheet in the workbook")
+            else:
+                print("No Dummy sheet found in the workbook")
+        except Exception as e:
+            print(f"Error removing Dummy sheet: {e}")
     except Exception as e:
         print(f"Error verifying sheet names: {e}")
 
